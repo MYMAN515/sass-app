@@ -10,7 +10,7 @@ export default function TryOnHistoryPage() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ تحميل المستخدم من cookies
+  // ✅ تحميل المستخدم من الكوكيز
   useEffect(() => {
     const stored = Cookies.get('user');
     if (stored) {
@@ -21,15 +21,15 @@ export default function TryOnHistoryPage() {
         setLoading(false);
       }
     } else {
-      setLoading(false); // لا يوجد مستخدم → أوقف التحميل
+      setLoading(false); // لا يوجد مستخدم
     }
   }, []);
 
-  // ✅ تحميل السجل إذا وجد المستخدم
+  // ✅ تحميل السجل بعد وجود المستخدم
   useEffect(() => {
-    if (user === null) return; // لم يحمّل بعد
+    if (user === null) return;
     if (!user?.email) {
-      setLoading(false); // لا يوجد إيميل → لا تحاول الاتصال
+      setLoading(false);
       return;
     }
 
@@ -52,11 +52,11 @@ export default function TryOnHistoryPage() {
     <Layout title="My Try-On History">
       <div className="max-w-5xl mx-auto py-10 px-6">
         <motion.h1
-          className="text-3xl font-bold text-purple-700 dark:text-purple-300 mb-8"
+          className="text-3xl font-bold text-purple-700 dark:text-purple-300 mb-8 text-center"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          My AI Try-On History
+          My AI Try-On & Enhance History
         </motion.h1>
 
         {loading ? (
@@ -64,27 +64,29 @@ export default function TryOnHistoryPage() {
         ) : !user?.email ? (
           <p className="text-red-500 text-center">No user email found. Please log in again.</p>
         ) : records.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400">No results yet.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-center">
+            No try-on results yet. Upload a product and generate AI output!
+          </p>
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
             {records.map((item) => (
               <motion.div
-                key={item.id}
-                className="bg-white dark:bg-zinc-800 rounded-xl shadow p-4"
+                key={`${item.image_url}-${item.created_at}`}
+                className="bg-white dark:bg-zinc-800 rounded-xl shadow p-4 border border-zinc-200 dark:border-zinc-700"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
               >
                 <img
                   src={item.image_url}
-                  alt="Try-On Result"
+                  alt="Generated Image"
                   className="w-full h-64 object-cover rounded-md mb-4"
                 />
                 <p className="text-xs text-gray-500 mb-1">
                   {new Date(item.created_at).toLocaleString()}
                 </p>
-                <p className="text-sm text-gray-800 dark:text-gray-100 line-clamp-3">
+                <div className="text-xs text-gray-600 dark:text-gray-300 overflow-hidden max-h-24 whitespace-pre-line break-words">
                   {item.prompt}
-                </p>
+                </div>
               </motion.div>
             ))}
           </div>

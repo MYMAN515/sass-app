@@ -2,7 +2,6 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/dashboard/history": "pages/dashboard/history.js",
-  "/api/history": "pages/api/history.js",
-  "/": "pages/index.js"
+  "/enhance": "pages/enhance.js",
+  "/dashboard": "pages/dashboard.js"
 }

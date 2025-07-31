@@ -10,11 +10,5 @@
     "files": [
       "static/chunks/_pages-dir-browser_node_modules_next_dist_pages__error_js.js"
     ]
-  },
-  "pages\\index.js -> @/components/HeroSection": {
-    "id": "pages\\index.js -> @/components/HeroSection",
-    "files": [
-      "static/chunks/_pages-dir-browser_components_HeroSection_jsx.js"
-    ]
   }
 }
