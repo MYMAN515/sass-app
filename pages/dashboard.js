@@ -22,6 +22,12 @@ const actions = [
     description: 'Let shoppers see clothes on real models instantly.',
     href: '/tryon',
   },
+  {
+    title: '🕘 View My History',
+    description: 'Access all your AI-generated images from Try-On and Enhance in one place.',
+    href: '/dashboard/history',
+    highlight: true,
+  },
 ]
 
 const gridVariants = {
@@ -83,15 +89,24 @@ export default function Dashboard() {
           {actions.map((action) => (
             <motion.div
               key={action.title}
-              className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-6 border hover:shadow-2xl transition-all"
+              className={`rounded-2xl shadow-xl p-6 border transition-all ${
+                action.highlight
+                  ? 'bg-purple-50 dark:bg-zinc-800 border-purple-300 dark:border-purple-600 hover:shadow-purple-300'
+                  : 'bg-white dark:bg-zinc-900 hover:shadow-2xl'
+              }`}
               variants={cardVariants}
             >
-              <h2 className="text-xl font-semibold text-purple-700 dark:text-purple-300 mb-2">
+              <h2 className={`text-xl font-semibold mb-2 ${
+                action.highlight ? 'text-purple-800 dark:text-purple-300' : 'text-purple-700 dark:text-purple-300'
+              }`}>
                 {action.title}
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-4">{action.description}</p>
-              <Button variant="secondary" onClick={() => router.push(action.href)}>
-                Get Started
+              <Button
+                variant={action.highlight ? 'primary' : 'secondary'}
+                onClick={() => router.push(action.href)}
+              >
+                {action.highlight ? 'Open History' : 'Get Started'}
               </Button>
             </motion.div>
           ))}

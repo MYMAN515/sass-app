@@ -16,7 +16,7 @@ export default function Layout({ children }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.3 }}
-          className="flex-1"
+          className="flex-1 pt-20 px-4" // 👈 أضف pt-20 هنا
         >
           {children}
         </motion.main>

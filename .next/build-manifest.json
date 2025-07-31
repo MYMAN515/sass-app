@@ -28,20 +28,10 @@
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
     ],
-    "/dashboard": [
+    "/dashboard/history": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/dashboard.js"
-    ],
-    "/login": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/login.js"
-    ],
-    "/rewrite": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/rewrite.js"
+      "static/chunks/pages/dashboard/history.js"
     ]
   },
   "ampFirstPages": []

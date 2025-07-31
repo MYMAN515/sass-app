@@ -9,24 +9,47 @@ import { Button } from '@/components/ui'
 const plans = [
   {
     name: 'Pro',
-    monthly: 20,
+    monthly: 25,
     yearly: 180,
     features: ['Up to 5 Users', 'All Tools Unlocked', 'Email Support'],
     cta: 'Start 9-day Trial',
     recommended: true,
+    priceId: 'price_1RqdB6HWc2vVrAkQn7A5OtBl', // ← YOUR real Stripe Price ID for Pro
   },
   {
     name: 'Business',
     monthly: 49,
-    yearly: 468,
+    yearly: 350,
     features: ['Unlimited Users', 'Priority Support', 'AI Powered Features'],
     cta: 'Subscribe',
+    priceId: 'price_1RqfMoHWc2vVrAkQ3Y0bRKES', // ← YOUR real Stripe Price ID for Business
   },
-  
 ]
 
 export default function Pricing() {
   const [billing, setBilling] = useState('monthly')
+
+  const handleCheckout = async (priceId) => {
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ priceId }),
+      })
+
+      const data = await res.json()
+      if (data?.url) {
+        window.location.href = data.url
+      } else {
+        alert('Checkout session failed.')
+      }
+    } catch (error) {
+      console.error(error)
+      alert('Something went wrong. Please try again.')
+    }
+  }
 
   return (
     <Layout title="Pricing">
@@ -90,7 +113,10 @@ export default function Pricing() {
                     <CheckCircle2 className="w-4 h-4 text-purple-500 mt-1" />
                     {feat}
                     {feat.includes('SSO') && (
-                      <Info className="w-4 h-4 ml-1 text-zinc-400 cursor-pointer" title="Single Sign-On and Service-Level Agreements available" />
+                      <Info
+                        className="w-4 h-4 ml-1 text-zinc-400 cursor-pointer"
+                        title="Single Sign-On and Service-Level Agreements available"
+                      />
                     )}
                   </li>
                 ))}
@@ -98,6 +124,7 @@ export default function Pricing() {
               <Button
                 className="w-full"
                 variant={plan.recommended ? 'default' : 'secondary'}
+                onClick={() => handleCheckout(plan.priceId)}
               >
                 {plan.cta}
               </Button>

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { supabase } from '@/lib/supabaseClient';
 import bcrypt from 'bcryptjs';
 import * as cookie from 'cookie';
 
@@ -13,17 +12,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing email or password' });
   }
 
-  const filePath = path.join(process.cwd(), 'data', 'users.json');
-  let users = [];
-  try {
-    const fileData = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '[]';
-    users = JSON.parse(fileData);
-  } catch (e) {
-    return res.status(500).json({ error: 'Server error reading users' });
-  }
+  // ✅ Query the user from Supabase (using "Data" table)
+  const { data: user, error } = await supabase
+    .from('Data') // your actual table name
+    .select('email, password, name')
+    .eq('email', email)
+    .single();
 
-  const user = users.find((u) => u.email === email);
-  if (!user) {
+  if (error || !user) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
@@ -32,24 +28,22 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
-  // ✅ Cookie for UI (readable by Navbar)
+  // ✅ Create both readable and secure cookies
   const readableCookie = cookie.serialize('user', JSON.stringify({ email: user.email }), {
-    httpOnly: false, // ✅ Client-readable
+    httpOnly: false,
     path: '/',
     maxAge: 60 * 60 * 24 * 7,
     sameSite: 'lax',
   });
 
-  // ✅ Cookie for server (secure session)
   const secureCookie = cookie.serialize('token', 'mock-token', {
-    httpOnly: true, // ✅ Only accessible by server
+    httpOnly: true,
     path: '/',
     maxAge: 60 * 60 * 24 * 7,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
   });
 
-  // ✅ Send both
   res.setHeader('Set-Cookie', [readableCookie, secureCookie]);
 
   return res.status(200).json({

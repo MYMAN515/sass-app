@@ -1,64 +1,77 @@
-// pages/register.js
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Head from 'next/head';
 
 export default function Register() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirm: '',
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
-
-  // Password strength checker
-  const isStrongPassword = (password) => {
-    // At least 8 chars, one uppercase, one lowercase, one number, one special char
-    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(password);
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = async e => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (form.password !== form.confirm) {
-      setError('Passwords do not match');
-      return;
+  if (form.password !== form.confirm) {
+    setError('Passwords do not match');
+    return;
+  }
+
+  setLoading(true);
+  setError('');
+
+  try {
+    // Register
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Registration failed');
     }
 
-    if (!isStrongPassword(form.password)) {
-      setError('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
-      return;
+    // Auto-login after successful registration
+    const loginRes = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: form.email,
+        password: form.password,
+      }),
+    });
+
+    const loginData = await loginRes.json();
+
+    if (!loginRes.ok) {
+      throw new Error(loginData.error || 'Auto login failed');
     }
 
-    setLoading(true);
-    setError('');
+    // ✅ Redirect to protected dashboard
+    window.location.href = '/dashboard';
+  } catch (err) {
+    setError(err.message || 'Registration failed. Try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
-    try {
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
-
-      // Save to localStorage for now
-      localStorage.setItem('user', JSON.stringify({ name: form.name, email: form.email }));
-
-      // Redirect to dashboard (or login if you prefer)
-      window.location.href = '/dashboard';
-    } catch (err) {
-      setError(err.message || 'Registration failed. Try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <>
@@ -72,7 +85,9 @@ export default function Register() {
           transition={{ duration: 0.4 }}
           className="w-full max-w-md bg-white dark:bg-zinc-800 p-8 rounded-xl shadow-xl"
         >
-          <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">Create an Account</h2>
+          <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">
+            Create an Account
+          </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <input
@@ -133,4 +148,4 @@ export default function Register() {
       </div>
     </>
   );
-  }
+}
