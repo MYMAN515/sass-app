@@ -6,6 +6,11 @@ import TryOnCustomizer from '@/components/TryOnCustomizer';
 import Spinner from '@/components/Spinner';
 import Toast from '@/components/Toast';
 import Button from '@/components/Button';
+const res = await fetch('/api/tryon', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ imageUrl, prompt }), // ← make sure both are provided
+});
 
 function generateDynamicPrompt({ product, height, skinTone, background, bodyType, style, angle }) {
   return `
