@@ -17,6 +17,7 @@
     "cookie": "^1.0.2",
     "dotenv": "^17.2.1",
     "formidable": "^3.5.4",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
     "framer-motion": "^12.23.11",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
