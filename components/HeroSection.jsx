@@ -1,191 +1,193 @@
 'use client';
 
 import Image from 'next/image';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
 export default function HeroSection() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
-    <section className="relative bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] text-white min-h-screen flex flex-col items-center justify-start px-6 overflow-hidden pt-32">
-      {/* Background Effects */}
-      <div className="absolute w-[400px] h-[400px] bg-gradient-to-tr from-purple-500 to-pink-500 opacity-10 rounded-full blur-[100px] -top-20 -left-20 z-0" />
-      <div className="absolute w-[200px] h-[200px] bg-gradient-to-tr from-fuchsia-500 to-indigo-600 opacity-10 rounded-full blur-2xl -bottom-10 -right-10 z-0" />
+    <section className="w-full font-sans overflow-hidden bg-white dark:bg-zinc-900 text-black dark:text-white">
+      {/* Hero Section */}
+      <div className="relative flex flex-col-reverse md:flex-row items-center justify-between bg-[#110133] dark:bg-[#0c001d] text-white px-6 md:px-24 py-20 gap-10">
+        {/* Floating CTA */}
+        {isMobile && (
+          <div className="fixed bottom-4 right-4 z-50 animate-bounce">
+            <Link
+              href="/upload"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full shadow-lg"
+            >
+              Try Now →
+            </Link>
+          </div>
+        )}
 
-      {/* Hero Title */}
-      <motion.div
-        initial={{ opacity: 0, y: -30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="text-center max-w-5xl z-10"
-      >
-        <motion.h1
-          className="text-4xl md:text-5xl font-extrabold leading-tight tracking-tight mb-4"
-          animate={{ scale: [1, 1.02, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
+        <div className="max-w-xl z-10">
+          <motion.h1 
+            className="text-4xl md:text-5xl font-extrabold leading-tight mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            Your Product, <br />Transformed by AI ✨
+          </motion.h1>
+          <motion.p
+            className="text-lg text-white/80 dark:text-white/70 mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+          >
+            Upload a photo and watch our AI turn it into a pro-level product image.
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+          >
+            <Link
+              href="/upload"
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-pink-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg"
+            >
+              Get Started
+            </Link>
+          </motion.div>
+        </div>
+
+        <motion.div
+          className="w-full max-w-sm aspect-[9/16] relative"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.6 }}
         >
-          I couldn’t afford a studio… so I built one 🤷‍♂️
-        </motion.h1>
-
-        <p className="text-md md:text-lg text-purple-200 max-w-2xl mx-auto">
-          I wanted to sell my products. I had no gear, no time, no budget. So I built an AI that shoots the photos for me. It learns how my product looks, builds scenes, adjusts lighting, and spits out images that convert.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-wrap gap-4 justify-center mt-8">
-          <Link
-            href="/upload"
-            className="bg-purple-600 hover:bg-purple-700 transition px-6 py-3 rounded-full text-white shadow-lg hover:scale-105"
-          >
-            📸 Try the AI Studio
-          </Link>
-          <Link
-            href="/how-it-works"
-            className="bg-white hover:bg-gray-100 transition px-6 py-3 rounded-full text-purple-700 font-semibold shadow-lg hover:scale-105"
-          >
-            🔍 How It Works
-          </Link>
-        </div>
-
-        <p className="mt-4 text-sm text-gray-400">💡 All you need is a phone photo of your product.</p>
-      </motion.div>
-
-      {/* Preview */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1.2 }}
-        className="relative mt-20 w-[90%] max-w-4xl h-[360px] rounded-2xl overflow-hidden border-2 border-purple-700/20 shadow-xl bg-gradient-to-br from-black/20 to-purple-800/10 backdrop-blur-xl"
-      >
-        <Image
-          src="/ai-studio.png"
-          alt=""
-          fill
-          style={{ objectFit: 'cover' }}
-          className="rounded-xl"
-          priority
-        />
-        <div className="absolute top-4 left-4 z-[5] bg-purple-900/60 text-white text-xs px-3 py-1 rounded-full shadow-lg animate-pulse pointer-events-none">
-          Make your product look like it’s from a $10k shoot 🤑
-        </div>
-      </motion.div>
-
-      {/* Before / After — The Glow-Up */}
-<motion.div
-  className="mt-32 w-full max-w-5xl z-10"
-  initial={{ opacity: 0, y: 40 }}
-  whileInView={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.8 }}
-  viewport={{ once: true }}
->
-  <h3 className="text-3xl font-bold text-center text-white mb-3">
-    This Is What We Call a Glow-Up ✨
-  </h3>
-  <p className="text-center text-purple-300 text-sm mb-10 max-w-xl mx-auto">
-    One’s from a phone camera. The other? From an AI trained to make your product look like it just dropped a 6-figure ad campaign.
-  </p>
-  <div className="flex flex-wrap justify-center gap-8">
-    <div className="text-center">
-      <Image
-        src="/before.webp"
-        alt="Before AI"
-        width={300}
-        height={300}
-        className="rounded-xl object-cover border border-white/10 shadow-md"
-      />
-      <p className="mt-2 text-white text-xs opacity-70">BEFORE – Just vibes & low light</p>
-    </div>
-    <div className="text-center relative">
-      <Image
-        src="/after.jpg"
-        alt="After AI"
-        width={300}
-        height={300}
-        className="rounded-xl object-cover border border-purple-500 shadow-xl"
-      />
-      <div className="absolute top-2 left-2 bg-fuchsia-600 text-white text-[10px] px-2 py-[2px] rounded-full animate-pulse">
-        AI Enhanced
+          <Image
+            src="/mockup-ai.png"
+            alt="AI Product Demo"
+            fill
+            className="rounded-2xl object-cover shadow-xl"
+          />
+        </motion.div>
       </div>
-      <p className="mt-2 text-white text-xs font-semibold tracking-wide text-purple-200">
-        AFTER – Looks like a $10k shoot
-      </p>
-    </div>
-  </div>
-</motion.div>
 
+      {/* Features Section */}
+      <div className="bg-white dark:bg-zinc-800 py-20 px-6 md:px-24">
+        <motion.h2 
+          className="text-3xl font-bold mb-12 text-black dark:text-white text-center"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          How AI Helps You Win
+        </motion.h2>
 
-      {/* Why This Is Wild */}
-      <motion.div
-        className="mt-32 w-full max-w-6xl z-10"
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        viewport={{ once: true }}
-      >
-        <h2 className="text-2xl text-center text-white font-bold mb-10">Why This Is Ridiculously Powerful</h2>
-        <div className="grid md:grid-cols-3 gap-10 text-left text-purple-100">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[{
+            title: 'Image Enhancement',
+            icon: '📷',
+            desc: 'Studio quality images at your fingertips.'
+          }, {
+            title: 'AI Try-On',
+            icon: '🧍‍♂️',
+            desc: 'Preview products on real models.'
+          }, {
+            title: 'Smart Descriptions',
+            icon: '💡',
+            desc: 'Auto-generate marketing copy instantly.'
+          }].map(({ title, icon, desc }) => (
+            <motion.div
+              key={title}
+              className="bg-gradient-to-br from-[#F0F4FF] to-white dark:from-zinc-700 dark:to-zinc-800 p-6 rounded-2xl shadow-md hover:shadow-xl transition-all text-center"
+              whileHover={{ scale: 1.05 }}
+            >
+              <div className="text-4xl mb-3">{icon}</div>
+              <h3 className="text-lg font-bold mb-2 text-black dark:text-white">{title}</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">{desc}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* Real Results Section */}
+      <div className="px-6 md:px-24 py-20">
+        <h2 className="text-3xl font-bold mb-10 text-black dark:text-white text-center">Before / After</h2>
+        <div className="flex flex-col md:flex-row gap-6 bg-white dark:bg-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="flex-1 bg-gradient-to-tr from-zinc-100 to-white dark:from-zinc-700 dark:to-zinc-800 p-6 text-center text-lg font-semibold text-zinc-800 dark:text-white flex flex-col justify-center">
+            ✨ Just one click → Amazing difference
+          </div>
+          <div className="flex-1 flex items-center justify-center relative">
+            <Image
+              src="/before-after-bottle.jpg"
+              alt="Before and After"
+              width={500}
+              height={300}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute top-4 left-4 text-xs text-black font-semibold bg-white px-2 py-1 rounded-full shadow">
+              Before
+            </div>
+            <div className="absolute top-4 right-4 text-xs text-white font-semibold bg-green-500 px-2 py-1 rounded-full shadow">
+              After
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-[#0f0320] text-white py-20 px-6">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-14">
+          How It Works
+        </h2>
+        <div className="flex flex-col md:flex-row justify-center items-center gap-12 relative max-w-6xl mx-auto">
+          {/* Timeline Line */}
+          <div className="hidden md:block absolute top-1/2 w-full h-1 bg-purple-700 z-0"></div>
+
           {[
             {
-              title: "🧠 Your Own AI Model",
-              desc: "We train a mini AI on your product. It learns your angles, textures, shadows — and builds scenes from scratch that look stunning."
+              title: 'Upload',
+              desc: 'Add your product photo',
+              icon: '📤',
             },
             {
-              title: "⚡ No Studio, No Problem",
-              desc: "No photographer. No gear. Just snap a photo with your phone, and we’ll turn it into a premium shot."
+              title: 'Enhance',
+              desc: 'AI-powered top quality',
+              icon: '⚙️',
             },
             {
-              title: "💰 The Images Sell Themselves",
-              desc: "Seriously. You just upload and wait. The results look so real, you’ll question how you even did this without AI."
-            }
-          ].map(({ title, desc }) => (
-            <div key={title} className="bg-white/5 p-6 rounded-xl border border-purple-500/10 shadow-lg">
-              <h4 className="text-lg font-bold mb-2">{title}</h4>
-              <p className="text-sm text-purple-200">{desc}</p>
+              title: 'Download',
+              desc: 'Get stunning result',
+              icon: '📥',
+            },
+          ].map((step, idx) => (
+            <div
+              key={idx}
+              className="bg-[#180a30] z-10 rounded-xl px-6 py-8 text-center shadow-xl w-full md:w-1/3"
+            >
+              <div className="w-12 h-12 mx-auto mb-4 bg-purple-600 rounded-full flex items-center justify-center text-white text-2xl">
+                {step.icon}
+              </div>
+              <h3 className="font-semibold text-xl mb-1">{step.title}</h3>
+              <p className="text-sm text-gray-300">{step.desc}</p>
             </div>
           ))}
         </div>
-      </motion.div>
-
-      {/* Testimonial */}
-      <motion.div
-        className="mt-32 text-center max-w-2xl z-10"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 1 }}
-        viewport={{ once: true }}
-      >
-        <h2 className="text-3xl font-bold mb-4">"I swear AI took these shots — I didn’t touch a thing 😭"</h2>
-        <p className="text-purple-300">— Real Customer (we didn’t pay him to say that)</p>
-      </motion.div>
-
-      {/* Final CTA */}
-      <motion.div
-        className="mt-24 mb-20 bg-gradient-to-tr from-purple-700 via-fuchsia-700 to-pink-600 p-10 rounded-2xl text-white text-center max-w-3xl shadow-2xl"
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1 }}
-        viewport={{ once: true }}
-      >
-        <h3 className="text-2xl font-semibold mb-2">Let AI Shoot Your Products. You Chill.</h3>
-        <p className="text-purple-100 mb-6">Upload your product. Come back in 2 minutes. Watch the magic happen.</p>
-        <div className="flex flex-wrap justify-center gap-4">
-          <Link href="/upload" className="bg-white text-purple-800 px-5 py-3 rounded-full font-semibold hover:scale-105 transition">
-            🚀 Try It Now
-          </Link>
-          <Link href="/pricing" className="text-white border border-white px-5 py-3 rounded-full hover:bg-white hover:text-purple-700 transition">
-            💸 Pricing
-          </Link>
-        </div>
-        
-      </motion.div>
-       {/* Bottom CTA */}
-        <motion.button
-          className="fixed bottom-6 right-6 bg-gradient-to-tr from-pink-500 to-indigo-600 text-white px-5 py-3 rounded-full shadow-xl hover:scale-105"
-          whileHover={{ scale: 1.1 }}
-          transition={{ duration: 0.3 }}
-          onClick={() => router.push('/enhance')}
+      </div>
+      {/* Final Call to Action */}
+      <div className="px-6 md:px-24 pb-20 text-center">
+        <motion.h2
+          className="text-2xl md:text-3xl font-bold text-black dark:text-white"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
         >
-          🚀 Launch Something
-        </motion.button>
+          Your products deserve better. Start now.
+        </motion.h2>
+      </div>
     </section>
   );
 }

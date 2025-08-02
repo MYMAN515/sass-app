@@ -1,93 +1,163 @@
-// ✅ Premium AI Try-On Page: modern layout, animation-rich, responsive, with smart prompt logic
+// ✅ TryOnPage.js — Fully updated version for AI Try-On Experience
 
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import TryOnCustomizer from '@/components/TryOnCustomizer';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Poppins } from 'next/font/google';
 import Spinner from '@/components/Spinner';
 import Toast from '@/components/Toast';
 import Button from '@/components/Button';
+import TryOnCustomizer from '@/components/TryOnCustomizer';
+import generateDynamicPrompt from '@/lib/generateDynamicPrompt';
 import { uploadImageToSupabase } from '@/lib/uploadImageToSupabase';
-function generateDynamicPrompt({ product, height, skinTone, background, bodyType, style, angle }) {
-  return `
-Generate a high-resolution studio-quality image of a realistic ${skinTone} fashion model with a ${bodyType} body type and ${height} height, wearing the uploaded ${product}. The model should appear as if part of a professional fashion photoshoot for a ${style} e-commerce website (e.g., Zara, ASOS, Farfetch).
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-Model Pose: Model should be standing in a natural, relaxed position, arms slightly apart from the body to avoid covering the garment. The pose should be captured from a ${angle} angle. Full body or upper half should be visible depending on image crop.
+const poppins = Poppins({ subsets: ['latin'], weight: ['400','600','700'], display: 'swap' });
 
-Model Look: Fashion-forward, clean, with good posture. Modern hairstyle and neutral expression are essential.
+const presetOptions = [
+  {
+    id: 'casual',
+    title: 'Casual Outfit',
+    img: '/presets/casual.png',
+    options: {
+      gender: 'Female',
+      product: 'T-Shirt and Jeans',
+      height: 'Average',
+      skinTone: 'Medium',
+      background: 'Urban Street',
+      bodyType: 'Slim',
+      style: 'Streetwear',
+      angle: 'Front',
+    },
+  },
+  {
+    id: 'luxury',
+    title: 'Luxury Dress',
+    img: '/presets/luxury-dress.png',
+    options: {
+      gender: 'Female',
+      product: 'Evening Dress',
+      height: 'Tall',
+      skinTone: 'Light',
+      background: 'Plain White',
+      bodyType: 'Curvy',
+      style: 'Luxury',
+      angle: '3/4 Angle',
+    },
+  },
+  {
+    id: 'sporty',
+    title: 'Sporty Look',
+    img: '/presets/sporty.png',
+    options: {
+      gender: 'Female',
+      product: 'Sportswear Set',
+      height: 'Short',
+      skinTone: 'Dark',
+      background: 'Urban Street',
+      bodyType: 'Athletic',
+      style: 'Catalog',
+      angle: 'Side',
+    },
+  },
+];
 
-Clothing Fit: Ensure the ${product} fits naturally and accurately on the model’s body. Include realistic shadows under arms, around edges, buttons, and any folds or design elements.
+const containerVariants = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
+const itemVariants = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 
-Lighting: Soft, evenly distributed studio lighting that highlights garment details, stitching, and fabric texture. Shadows should appear under the neck, around arms, and waistline.
+const PresetCard = React.memo(({ preset, selected, onClick }) => (
+  <motion.div
+    variants={itemVariants}
+    onClick={onClick}
+    className={`cursor-pointer p-4 rounded-3xl shadow-lg transition-all border ${
+      selected ? 'border-purple-600 scale-105' : 'border-gray-200 dark:border-zinc-700'
+    } bg-white dark:bg-zinc-800`}
+  >
+    <img src={preset.img} alt={preset.title} className="w-full h-24 object-cover mb-2 rounded-lg" />
+    <h3 className="text-sm text-center font-medium text-gray-800 dark:text-gray-200">
+      {preset.title}
+    </h3>
+  </motion.div>
+));
 
-Background: Use a ${background} background. It should be plain and softly blurred to mimic a premium studio shoot with no distractions.
-
-Camera Framing: High-resolution, front-facing or as per selected angle, with clean composition suitable for display in professional catalogs or global e-commerce platforms.
-
-Fabric Detail: Preserve all details of the original item such as patterns, logos, prints, tags, creases, and stitching. Avoid any blurring, melting, or distortion of the fabric.
-
-Photographic Quality: The final output must look like it was shot by a professional fashion photographer for use in a luxury clothing brand’s online store.
-
-Output: High-resolution, clean edges, no watermark, no text overlays.
-`.trim();
-}
 export default function TryOnPage() {
   const [file, setFile] = useState(null);
-  const [uploadedImage, setUploadedImage] = useState('');
-  const [options, setOptions] = useState({});
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState(null);
+  const [useCustom, setUseCustom] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [useCustomPrompt, setUseCustomPrompt] = useState(false);
+  const [options, setOptions] = useState({});
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const carouselRef = useRef(null);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      setToast({ show: true, message: 'Unsupported file type.', type: 'error' });
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const valid = ['image/jpeg','image/png','image/jpg','image/webp'];
+    if (!valid.includes(f.type)) {
+      setToast({ show: true, message: 'Only JPG/PNG/WEBP allowed.', type: 'error' });
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setToast({ show: true, message: 'Max file size is 5MB.', type: 'error' });
+    if (f.size > 5 * 1024 * 1024) {
+      setToast({ show: true, message: 'Max size 5MB.', type: 'error' });
       return;
     }
-    setFile(file);
-    setUploadedImage(URL.createObjectURL(file));
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(f);
+    setPreviewUrl(url);
+    setFile(f);
+    setSelectedPreset(null);
     setResult(null);
   };
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = result;
-    link.download = 'ai-tryon.jpg';
-    link.click();
+  const selectPreset = (preset) => {
+    setSelectedPreset(preset.id);
+    setUseCustom(false);
+    setCustomPrompt('');
+    setOptions(preset.options);
+  };
+
+  const toggleCustom = () => {
+    setUseCustom(prev => {
+      const next = !prev;
+      if (next) setSelectedPreset(null);
+      return next;
+    });
+  };
+
+  const scroll = (dir) => {
+    if (!carouselRef.current) return;
+    const offset = 240;
+    carouselRef.current.scrollBy({ left: dir === 'left' ? -offset : offset, behavior: 'smooth' });
   };
 
   const handleGenerate = async () => {
     if (!file) {
-      setToast({ show: true, message: 'Upload an image first.', type: 'error' });
+      setToast({ show: true, message: 'Please upload an image.', type: 'error' });
       return;
     }
     setLoading(true);
-    setResult(null);
-    try {
-      const imageUrl = await uploadImageToSupabase(file);
-      const prompt = useCustomPrompt ? customPrompt : generateDynamicPrompt(options);
+    setToast({ show: false, message: '', type: 'success' });
+    const prompt = useCustom ? customPrompt : generateDynamicPrompt(options);
 
+    try {
+      const url = await uploadImageToSupabase(file);
       const res = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, prompt }),
+        body: JSON.stringify({ imageUrl: url, prompt }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Generation failed');
-
       setResult(data.output);
-      setToast({ show: true, message: 'Try-On complete!', type: 'success' });
+      setToast({ show: true, message: 'Try-On image ready!', type: 'success' });
     } catch (err) {
       setToast({ show: true, message: err.message, type: 'error' });
     } finally {
@@ -95,97 +165,88 @@ export default function TryOnPage() {
     }
   };
 
+  useEffect(() => {
+    if (carouselRef.current) carouselRef.current.scrollTo({ left: 0 });
+  }, []);
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] text-white px-4 py-20 flex flex-col items-center justify-center font-sans">
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-6xl space-y-12"
-      >
-        <div className="text-center space-y-3">
-          <motion.h1
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight"
-          >
-            🧠 Try-On Anything with AI
-          </motion.h1>
-          <p className="text-purple-200 max-w-2xl mx-auto text-lg">
-            Upload a clothing image and visualize it on a model with studio-level quality. Customize or write your own prompt.
-          </p>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
-          className="bg-zinc-900 border border-zinc-700 p-6 sm:p-8 rounded-3xl shadow-xl space-y-6"
-        >
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-purple-300 mb-2">🖼️ Select your product image</label>
-              <input
-                type="file"
-                accept="image/png, image/jpeg, image/jpg, image/webp"
-                onChange={handleFileChange}
-                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-sm text-white cursor-pointer"
-              />
-              {uploadedImage && (
-                <img src={uploadedImage} alt="preview" className="mt-4 rounded-xl border border-purple-500 shadow max-h-[300px] mx-auto" />
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 text-sm text-white">
-                <input
-                  type="checkbox"
-                  checked={useCustomPrompt}
-                  onChange={() => setUseCustomPrompt(!useCustomPrompt)}
-                />
-                ✏️ Write custom AI prompt
-              </label>
-              {useCustomPrompt ? (
-                <textarea
-                  className="w-full bg-zinc-800 border border-zinc-600 rounded-md p-3 text-sm"
-                  rows={6}
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="e.g., Generate a realistic model wearing a red t-shirt on clean background from side angle."
-                />
-              ) : (
-                <TryOnCustomizer onChange={setOptions} />
-              )}
-            </div>
-          </div>
-
-          <div className="text-center">
-            <Button onClick={handleGenerate} disabled={loading} variant="primary">
-              {loading ? <Spinner /> : '🚀 Generate Try-On Image'}
-            </Button>
-          </div>
-        </motion.div>
-
-        {result && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="text-center space-y-4"
-          >
-            <h2 className="text-xl text-purple-300 font-semibold">✅ AI Result</h2>
-            <img
-              src={result}
-              alt="Generated"
-              className="rounded-2xl shadow-2xl border border-purple-600 max-w-[90vw] max-h-[80vh] mx-auto"
-            />
-            <Button onClick={handleDownload} variant="secondary">⬇️ Download Result</Button>
-          </motion.div>
-        )}
-      </motion.div>
-
+    <main className={`${poppins.className} min-h-screen bg-gradient-to-b from-white to-purple-50 dark:from-zinc-900 dark:to-purple-900 text-gray-900 dark:text-gray-100 py-20`}>
       <Toast show={toast.show} message={toast.message} type={toast.type} />
+      <div className="px-6 md:px-24 mx-auto space-y-32">
+
+        {/* Upload Section */}
+        <motion.section initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.5 }}>
+          <h2 className="text-3xl font-semibold mb-4 text-center">Upload Clothing Photo</h2>
+          <div className="flex justify-center mb-6"><div className="w-20 h-1 bg-purple-600 rounded" /></div>
+          <div className="max-w-md mx-auto bg-white dark:bg-zinc-800 rounded-3xl p-8 shadow-xl">
+            <label className="block mb-4">
+              <div className="w-full bg-gray-100 dark:bg-zinc-700 rounded-lg p-4 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-600 transition cursor-pointer">
+                <span className="text-gray-600 dark:text-gray-300">{file?.name || 'Click to choose an image'}</span>
+                <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              </div>
+            </label>
+            {previewUrl && <motion.img src={previewUrl} alt="preview" className="w-full rounded-2xl" initial={{ opacity:0 }} animate={{ opacity:1 }} />}
+          </div>
+        </motion.section>
+
+        {/* Presets Carousel */}
+        <motion.section initial={{ opacity:0, y:20 }} whileInView={{ opacity:1, y:0 }} transition={{ duration:0.5 }}>
+          <h2 className="text-3xl font-semibold mb-4 text-center">Choose a Try-On Style</h2>
+          <div className="flex justify-center mb-6"><div className="w-20 h-1 bg-purple-600 rounded" /></div>
+          <div className="relative max-w-4xl mx-auto">
+            <button onClick={() => scroll('left')} className="absolute left-0 top-1/2 -translate-y-1/2 bg-white/50 dark:bg-zinc-800 p-2 rounded-full shadow-lg z-10 hover:bg-white dark:hover:bg-zinc-700 transition">
+              <ChevronLeft size={24} />
+            </button>
+            <motion.div ref={carouselRef} className="flex space-x-6 overflow-x-auto scrollbar-hide py-4" variants={containerVariants} initial="hidden" animate="show">
+              {presetOptions.map(p => (
+                <PresetCard key={p.id} preset={p} selected={selectedPreset === p.id} onClick={() => selectPreset(p)} />
+              ))}
+            </motion.div>
+            <button onClick={() => scroll('right')} className="absolute right-0 top-1/2 -translate-y-1/2 bg-white/50 dark:bg-zinc-800 p-2 rounded-full shadow-lg z-10 hover:bg-white dark:hover:bg-zinc-700 transition">
+              <ChevronRight size={24} />
+            </button>
+          </div>
+        </motion.section>
+
+        {/* Customize Prompt */}
+        <motion.section initial={{ opacity:0, y:20 }} whileInView={{ opacity:1, y:0 }} transition={{ duration:0.5 }}>
+          <h2 className="text-3xl font-semibold mb-4 text-center">Customize Try-On Prompt</h2>
+          <div className="flex justify-center mb-6"><div className="w-20 h-1 bg-purple-600 rounded" /></div>
+          <div className="max-w-md mx-auto bg-white dark:bg-zinc-800 rounded-3xl p-8 shadow-xl space-y-4">
+            <label className="flex items-center space-x-2">
+              <input type="checkbox" checked={useCustom} onChange={toggleCustom} className="accent-purple-600" />
+              <span className="font-medium">Use custom prompt</span>
+            </label>
+            {useCustom
+              ? <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} rows={4} className="w-full bg-gray-100 dark:bg-zinc-700 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 transition" placeholder="Type your prompt..." />
+              : <TryOnCustomizer onChange={setOptions} />
+            }
+          </div>
+        </motion.section>
+
+        {/* Generate Button */}
+        <motion.section initial={{ opacity:0 }} whileInView={{ opacity:1 }} transition={{ duration:0.5 }} className="text-center">
+          <Button onClick={handleGenerate} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg transition">
+            {loading ? <Spinner /> : 'Generate Try-On'}
+          </Button>
+        </motion.section>
+
+        {/* Result Display */}
+        {result && (
+          <motion.section initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.5 }}>
+            <h2 className="text-3xl font-semibold mb-4 text-center">Result</h2>
+            <div className="flex justify-center mb-6"><div className="w-20 h-1 bg-purple-600 rounded" /></div>
+            <AnimatePresence>
+              {!loading && <motion.img src={result} alt="result" className="w-full max-w-md mx-auto rounded-2xl border border-purple-600 shadow-xl" initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }} />}
+            </AnimatePresence>
+          </motion.section>
+        )}
+      </div>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </main>
   );
 }

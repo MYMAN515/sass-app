@@ -8,6 +8,7 @@ export default function TryOnCustomizer({ onChange }) {
     height: 'Average',
     skinTone: 'Medium',
     background: 'Beige Studio',
+    
     bodyType: 'Athletic',
     style: 'Catalog',
     angle: 'Front',
@@ -36,6 +37,8 @@ export default function TryOnCustomizer({ onChange }) {
 
       <div className="grid md:grid-cols-3 sm:grid-cols-2 gap-6">
         {[
+          { label: 'Model Gender', name: 'gender', options: ['Female', 'Male'] },
+          { label: 'Model Age', name: 'Age', options: ['Child', 'Teen', 'Adult', 'Senior'] },
           { label: 'Product Type', name: 'product', options: ['Shirt', 'T-Shirt', 'Jacket', 'Sweater', 'Pants', 'Jeans', 'Shorts', 'Dress', 'Skirt', 'Hoodie'] },
           { label: 'Model Height', name: 'height', options: ['Short', 'Average', 'Tall'] },
           { label: 'Skin Tone', name: 'skinTone', options: ['Light', 'Medium', 'Dark'] },
