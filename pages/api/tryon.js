@@ -1,11 +1,26 @@
 // pages/api/tryon.js
+<<<<<<< HEAD
+=======
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+>>>>>>> 292c6fba (New Front-end | Back-End|)
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
+<<<<<<< HEAD
 
   const { imageUrl, prompt } = req.body;
+=======
+  
+  const { imageUrl, prompt } = req.body || {};
+
+
+>>>>>>> 292c6fba (New Front-end | Back-End|)
   if (!imageUrl || !prompt) {
     return res.status(400).json({ error: 'Missing imageUrl or prompt' });
   }

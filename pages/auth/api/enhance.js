@@ -17,12 +17,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing imageUrl or prompt' });
   }
 
-<<<<<<< HEAD
-  console.log("✅ Replicate request starting...");
-  console.log("🖼️ imageUrl:", imageUrl);
-  console.log("📜 prompt:", prompt);
-=======
->>>>>>> 292c6fba (New Front-end | Back-End|)
 
   try {
     const start = await fetch('https://api.replicate.com/v1/predictions', {
@@ -56,10 +50,6 @@ export default async function handler(req, res) {
     const statusUrl = startData.urls.get;
     let output = null;
 
-<<<<<<< HEAD
-    console.log("⏳ Polling generation status...");
-=======
->>>>>>> 292c6fba (New Front-end | Back-End|)
 
     while (true) {
       const pollRes = await fetch(statusUrl, {
@@ -70,18 +60,11 @@ export default async function handler(req, res) {
 
       if (pollData.status === 'succeeded') {
         output = pollData.output;
-<<<<<<< HEAD
-        console.log("✅ Generation succeeded:", output);
-=======
->>>>>>> 292c6fba (New Front-end | Back-End|)
         break;
       }
 
       if (pollData.status === 'failed') {
-<<<<<<< HEAD
         console.error("❌ Generation failed:", pollData);
-=======
->>>>>>> 292c6fba (New Front-end | Back-End|)
         return res.status(500).json({ error: 'AI generation failed' });
       }
 

@@ -110,4 +110,8 @@ export default function LoginPage() {
       </motion.div>
     </main>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 292c6fba (New Front-end | Back-End|)

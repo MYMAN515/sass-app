@@ -35,4 +35,8 @@ export default function App({ Component, pageProps }) {
       </main>
     </>
   )
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 292c6fba (New Front-end | Back-End|)
