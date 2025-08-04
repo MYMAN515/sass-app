@@ -172,7 +172,7 @@ export default function EnhanceCustomizer({ onChange, onComplete }) {
     if (stepIndex < fields.length - 1) {
       setStepIndex(stepIndex + 1);
     } else {
-      onComplete?.(updated); // ✅ يرجع الفورم كامل بعد آخر اختيار
+      onComplete?.(updated); // ✅ Final step triggers completion
     }
   };
 
@@ -191,20 +191,22 @@ export default function EnhanceCustomizer({ onChange, onComplete }) {
 
   return (
     <motion.div
-      className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-3xl p-8 shadow-xl max-w-3xl mx-auto mt-12"
+      className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-3xl p-6 sm:p-8 shadow-xl w-full max-w-3xl mx-auto mt-10 sm:mt-12"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-semibold text-zinc-900 dark:text-white">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2 sm:gap-0">
+        <h2 className="text-2xl sm:text-3xl font-semibold text-zinc-900 dark:text-white">
           🎨 Enhance Product Image
         </h2>
-        <p className="text-sm text-zinc-400 dark:text-zinc-300">
+        <p className="text-sm text-zinc-500 dark:text-zinc-300">
           Step {stepIndex + 1} of {fields.length}
         </p>
       </div>
 
+      {/* Field Step */}
       <AnimatePresence mode="wait">
         {current && (
           <motion.div
@@ -214,6 +216,7 @@ export default function EnhanceCustomizer({ onChange, onComplete }) {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4 }}
           >
+            {/* Label + Edit */}
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-zinc-800 dark:text-white">
                 {current.label}
@@ -229,6 +232,7 @@ export default function EnhanceCustomizer({ onChange, onComplete }) {
               )}
             </div>
 
+            {/* Custom Input or Options */}
             {customEdit[current.name] ? (
               <>
                 <input
@@ -243,7 +247,7 @@ export default function EnhanceCustomizer({ onChange, onComplete }) {
                 <p className="text-xs text-zinc-400 mt-2">Type your own value and click Done.</p>
               </>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {current.options.map((opt) => (
                   <button
                     key={opt}
