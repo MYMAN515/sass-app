@@ -1,32 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-<<<<<<< HEAD
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/router';
-import Cookies from 'js-cookie';
-import { MoonIcon, SunIcon, Bars3Icon } from '@heroicons/react/24/solid';
-=======
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
 import { AnimatePresence, motion } from 'framer-motion';
 import { MoonIcon, SunIcon, Bars3Icon } from '@heroicons/react/24/solid';
 import { supabase } from '@/lib/supabaseClient';
->>>>>>> 292c6fba (New Front-end | Back-End|)
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState(false);
   const [user, setUser] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
-<<<<<<< HEAD
-=======
   const [plan, setPlan] = useState(null);
   const [credits, setCredits] = useState(null);
 
->>>>>>> 292c6fba (New Front-end | Back-End|)
   const router = useRouter();
 
   useEffect(() => {
@@ -54,8 +43,6 @@ export default function Navbar() {
     }
   }, []);
 
-<<<<<<< HEAD
-=======
   useEffect(() => {
     const fetchUserData = async () => {
       if (user?.email) {
@@ -73,7 +60,6 @@ export default function Navbar() {
     fetchUserData();
   }, [user]);
 
->>>>>>> 292c6fba (New Front-end | Back-End|)
   const toggleTheme = () => {
     const next = !dark;
     setDark(next);
@@ -83,11 +69,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await fetch('/api/logout');
-<<<<<<< HEAD
-    Cookies.remove('user', { path: '/' });
-=======
     Cookies.remove('user');
->>>>>>> 292c6fba (New Front-end | Back-End|)
     setUser(null);
     router.push('/');
   };
@@ -100,20 +82,6 @@ export default function Navbar() {
 
   return (
     <motion.header
-<<<<<<< HEAD
-      className={`fixed top-0 w-full z-50 transition-all px-4 py-3 backdrop-blur-md bg-zinc-900/80 text-white shadow-md`}
-      initial={{ y: -50, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-    >
-      <div className="max-w-6xl mx-auto flex justify-between items-center">
-        {/* Logo */}
-        <h1 className="text-lg font-bold text-white">AI Store Assistant</h1>
-
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex gap-6 text-sm">
-          {links.map(({ label, href }) => (
-            <Link key={href} href={href} className="hover:text-purple-400">
-=======
       className={`fixed top-0 w-full z-50 backdrop-blur-md bg-white/70 dark:bg-zinc-900/80 transition-all shadow-md ${scrolled ? 'border-b border-zinc-200 dark:border-zinc-700' : ''}`}
       initial={{ y: -50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
@@ -130,23 +98,11 @@ export default function Navbar() {
               href={href}
               className={`transition-colors duration-300 hover:text-purple-500 ${router.pathname === href ? 'text-purple-600 dark:text-purple-400' : 'text-zinc-700 dark:text-zinc-300'}`}
             >
->>>>>>> 292c6fba (New Front-end | Back-End|)
               {label}
             </Link>
           ))}
         </nav>
 
-<<<<<<< HEAD
-        {/* Desktop Right Side */}
-        <div className="hidden md:flex items-center gap-3">
-          <button onClick={toggleTheme} className="p-2 rounded-md bg-zinc-800">
-            {dark ? <SunIcon className="w-4 h-4 text-yellow-300" /> : <MoonIcon className="w-4 h-4 text-purple-400" />}
-          </button>
-          {user && (
-            <div className="text-sm text-zinc-200 flex gap-2 items-center">
-              <span>{user.email}</span>
-              <button onClick={handleLogout} className="text-purple-300 hover:underline">Log out</button>
-=======
         <div className="hidden md:flex items-center gap-5">
           <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition">
             {dark ? (
@@ -179,57 +135,25 @@ export default function Navbar() {
               <Link href="/register" className="border border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition">
                 Register
               </Link>
->>>>>>> 292c6fba (New Front-end | Back-End|)
             </div>
           )}
         </div>
 
-<<<<<<< HEAD
-        {/* Hamburger Menu */}
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="md:hidden w-8 h-8 flex items-center justify-center rounded-md bg-zinc-800 text-purple-300"
-=======
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className="md:hidden p-2 rounded-lg bg-zinc-100 dark:bg-zinc-700 text-purple-500"
->>>>>>> 292c6fba (New Front-end | Back-End|)
           aria-label="Toggle menu"
         >
           <Bars3Icon className="w-6 h-6" />
         </button>
       </div>
 
-<<<<<<< HEAD
-      {/* Mobile Menu */}
-=======
->>>>>>> 292c6fba (New Front-end | Back-End|)
       <AnimatePresence>
         {menuOpen && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-<<<<<<< HEAD
-            className="md:hidden mt-3 bg-zinc-800 rounded-xl px-4 py-4 space-y-4 text-white"
-          >
-            <div className="space-y-2">
-              {links.map(({ label, href }) => (
-                <Link key={href} href={href} className="block text-base font-medium hover:text-purple-300">
-                  {label}
-                </Link>
-              ))}
-            </div>
-            <hr className="border-zinc-700" />
-            <div className="flex items-center justify-between">
-              <button onClick={toggleTheme} className="p-2 rounded-md bg-zinc-700">
-                {dark ? <SunIcon className="w-5 h-5 text-yellow-300" /> : <MoonIcon className="w-5 h-5 text-purple-400" />}
-              </button>
-              {user && (
-                <div className="text-sm">
-                  <p className="mb-1 text-white text-xs sm:text-sm">{user.email}</p>
-                  <button onClick={handleLogout} className="text-purple-300 hover:underline text-xs sm:text-sm">Log out</button>
-=======
             className="md:hidden mx-4 mt-3 bg-white dark:bg-zinc-800 rounded-xl px-5 py-5 shadow-md space-y-4"
           >
             {links.map(({ label, href }) => (
@@ -262,7 +186,6 @@ export default function Navbar() {
                   <Link href="/register" className="block text-center text-sm font-medium border border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white px-4 py-2 rounded-md">
                     Register
                   </Link>
->>>>>>> 292c6fba (New Front-end | Back-End|)
                 </div>
               )}
             </div>
