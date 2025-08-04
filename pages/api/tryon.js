@@ -1,26 +1,18 @@
 // pages/api/tryon.js
-<<<<<<< HEAD
-=======
+
 export const config = {
   api: {
     bodyParser: true,
   },
 };
->>>>>>> 292c6fba (New Front-end | Back-End|)
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
-<<<<<<< HEAD
 
-  const { imageUrl, prompt } = req.body;
-=======
-  
   const { imageUrl, prompt } = req.body || {};
 
-
->>>>>>> 292c6fba (New Front-end | Back-End|)
   if (!imageUrl || !prompt) {
     return res.status(400).json({ error: 'Missing imageUrl or prompt' });
   }
@@ -30,7 +22,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Replicate API token not set' });
   }
 
-  // Start the prediction
   const startRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -38,7 +29,7 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      version: 'black-forest-labs/flux-kontext-pro',
+      version: 'black-forest-labs/flux-kontext-max',
       input: {
         prompt,
         input_image: imageUrl,
@@ -58,11 +49,10 @@ export default async function handler(req, res) {
     });
   }
 
-  // Poll for the result
   const statusUrl = startData.urls.get;
   let output = null;
   let pollCount = 0;
-  const maxPolls = 30; // ~1 minute
+  const maxPolls = 30;
 
   while (pollCount < maxPolls) {
     const pollRes = await fetch(statusUrl, {

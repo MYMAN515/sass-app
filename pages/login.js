@@ -44,7 +44,6 @@ export default function LoginPage() {
         transition={{ duration: 0.7 }}
         className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl p-8 space-y-6 relative"
       >
-        {/* زر الرجوع */}
         <button
           onClick={() => router.back()}
           className="absolute top-4 left-4 text-sm text-purple-600 dark:text-purple-300 hover:underline"
@@ -56,7 +55,6 @@ export default function LoginPage() {
           Login to AI Store Assistant
         </h1>
 
-        {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <input
             type="email"
@@ -85,24 +83,21 @@ export default function LoginPage() {
           )}
         </form>
 
-        {/* Divider */}
         <div className="flex items-center justify-center gap-2">
           <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
           <span className="text-xs text-zinc-500 dark:text-zinc-400">or continue with</span>
           <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
         </div>
 
-        {/* Google Login */}
         <button
           onClick={() => (window.location.href = '/api/login-with-google')}
           className="w-full flex items-center justify-center gap-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:shadow-md transition py-3 rounded-xl"
         >
           <img
-  src="https://www.svgrepo.com/show/475656/google-color.svg"
-  alt="Google"
-  className="w-5 h-5"
-/>
-
+            src="https://www.svgrepo.com/show/475656/google-color.svg"
+            alt="Google"
+            className="w-5 h-5"
+          />
           <span className="text-sm font-medium text-zinc-700 dark:text-white">
             Sign in with Google
           </span>
@@ -110,8 +105,4 @@ export default function LoginPage() {
       </motion.div>
     </main>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 292c6fba (New Front-end | Back-End|)

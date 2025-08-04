@@ -1,26 +1,3 @@
-<<<<<<< HEAD
-// components/TryOnCustomizer.js
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-
-export default function TryOnCustomizer({ onChange }) {
-  const [options, setOptions] = useState({
-    product: 'Shirt',
-    height: 'Average',
-    skinTone: 'Medium',
-    background: 'Beige Studio',
-    
-    bodyType: 'Athletic',
-    style: 'Catalog',
-    angle: 'Front',
-  });
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    const updated = { ...options, [name]: value };
-    setOptions(updated);
-    onChange(updated);
-=======
 'use client';
 
 import { useState } from 'react';
@@ -79,54 +56,10 @@ export default function TryOnCustomizer({ onChange, onComplete }) {
       handleSelect(val);
     }
     setCustomEdit({ ...customEdit, [current.name]: false });
->>>>>>> 292c6fba (New Front-end | Back-End|)
   };
 
   return (
     <motion.div
-<<<<<<< HEAD
-      className="bg-gradient-to-br from-zinc-900 to-zinc-800 border border-purple-700 rounded-3xl p-8 shadow-2xl mb-10"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-    >
-      <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">
-        ✨ Customize your AI Try-On Experience
-      </h2>
-      <p className="text-sm text-zinc-400 mb-6">
-        Choose model preferences and styling details to visualize your product more accurately.
-      </p>
-
-      <div className="grid md:grid-cols-3 sm:grid-cols-2 gap-6">
-        {[
-          { label: 'Model Gender', name: 'gender', options: ['Female', 'Male'] },
-          { label: 'Model Age', name: 'Age', options: ['Child', 'Teen', 'Adult', 'Senior'] },
-          { label: 'Product Type', name: 'product', options: ['Shirt', 'T-Shirt', 'Jacket', 'Sweater', 'Pants', 'Jeans', 'Shorts', 'Dress', 'Skirt', 'Hoodie'] },
-          { label: 'Model Height', name: 'height', options: ['Short', 'Average', 'Tall'] },
-          { label: 'Skin Tone', name: 'skinTone', options: ['Light', 'Medium', 'Dark'] },
-          { label: 'Background', name: 'background', options: ['Beige Studio', 'Plain White', 'Urban Street'] },
-          { label: 'Body Type', name: 'bodyType', options: ['Slim', 'Athletic', 'Curvy'] },
-          { label: 'Photo Style', name: 'style', options: ['Catalog', 'Streetwear', 'Luxury'] },
-          { label: 'Pose Angle', name: 'angle', options: ['Front', 'Side', '3/4 Angle'] },
-        ].map(({ label, name, options: optionList }) => (
-          <div key={name} className="text-left">
-            <label className="block text-sm text-zinc-300 font-medium mb-1">
-              {label}
-            </label>
-            <select
-              name={name}
-              value={options[name]}
-              onChange={handleChange}
-              className="w-full bg-zinc-900 border border-zinc-700 text-white px-4 py-2 rounded-lg shadow-sm hover:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-600"
-            >
-              {optionList.map((opt) => (
-                <option key={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
-        ))}
-      </div>
-=======
       className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-3xl p-8 shadow-xl max-w-3xl mx-auto mt-12"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -140,11 +73,7 @@ export default function TryOnCustomizer({ onChange, onComplete }) {
           onClick={() => {
             const toggled = !showAdvanced;
             setShowAdvanced(toggled);
-            if (toggled) {
-              setStepIndex(2); // jump to Age
-            } else {
-              setStepIndex(0); // reset to beginning
-            }
+            setStepIndex(toggled ? 2 : 0);
           }}
           className="text-sm px-4 py-2 bg-purple-100 text-purple-700 rounded-full border border-purple-300 hover:bg-purple-200"
         >
@@ -182,9 +111,7 @@ export default function TryOnCustomizer({ onChange, onComplete }) {
                   type="text"
                   placeholder={`Enter custom ${current.name}...`}
                   value={inputBuffer[current.name]}
-                  onChange={(e) =>
-                    setInputBuffer({ ...inputBuffer, [current.name]: e.target.value })
-                  }
+                  onChange={(e) => setInputBuffer({ ...inputBuffer, [current.name]: e.target.value })}
                   className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-xl px-4 py-3 border border-zinc-300 dark:border-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
                 <p className="text-xs text-zinc-400 mt-2">Type your own value and click Done.</p>
@@ -197,10 +124,10 @@ export default function TryOnCustomizer({ onChange, onComplete }) {
                     onClick={() => handleSelect(opt)}
                     className={`rounded-xl px-4 py-3 min-h-[48px] text-sm font-medium border transition-all duration-200 flex items-center justify-center text-center
                       ${
-                      form[current.name] === opt
-                        ? 'bg-purple-600 text-white border-purple-600 shadow-md'
-                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-white border-zinc-300 dark:border-zinc-700 hover:border-purple-400'
-                    }`}
+                        form[current.name] === opt
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-md'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-white border-zinc-300 dark:border-zinc-700 hover:border-purple-400'
+                      }`}
                   >
                     {opt}
                   </button>
@@ -210,7 +137,6 @@ export default function TryOnCustomizer({ onChange, onComplete }) {
           </motion.div>
         )}
       </AnimatePresence>
->>>>>>> 292c6fba (New Front-end | Back-End|)
     </motion.div>
   );
 }

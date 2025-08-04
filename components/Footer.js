@@ -27,10 +27,7 @@ export default function Footer() {
         <div>
           <h4 className="font-bold text-white mb-3">Resources</h4>
           <ul className="space-y-2 text-sm">
-            <li><Link href="/">Docs ↗</Link></li>
             <li><Link href="/pricing">Pricing</Link></li>
-            <li><Link href="/">Changelog</Link></li>
-            <li><Link href="/">Support</Link></li>
           </ul>
         </div>
 
@@ -56,7 +53,7 @@ export default function Footer() {
         <div>
           <p className="text-white font-bold text-lg">🧠 AIStore</p>
           <p className="mt-1 text-gray-400">© 2025 AIStore. All rights reserved.</p>
-          <p className="mt-1 text-gray-500">Built with 💙 from Qais, Jordan | UAE</p>
+          <p className="mt-1 text-gray-500">Built with 🤎 from Qais, Jordan | UAE</p>
         </div>
 
         <div className="flex items-center gap-2 bg-[#22C55E] text-black px-3 py-1 rounded-full text-xs font-semibold">

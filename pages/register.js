@@ -14,75 +14,12 @@ export default function Register() {
     email: '',
     password: '',
     confirm: '',
-<<<<<<< HEAD
-=======
-    agree: false, // ✅ جديد
->>>>>>> 292c6fba (New Front-end | Back-End|)
+    agree: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e) => {
-<<<<<<< HEAD
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (form.password !== form.confirm) {
-    setError('Passwords do not match');
-    return;
-  }
-
-  setLoading(true);
-  setError('');
-
-  try {
-    // ✅ Step 1: Sign up
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-    });
-
-    if (signUpError) throw new Error(signUpError.message);
-
-    // ✅ Step 2: Immediately login to get access_token
-    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
-    });
-
-    if (loginError) throw new Error('Login failed after signup');
-
-    const token = loginData?.session?.access_token;
-    if (!token) throw new Error('Failed to get session token');
-
-    // ✅ Step 3: Send to backend API
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        name: form.name,
-        email: form.email,
-        password: form.password,
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
-
-    window.location.href = '/dashboard';
-  } catch (err) {
-    setError(err.message || 'Registration failed. Try again.');
-  } finally {
-    setLoading(false);
-  }
-};
-
-=======
     const { name, type, checked, value } = e.target;
     setForm((prev) => ({
       ...prev,
@@ -107,26 +44,21 @@ export default function Register() {
     setError('');
 
     try {
-      // ✅ Step 1: Sign up
       const { error: signUpError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
       });
-
       if (signUpError) throw new Error(signUpError.message);
 
-      // ✅ Step 2: Login to get token
       const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
         email: form.email,
         password: form.password,
       });
-
       if (loginError) throw new Error('Login failed after signup');
 
       const token = loginData?.session?.access_token;
       if (!token) throw new Error('Failed to get session token');
 
-      // ✅ Step 3: Send to backend API
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: {
@@ -150,7 +82,6 @@ export default function Register() {
       setLoading(false);
     }
   };
->>>>>>> 292c6fba (New Front-end | Back-End|)
 
   return (
     <>
@@ -212,9 +143,6 @@ export default function Register() {
               required
             />
 
-<<<<<<< HEAD
-=======
-            {/* ✅ Checkbox for Terms */}
             <div className="flex items-start gap-2 text-sm">
               <input
                 type="checkbox"
@@ -246,20 +174,10 @@ export default function Register() {
               </label>
             </div>
 
-            {/* Error */}
->>>>>>> 292c6fba (New Front-end | Back-End|)
             {error && (
               <p className="text-red-500 text-sm text-center">{error}</p>
             )}
 
-<<<<<<< HEAD
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition"
-=======
-            {/* Submit Button */}
             <motion.button
               whileTap={{ scale: 0.98 }}
               type="submit"
@@ -269,16 +187,11 @@ export default function Register() {
                   ? 'bg-zinc-400 cursor-not-allowed text-white'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
               }`}
->>>>>>> 292c6fba (New Front-end | Back-End|)
             >
               {loading ? 'Creating...' : 'Register'}
             </motion.button>
           </form>
 
-<<<<<<< HEAD
-=======
-          {/* Divider */}
->>>>>>> 292c6fba (New Front-end | Back-End|)
           <div className="flex items-center justify-center gap-2">
             <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
             <span className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -287,10 +200,6 @@ export default function Register() {
             <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
           </div>
 
-<<<<<<< HEAD
-=======
-          {/* Google Button */}
->>>>>>> 292c6fba (New Front-end | Back-End|)
           <button
             onClick={() => (window.location.href = '/api/login-with-google')}
             className="w-full flex items-center justify-center gap-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:shadow-md transition py-3 rounded-xl"
@@ -305,10 +214,6 @@ export default function Register() {
             </span>
           </button>
 
-<<<<<<< HEAD
-=======
-          {/* Already have account */}
->>>>>>> 292c6fba (New Front-end | Back-End|)
           <p className="text-sm text-center text-zinc-500 dark:text-zinc-400">
             Already have an account?{' '}
             <Link
