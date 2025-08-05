@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = {
   api: {
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' });
     }
 
-    const supabase = createServerClient(req, res);
+const supabase = createPagesServerClient({ req, res });
 
     const {
       data: { session },
