@@ -1,5 +1,4 @@
 import { createServerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 
 export const config = {
   api: {
@@ -18,7 +17,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' });
   }
 
-  const supabase = createServerClient({ cookies });
+  const supabase = createServerClient(req, res);
 
   const {
     data: { session },
@@ -31,6 +30,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
 
+  // Check user credits if plan isn't Free
   if (plan !== 'Free') {
     const { data, error } = await supabase
       .from('Data')
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     }
 
     if (data.credits <= 0) {
-      return res.status(403).json({ error: 'You have no remaining credits. Please upgrade your plan.' });
+      return res.status(403).json({ error: 'No credits remaining. Please upgrade.' });
     }
   }
 
@@ -89,6 +89,7 @@ export default async function handler(req, res) {
     });
   }
 
+  // Polling for completion
   const statusUrl = startData.urls.get;
   let output = null;
   let pollCount = 0;
@@ -117,10 +118,10 @@ export default async function handler(req, res) {
     return res.status(504).json({ error: 'Timed out waiting for AI result' });
   }
 
-  let finalOutput = output;
+  // Deduct credit if not Free
   if (plan !== 'Free') {
     const { error: creditError } = await supabase.rpc('decrement_credit', {
-      user_email: user_email,
+      user_email,
     });
 
     if (creditError) {
@@ -128,6 +129,7 @@ export default async function handler(req, res) {
     }
   }
 
+  // Log the result
   const { error: insertError } = await supabase.from('Data').insert([
     {
       email: user_email,
@@ -143,5 +145,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to insert enhancement log', detail: insertError.message });
   }
 
-  return res.status(200).json({ output: finalOutput });
+  return res.status(200).json({ output });
 }
