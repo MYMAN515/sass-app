@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' });
     }
 
-const supabase = createPagesServerClient({ req, res });
+    const supabase = createPagesServerClient({ req, res });
 
     const {
       data: { session },
@@ -34,11 +34,12 @@ const supabase = createPagesServerClient({ req, res });
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
+    // ✅ Check available credits (if not Free plan)
     if (plan !== 'Free') {
       const { data, error } = await supabase
         .from('Data')
         .select('credits')
-        .eq('email', user_email)
+        .eq('user_id', user_id)
         .single();
 
       if (error || !data) {
@@ -46,7 +47,7 @@ const supabase = createPagesServerClient({ req, res });
       }
 
       if (data.credits <= 0) {
-        return res.status(403).json({ error: 'No credits remaining. Please upgrade.' });
+        return res.status(403).json({ error: 'No credits remaining. Please upgrade your plan.' });
       }
     }
 
@@ -78,7 +79,6 @@ const supabase = createPagesServerClient({ req, res });
       startData = await startRes.json();
     } catch (err) {
       const text = await startRes.text();
-      console.error('Non-JSON response from Replicate:', text);
       return res.status(500).json({
         error: 'Invalid JSON from Replicate',
         detail: text.slice(0, 300),
@@ -92,6 +92,7 @@ const supabase = createPagesServerClient({ req, res });
       });
     }
 
+    // ✅ Polling
     const statusUrl = startData.urls.get;
     let output = null;
     let pollCount = 0;
@@ -120,17 +121,18 @@ const supabase = createPagesServerClient({ req, res });
       return res.status(504).json({ error: 'Timed out waiting for AI result' });
     }
 
+    // ✅ Decrement credit via RPC
     if (plan !== 'Free') {
-  const { error: creditError } = await supabase.rpc('decrement_credit', {
-    user_uuid: user_id,
-  });
+      const { error: creditError } = await supabase.rpc('decrement_credit', {
+        user_uuid: user_id,
+      });
 
-  if (creditError) {
-    console.error('Credit deduction failed:', creditError);
-  }
-}
+      if (creditError) {
+        console.error('Credit deduction failed:', creditError);
+      }
+    }
 
-
+    // ✅ Insert log
     const { error: insertError } = await supabase.from('Data').insert([
       {
         email: user_email,
