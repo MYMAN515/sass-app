@@ -22,7 +22,7 @@ export default function Login() {
     setError('');
 
     try {
-      const res = await fetch('/api/loginapi', {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
