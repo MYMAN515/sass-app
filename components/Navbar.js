@@ -71,12 +71,11 @@ export default function Navbar() {
     localStorage.setItem('theme', next ? 'dark' : 'light');
   };
 
-  const handleLogout = async () => {
-    await fetch('/api/logout');
-    Cookies.remove('user');
-    setUser(null);
-    router.push('/');
-  };
+const handleLogout = async () => {
+  await fetch('/api/logout');
+  await supabase.auth.signOut(); // 🧠 مهم لتسجيل الخروج من Supabase
+  router.push('/login'); // ✅ توجيه بعد تسجيل الخروج
+};
 
   const links = [
     { label: 'Home', href: '/' },
