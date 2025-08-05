@@ -5,9 +5,9 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { supabase } from '@/lib/supabaseClient';
 
-export default function EmailConfirmationChecker() {
+export default function VerifyEmailPage() {
   const router = useRouter();
-  const [checking, setChecking] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState('');
 
@@ -15,6 +15,9 @@ export default function EmailConfirmationChecker() {
     const interval = setInterval(async () => {
       setChecking(true);
       try {
+        // 🔁 تأكد من تحديث الجلسة أولًا
+        await supabase.auth.refreshSession();
+
         const {
           data: { session },
           error,
@@ -22,18 +25,21 @@ export default function EmailConfirmationChecker() {
 
         if (error) throw error;
 
-        const confirmed = session?.user?.email_confirmed_at;
-        setConfirmed(!!confirmed);
-
-        if (confirmed) {
-          router.push('/dashboard');
+        const emailConfirmed = session?.user?.email_confirmed_at;
+        if (emailConfirmed) {
+          clearInterval(interval);
+          setConfirmed(true);
+          setTimeout(() => router.push('/dashboard'), 1500); // ⏳ بعد 1.5 ثانية للانتقال
+        } else {
+          setConfirmed(false);
         }
       } catch (err) {
-        setError('Something went wrong while checking email status.');
+        setError('Something went wrong while checking email verification.');
+        clearInterval(interval);
       } finally {
         setChecking(false);
       }
-    }, 5000);
+    }, 4000); // ⏳ كل 4 ثواني
 
     return () => clearInterval(interval);
   }, [router]);
@@ -41,18 +47,31 @@ export default function EmailConfirmationChecker() {
   return (
     <>
       <Head>
-        <title>Verifying Email - AI Assistant</title>
+        <title>Verify Email - AI Store Assistant</title>
       </Head>
-      <main className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-200 dark:from-zinc-900 dark:to-zinc-800 flex flex-col items-center justify-center px-4 text-center">
-        <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-xl max-w-md w-full">
-          <h1 className="text-2xl font-bold text-zinc-800 dark:text-white mb-4">
-            Checking Email Verification...
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-indigo-800 to-purple-900 px-4 py-20">
+        <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-2xl p-8 shadow-2xl text-center space-y-4">
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
+            {confirmed ? 'Email Verified 🎉' : 'Waiting for Email Confirmation...'}
           </h1>
-          <p className="text-zinc-600 dark:text-zinc-300 mb-2">
-            This page will redirect automatically once your email is confirmed.
+
+          <p className="text-zinc-600 dark:text-zinc-400">
+            {confirmed
+              ? 'Redirecting you to your dashboard...'
+              : 'Please check your email and click the confirmation link. This page will auto-update.'}
           </p>
-          {checking && <p className="text-purple-600 font-semibold">Verifying...</p>}
-          {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+
+          {checking && !confirmed && (
+            <p className="text-purple-600 font-medium">Checking status...</p>
+          )}
+
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+
+          <div className="mt-6">
+            <p className="text-xs text-zinc-400">
+              Didn’t receive the email? Check your spam folder or try signing up again.
+            </p>
+          </div>
         </div>
       </main>
     </>
