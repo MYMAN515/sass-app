@@ -7,6 +7,7 @@ import Spinner from '@/components/Spinner';
 import Toast from '@/components/Toast';
 import Button from '@/components/Button';
 import EnhanceCustomizer from '@/components/EnhanceCustomizer';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { uploadImageToSupabase } from '@/lib/uploadImageToSupabase';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Layout from '@/components/Layout';
@@ -90,34 +91,78 @@ export default function EnhancePage() {
     setShowEnhanceModal(true);
   };
 
-  const handleGenerate = async (customOptions) => {
-    if (!file) {
-      setToast({ show: true, message: 'Please upload an image.', type: 'error' });
-      return;
-    }
+  const supabase = createClientComponentClient();
+const [userPlan, setUserPlan] = useState('Free');
+const [userEmail, setUserEmail] = useState('');
 
-    setLoading(true);
-    setToast({ show: false, message: '', type: 'success' });
+useEffect(() => {
+  const fetchUserData = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession(); // ✅ الصحيح
 
-    const prompt = generateEnhancePrompt(customOptions || options);
+    const email = session?.user?.email;
 
-    try {
-      const url = await uploadImageToSupabase(file);
-      const res = await fetch('/api/enhance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: url, prompt }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Enhancement failed');
-      setResult(data.output);
-      setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
-    } catch (err) {
-      setToast({ show: true, message: err.message, type: 'error' });
-    } finally {
-      setLoading(false);
+    if (email) {
+      setUserEmail(email);
+
+      const { data, error } = await supabase
+        .from('Data')
+        .select('plan')
+        .eq('email', email)
+        .single();
+
+      if (!error && data?.plan) {
+        setUserPlan(data.plan);
+      }
     }
   };
+
+  fetchUserData();
+}, []);
+
+
+const handleGenerate = async (customOptions) => {
+  if (!file) {
+    setToast({ show: true, message: 'Please upload an image.', type: 'error' });
+    return;
+  }
+
+  if (!userEmail) {
+    setToast({ show: true, message: 'User not logged in. Please login again.', type: 'error' });
+    return;
+  }
+
+  setLoading(true);
+  setToast({ show: false, message: '', type: 'success' });
+
+  const prompt = generateEnhancePrompt(customOptions || options);
+
+  try {
+    const url = await uploadImageToSupabase(file);
+
+    console.log('🧠 userEmail before fetch:', userEmail);
+    const res = await fetch('/api/enhance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageUrl: url,
+        prompt,
+        plan: userPlan,
+        user_email: userEmail,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Enhancement failed');
+    setResult(data.output);
+    setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
+  } catch (err) {
+    setToast({ show: true, message: err.message, type: 'error' });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const scroll = (dir) => {
     if (!carouselRef.current) return;

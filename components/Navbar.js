@@ -176,45 +176,81 @@ export default function Navbar() {
       </motion.header>
 
       {/* Mobile Menu */}
-      <AnimatePresence>
-        {menuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.95 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={() => setMenuOpen(false)}
-            />
-            <motion.nav
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -10, opacity: 0 }}
-              className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 shadow-md p-6 rounded-b-2xl"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-lg font-bold text-zinc-800 dark:text-zinc-100">Menu</span>
-                <button onClick={() => setMenuOpen(false)} aria-label="Close menu">
-                  <XMarkIcon className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
-                </button>
+<AnimatePresence>
+  {menuOpen && (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.95 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        onClick={() => setMenuOpen(false)}
+      />
+      <motion.nav
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: -10, opacity: 0 }}
+        className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 shadow-md p-6 rounded-b-2xl"
+      >
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-lg font-bold text-zinc-800 dark:text-zinc-100">Menu</span>
+          <button onClick={() => setMenuOpen(false)} aria-label="Close menu">
+            <XMarkIcon className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+          </button>
+        </div>
+        <ul className="flex flex-col gap-4 text-zinc-800 dark:text-zinc-100 font-medium mb-6">
+          {links.map(({ label, href }) => (
+            <li key={href}>
+              <Link
+                href={href}
+                onClick={() => setMenuOpen(false)}
+                className="block py-1"
+              >
+                {label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        {/* Mobile Auth Section */}
+        <div className="flex flex-col gap-3">
+          {user ? (
+            <div className="flex flex-col gap-2 p-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 shadow-inner text-sm">
+              <span className="font-medium text-zinc-800 dark:text-zinc-100">{user.email}</span>
+              <div className="flex gap-2 flex-wrap">
+                <span className="bg-purple-600 text-white text-xs font-semibold px-2 py-1 rounded-full">{plan || 'Free'}</span>
+                <span className="bg-emerald-600 text-white text-xs font-semibold px-2 py-1 rounded-full">{credits ?? 0} credits</span>
               </div>
-              <ul className="flex flex-col gap-4 text-zinc-800 dark:text-zinc-100 font-medium">
-                {links.map(({ label, href }) => (
-                  <li key={href}>
-                    <Link
-                      href={href}
-                      onClick={() => setMenuOpen(false)}
-                      className="block py-1"
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </motion.nav>
-          </>
-        )}
-      </AnimatePresence>
+              <button
+                onClick={handleLogout}
+                className="text-red-500 text-xs font-medium hover:underline text-left mt-2"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-semibold text-center"
+              >
+                Login
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMenuOpen(false)}
+                className="border border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white px-4 py-2 rounded-xl text-sm font-semibold text-center"
+              >
+                Register
+              </Link>
+            </div>
+          )}
+        </div>
+      </motion.nav>
+    </>
+  )}
+</AnimatePresence>
     </>
   );
 }

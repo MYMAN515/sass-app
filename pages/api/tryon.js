@@ -1,4 +1,5 @@
-// pages/api/tryon.js
+import { addWatermarkToImage } from '@/lib/addWatermarkToImage';
+import { supabase } from '@/lib/supabaseClient';
 
 export const config = {
   api: {
@@ -11,12 +12,30 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
 
-  const { imageUrl, prompt } = req.body || {};
+  const { imageUrl, prompt, plan = 'Free', user_email } = req.body || {};
 
-  if (!imageUrl || !prompt) {
-    return res.status(400).json({ error: 'Missing imageUrl or prompt' });
+  if (!imageUrl || !prompt || !user_email) {
+    return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' });
   }
 
+  // 🧠 Step 1: Check credits (if not Free)
+  if (plan !== 'Free') {
+    const { data, error } = await supabase
+      .from('Data')
+      .select('credits')
+      .eq('email', user_email)
+      .single();
+
+    if (error || !data) {
+      return res.status(500).json({ error: 'Failed to fetch user credits' });
+    }
+
+    if (data.credits <= 0) {
+      return res.status(403).json({ error: 'You have no remaining credits. Please upgrade your plan.' });
+    }
+  }
+
+  // ⚡ Step 2: Generate image with Replicate
   const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
   if (!REPLICATE_TOKEN) {
     return res.status(500).json({ error: 'Replicate API token not set' });
@@ -76,5 +95,27 @@ export default async function handler(req, res) {
     return res.status(504).json({ error: 'Timed out waiting for AI result' });
   }
 
-  return res.status(200).json({ output });
+  // 🖋️ Step 3: Add watermark for Free users
+  let finalOutput = output;
+  if (plan === 'Free') {
+    try {
+      finalOutput = await addWatermarkToImage(output);
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to apply watermark', detail: err.message });
+    }
+  }
+
+  // 📉 Step 4: Deduct 1 credit for paid users
+  if (plan !== 'Free') {
+    const { error: creditError } = await supabase.rpc('decrement_credit', {
+      user_email: user_email,
+    });
+
+    if (creditError) {
+      console.error('Credit deduction failed:', creditError);
+    }
+  }
+
+  // ✅ Final response
+  return res.status(200).json({ output: finalOutput });
 }
