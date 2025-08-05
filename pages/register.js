@@ -49,12 +49,14 @@ export default function Register() {
         password: form.password,
         options: {
           emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email`,
+          data: {
+            name: form.name,
+          },
         },
       });
 
       if (signUpError) throw new Error(signUpError.message);
 
-      // ✅ مباشرة إلى صفحة التحقق
       router.push('/verify-email');
     } catch (err) {
       setError(err.message || 'Registration failed. Try again.');
@@ -90,7 +92,7 @@ export default function Register() {
             <input
               name="name"
               placeholder="Full Name"
-              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500"
               value={form.name}
               onChange={handleChange}
               required
@@ -99,7 +101,7 @@ export default function Register() {
               name="email"
               type="email"
               placeholder="Email"
-              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
               value={form.email}
               onChange={handleChange}
               required
@@ -108,7 +110,7 @@ export default function Register() {
               name="password"
               type="password"
               placeholder="Password"
-              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
               value={form.password}
               onChange={handleChange}
               required
@@ -117,7 +119,7 @@ export default function Register() {
               name="confirm"
               type="password"
               placeholder="Confirm Password"
-              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
               value={form.confirm}
               onChange={handleChange}
               required
