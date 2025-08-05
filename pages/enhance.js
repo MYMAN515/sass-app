@@ -1,76 +1,170 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import EnhanceCustomizer from '@/components/EnhanceCustomizer';
+import React, { useState, useEffect, useRef } from 'react';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Spinner from '@/components/Spinner';
 import Toast from '@/components/Toast';
 import Button from '@/components/Button';
-
-function generateEnhancePrompt({ productType, photographyStyle, background, lighting, purpose }) {
-  return `
-Enhance the uploaded ${productType} photo using a ${photographyStyle} setup.
-Use a ${background} background with ${lighting} lighting conditions.
-Final output should look ${purpose}-ready with clarity, realism, and modern styling.
-`.trim();
-}
-
+import EnhanceCustomizer from '@/components/EnhanceCustomizer';
 import { uploadImageToSupabase } from '@/lib/uploadImageToSupabase';
+import Layout from '@/components/Layout';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Poppins } from 'next/font/google';
+
+const poppins = Poppins({ subsets: ['latin'], weight: ['400', '600', '700'], display: 'swap' });
+
+const generateEnhancePrompt = ({
+  photographyStyle = '',
+  background = '',
+  lighting = '',
+  colorStyle = '',
+  realism = '',
+  outputQuality = '',
+}) => {
+  return Enhance this product photo using the ${photographyStyle} photography style.
+Apply a ${background} background that complements the product without distracting from it.
+Use ${lighting} to highlight material textures, contours, and product details clearly and naturally.
+Match the scene with a ${colorStyle} color palette to reinforce brand tone and aesthetic harmony.
+Ensure a ${realism} level that maintains photorealistic integrity and avoids any artificial or cartoonish effects.
+The final image should be in ${outputQuality} resolution — clean, crisp, and flawless..trim();
+};
 
 export default function EnhancePage() {
+  const [supabase] = useState(() => createBrowserSupabaseClient());
+  const [session, setSession] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
+  const [userId, setUserId] = useState('');
+  const [userPlan, setUserPlan] = useState('Free');
+
   const [file, setFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [options, setOptions] = useState({});
-  const [customPrompt, setCustomPrompt] = useState('');
-  const [useCustomPrompt, setUseCustomPrompt] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [showEnhanceModal, setShowEnhanceModal] = useState(false);
+  const [options, setOptions] = useState({});
+  const carouselRef = useRef(null);
+
+  useEffect(() => {
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      const session = data?.session;
+
+      if (!session) {
+        setToast({ show: true, message: 'Session expired. Please login again.', type: 'error' });
+        return;
+      }
+
+      setSession(session);
+      setUserEmail(session.user.email);
+      setUserId(session.user.id);
+
+      const { data: userData } = await supabase
+        .from('Data')
+        .select('plan')
+        .eq('email', session.user.email)
+        .single();
+
+      if (userData?.plan) {
+        setUserPlan(userData.plan);
+      }
+    };
+
+    getSession();
+  }, [supabase]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (!selectedFile) return;
+    const f = e.target.files?.[0];
+    if (!f) return;
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-    if (!allowedTypes.includes(selectedFile.type)) {
-      setToast({ show: true, message: 'Only JPG, PNG, JPEG, WEBP formats are allowed.', type: 'error' });
-      return;
-    }
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setToast({ show: true, message: 'File is too large. Max size is 5MB.', type: 'error' });
+    if (!['image/jpeg', 'image/png', 'image/jpg', 'image/webp'].includes(f.type)) {
+      setToast({ show: true, message: 'Only JPG/PNG/WEBP allowed.', type: 'error' });
       return;
     }
 
-    setFile(selectedFile);
-    setImagePreview(URL.createObjectURL(selectedFile));
+    if (f.size > 5 * 1024 * 1024) {
+      setToast({ show: true, message: 'Max size 5MB.', type: 'error' });
+      return;
+    }
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(f);
+    setPreviewUrl(url);
+    setFile(f);
+    setResult(null);
+    setShowEnhanceModal(true);
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (customOptions) => {
     if (!file) {
-      setToast({ show: true, message: 'Please upload an image file.', type: 'error' });
+      setToast({ show: true, message: 'Please upload an image.', type: 'error' });
       return;
     }
 
-    const prompt = useCustomPrompt ? customPrompt : generateEnhancePrompt(options);
+    if (!userEmail || !userId) {
+      setToast({ show: true, message: 'User not logged in. Please login again.', type: 'error' });
+      return;
+    }
+
     setLoading(true);
     setToast({ show: false, message: '', type: 'success' });
-    setResult(null);
+
+    const prompt = generateEnhancePrompt(customOptions || options);
 
     try {
-      const uploadedUrl = await uploadImageToSupabase(file);
-
+      const imageUrl = await uploadImageToSupabase(file);
       const res = await fetch('/api/enhance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: uploadedUrl, prompt }),
-      });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    imageUrl,
+    prompt,
+    plan: userPlan,
+    user_email: userEmail,
+  }),
+});
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Generation failed');
+const text = await res.text();
+let data;
+try {
+  data = JSON.parse(text);
+} catch (err) {
+  setToast({
+    show: true,
+    message: Server Error (non-JSON): ${text.slice(0, 150)},
+    type: 'error',
+  });
+  setLoading(false);
+  return;
+}
 
-      setResult(data.image);
-      setToast({ show: true, message: 'AI enhancement complete!', type: 'success' });
+if (!res.ok) {
+  let errorMessage = Server Error: ${data?.error || 'Unknown error'};
+  if (data?.detail) {
+    errorMessage += \nDetails: ${data.detail};
+  }
+
+  setToast({
+    show: true,
+    message: errorMessage,
+    type: 'error',
+  });
+  setLoading(false);
+  return;
+}
+
+setResult(data.output);
+setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
+
+
+      setResult(data.output);
+      setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
     } catch (err) {
       setToast({ show: true, message: err.message, type: 'error' });
     } finally {
@@ -79,106 +173,64 @@ export default function EnhancePage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] text-white flex items-center justify-center px-6 py-20 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-tr from-purple-700/10 via-fuchsia-600/10 to-indigo-800/10 animate-pulse-fast blur-3xl z-0" />
-
-      <div className="relative z-10 w-full max-w-5xl backdrop-blur-sm bg-white/5 border border-white/10 rounded-3xl p-10 shadow-2xl space-y-10">
-        <motion.div
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-center"
-        >
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
-            ✨ AI Enhance Studio
-          </h1>
-          <p className="text-purple-200 max-w-2xl mx-auto">
-            Upload your product image and generate a professional, AI-enhanced version styled for e-commerce.
-          </p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
-        >
-          <div className="bg-zinc-900 border border-zinc-700 p-6 rounded-2xl shadow-xl space-y-6">
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-purple-300">Upload Product Image</label>
-              <input
-                type="file"
-                accept="image/png, image/jpeg, image/jpg, image/webp"
-                onChange={handleFileChange}
-                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white"
-              />
-              <p className="text-xs text-purple-400 mt-1">
-                Accepted formats: JPG, PNG, JPEG, WEBP. Max size: 5MB.
-              </p>
-              {imagePreview && (
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="mt-4 rounded-xl border border-purple-500 shadow max-h-64 mx-auto"
-                />
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={useCustomPrompt} onChange={() => setUseCustomPrompt(!useCustomPrompt)} />
-                Write custom prompt
+    <Layout title="Enhance Product Image" description="Enhance your product images with AI">
+      <main className={${poppins.className} min-h-screen py-20}>
+        <Toast show={toast.show} message={toast.message} type={toast.type} />
+        <div className="px-4 sm:px-6 md:px-12 lg:px-24 mx-auto space-y-32 max-w-4xl">
+          {/* Upload */}
+          <section>
+            <h2 className="text-3xl font-semibold text-center mb-6">Upload Product Photo</h2>
+            <div className="bg-white dark:bg-zinc-800 p-6 rounded-3xl shadow-xl">
+              <label className="block mb-4 relative">
+                <div className="bg-gray-100 dark:bg-zinc-700 rounded-lg p-4 text-center hover:bg-gray-200 dark:hover:bg-zinc-600 transition cursor-pointer">
+                  <span>{file?.name || 'Click to choose an image'}</span>
+                  <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                </div>
               </label>
-
-              {useCustomPrompt ? (
-                <textarea
-                  className="w-full bg-zinc-800 border border-zinc-600 rounded-md p-3 text-sm"
-                  rows={6}
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="e.g., Enhance the image with a clean white background and soft shadows for Amazon listing."
-                />
-              ) : (
-                <EnhanceCustomizer onChange={setOptions} />
-              )}
+              {previewUrl && <img src={previewUrl} alt="preview" className="rounded-2xl mt-4 max-w-full" />}
             </div>
+          </section>
 
-            <div className="text-center">
-              <Button
-                onClick={handleGenerate}
-                disabled={loading}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-xl shadow-xl transition-transform hover:scale-105 active:scale-95"
-              >
-                {loading ? <Spinner /> : 'Enhance Image'}
-              </Button>
-            </div>
-          </div>
-        </motion.div>
+          {/* Modal */}
+          <AnimatePresence>
+            {showEnhanceModal && (
+              <motion.div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <motion.div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-xl w-full sm:max-w-xl md:max-w-2xl" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}>
+                  <EnhanceCustomizer
+                    onChange={(update) => setOptions((prev) => ({ ...prev, ...update }))}
+                    onComplete={(finalOptions) => {
+                      setShowEnhanceModal(false);
+                      handleGenerate(finalOptions);
+                    }}
+                  />
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {result && (
-          <motion.div
-            className="mt-10 text-center"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h2 className="text-2xl font-semibold mb-4 text-purple-200">✅ Enhanced Result</h2>
-            <img
-              src={result}
-              alt="Enhanced AI result"
-              className="rounded-2xl shadow-2xl border border-purple-500 max-w-[90vw] max-h-[80vh] mx-auto mb-4"
-            />
-            <a
-              href={result}
-              download="enhanced-image.jpg"
-              className="inline-block mt-2 bg-purple-600 hover:bg-purple-700 text-white text-sm px-5 py-2 rounded-lg font-medium shadow-md transition-all"
-            >
-              ⬇️ Download Image
-            </a>
-          </motion.div>
-        )}
-      </div>
+          {/* Result */}
+          {result && (
+            <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+              <h2 className="text-2xl font-semibold text-center mb-4">Enhanced Result</h2>
+              <motion.img
+                src={result}
+                alt="result"
+                className="w-full max-w-md mx-auto rounded-2xl border border-purple-600 shadow-xl"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              />
+            </motion.section>
+          )}
 
-      <Toast show={toast.show} message={toast.message} type={toast.type} />
-    </main>
+          {/* Spinner */}
+          {loading && !result && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="flex items-center justify-center min-h-[300px] px-4">
+              <Spinner />
+            </motion.div>
+          )}
+        </div>
+      </main>
+    </Layout>
   );
 }
