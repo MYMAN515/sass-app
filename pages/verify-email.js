@@ -7,56 +7,50 @@ import { supabase } from '@/lib/supabaseClient';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const [status, setStatus] = useState('Verifying...');
+  const [status, setStatus] = useState('Checking...');
   const [error, setError] = useState('');
 
   useEffect(() => {
     const hash = window.location.hash;
+
+    if (!hash || !hash.includes('access_token')) {
+      setStatus('No token found in URL.');
+      return;
+    }
+
     const params = new URLSearchParams(hash.substring(1));
     const access_token = params.get('access_token');
-    const type = params.get('type'); // usually "signup"
 
-    const autoSignIn = async () => {
+    const loginWithToken = async () => {
       try {
-        if (!access_token) {
-          setStatus('No token found in URL.');
-          return;
-        }
-
-        // ✅ تسجيل الجلسة يدويًا باستخدام التوكن
         const { data, error } = await supabase.auth.setSession({
           access_token,
-          refresh_token: '', // لا يوجد refresh_token في الرابط، لكن مسموح تمريره كـ ''
+          refresh_token: '', // can be empty
         });
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
-        setStatus('Email verified successfully! Redirecting...');
-        setTimeout(() => {
-          router.replace('/dashboard');
-        }, 1500);
+        setStatus('Email verified! Redirecting...');
+        setTimeout(() => router.replace('/dashboard'), 1500);
       } catch (err) {
-        console.error(err);
-        setError('Failed to verify your email. Please try logging in manually.');
         setStatus('');
+        setError('Failed to verify email. Try logging in manually.');
       }
     };
 
-    autoSignIn();
+    loginWithToken();
   }, [router]);
 
   return (
     <>
       <Head>
-        <title>Verifying Email - AI Store Assistant</title>
+        <title>Email Verification</title>
       </Head>
       <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-indigo-800 to-purple-900 px-4 py-20">
-        <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-2xl p-8 shadow-2xl text-center space-y-4">
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Email Verification</h1>
-          <p className="text-zinc-600 dark:text-zinc-400">{status}</p>
-          {error && <p className="text-red-500">{error}</p>}
+        <div className="max-w-md w-full bg-black/80 text-white rounded-2xl p-8 shadow-xl text-center space-y-4">
+          <h1 className="text-2xl font-bold">Email Verification</h1>
+          <p>{status}</p>
+          {error && <p className="text-red-400">{error}</p>}
         </div>
       </main>
     </>
