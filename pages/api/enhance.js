@@ -1,3 +1,13 @@
+// pages/api/enhance.js
+
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST requests allowed' });
@@ -10,12 +20,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing imageUrl or prompt' });
   }
 
-  const supabase = createPagesServerClient({ req, res });
+  // ✅ Create Supabase client (server-side)
+  const supabase = createServerSupabaseClient({ req, res });
 
+  // ✅ Get session
   const {
     data: { session },
     error: sessionError,
   } = await supabase.auth.getSession();
+
   console.log('[DEBUG] Session:', session);
   if (!session || sessionError) {
     console.error('[ERROR] Session error:', sessionError);
@@ -25,11 +38,13 @@ export default async function handler(req, res) {
   const userEmail = session.user.email;
   console.log('[DEBUG] userEmail:', userEmail);
 
+  // ✅ Fetch user data
   const { data: userData, error: userError } = await supabase
     .from('Data')
     .select('credits, plan')
     .eq('email', userEmail)
     .single();
+
   console.log('[DEBUG] userData:', userData);
 
   if (userError || !userData) {
@@ -37,13 +52,14 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'User not found' });
   }
 
+  // ✅ Check credits
   if (userData.plan !== 'Pro' && userData.credits <= 0) {
     console.warn('[WARNING] No credits left');
     return res.status(403).json({ error: 'No credits left' });
   }
 
-  // ✅ Replicate API Request
-  console.log('[DEBUG] Sending to Replicate...');
+  // ✅ Call Replicate API
+  console.log('[DEBUG] Sending request to Replicate...');
   const replicateRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -51,7 +67,7 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      version: 'black-forest-labs/flux-kontext-max',
+      version: 'black-forest-labs/flux-kontext-max', // ✅ تأكد من وجود هذا الموديل على Replicate
       input: {
         input_image: imageUrl,
         prompt,
@@ -69,16 +85,23 @@ export default async function handler(req, res) {
   }
 
   const generatedImage = replicateData?.urls?.get;
-  console.log('[DEBUG] generatedImage:', generatedImage);
+  console.log('[DEBUG] Generated image URL:', generatedImage);
 
   if (!generatedImage) {
     return res.status(500).json({ error: 'Image generation failed' });
   }
 
+  // ✅ Deduct credit if Free plan
   if (userData.plan !== 'Pro') {
-    const { error: rpcError } = await supabase.rpc('decrement_credit', { user_email: userEmail });
-    if (rpcError) console.error('[ERROR] Failed to decrement credit:', rpcError);
-    else console.log('[DEBUG] Credit decremented');
+    const { error: rpcError } = await supabase.rpc('decrement_credit', {
+      user_email: userEmail,
+    });
+
+    if (rpcError) {
+      console.error('[ERROR] Failed to decrement credit:', rpcError);
+    } else {
+      console.log('[DEBUG] Credit decremented successfully');
+    }
   }
 
   return res.status(200).json({ success: true, image: generatedImage });
