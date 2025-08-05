@@ -1,10 +1,10 @@
 // pages/api/enhance.js
 
 import { createClient } from '@supabase/supabase-js';
-
+//
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY // هذا لازم يكون service role token
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY // هذا لازم يكون service role token
 );
 
 export default async function handler(req, res) {
