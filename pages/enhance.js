@@ -12,7 +12,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Poppins } from 'next/font/google';
 
 const poppins = Poppins({ subsets: ['latin'], weight: ['400', '600', '700'], display: 'swap' });
-
 const generateEnhancePrompt = ({
   photographyStyle = '',
   background = '',
@@ -21,13 +20,16 @@ const generateEnhancePrompt = ({
   realism = '',
   outputQuality = '',
 }) => {
-  return Enhance this product photo using the ${photographyStyle} photography style.
+  return `
+Enhance this product photo using the ${photographyStyle} photography style.
 Apply a ${background} background that complements the product without distracting from it.
 Use ${lighting} to highlight material textures, contours, and product details clearly and naturally.
 Match the scene with a ${colorStyle} color palette to reinforce brand tone and aesthetic harmony.
 Ensure a ${realism} level that maintains photorealistic integrity and avoids any artificial or cartoonish effects.
-The final image should be in ${outputQuality} resolution — clean, crisp, and flawless..trim();
+The final image should be in ${outputQuality} resolution — clean, crisp, and flawless.
+`.trim();
 };
+
 
 export default function EnhancePage() {
   const [supabase] = useState(() => createBrowserSupabaseClient());
@@ -159,11 +161,11 @@ if (!res.ok) {
   return;
 }
 
-setResult(data.output);
+setResult(data.image);
 setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
 
 
-      setResult(data.output);
+setResult(data.image);
       setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
     } catch (err) {
       setToast({ show: true, message: err.message, type: 'error' });
