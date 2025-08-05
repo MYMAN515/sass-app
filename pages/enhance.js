@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Poppins } from 'next/font/google';
 
 const poppins = Poppins({ subsets: ['latin'], weight: ['400', '600', '700'], display: 'swap' });
+
 const generateEnhancePrompt = ({
   photographyStyle = '',
   background = '',
@@ -29,7 +30,6 @@ Ensure a ${realism} level that maintains photorealistic integrity and avoids any
 The final image should be in ${outputQuality} resolution — clean, crisp, and flawless.
 `.trim();
 };
-
 
 export default function EnhancePage() {
   const [supabase] = useState(() => createBrowserSupabaseClient());
@@ -122,50 +122,46 @@ export default function EnhancePage() {
     try {
       const imageUrl = await uploadImageToSupabase(file);
       const res = await fetch('/api/enhance', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    imageUrl,
-    prompt,
-    plan: userPlan,
-    user_email: userEmail,
-  }),
-});
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl,
+          prompt,
+          plan: userPlan,
+          user_email: userEmail,
+        }),
+      });
 
-const text = await res.text();
-let data;
-try {
-  data = JSON.parse(text);
-} catch (err) {
-  setToast({
-    show: true,
-    message: Server Error (non-JSON): ${text.slice(0, 150)},
-    type: 'error',
-  });
-  setLoading(false);
-  return;
-}
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        setToast({
+          show: true,
+          message: `Server Error (non-JSON): ${text.slice(0, 150)}`,
+          type: 'error',
+        });
+        setLoading(false);
+        return;
+      }
 
-if (!res.ok) {
-  let errorMessage = Server Error: ${data?.error || 'Unknown error'};
-  if (data?.detail) {
-    errorMessage += \nDetails: ${data.detail};
-  }
+      if (!res.ok) {
+        let errorMessage = `Server Error: ${data?.error || 'Unknown error'}`;
+        if (data?.detail) {
+          errorMessage += `\nDetails: ${data.detail}`;
+        }
 
-  setToast({
-    show: true,
-    message: errorMessage,
-    type: 'error',
-  });
-  setLoading(false);
-  return;
-}
+        setToast({
+          show: true,
+          message: errorMessage,
+          type: 'error',
+        });
+        setLoading(false);
+        return;
+      }
 
-setResult(data.image);
-setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
-
-
-setResult(data.image);
+      setResult(data.image);
       setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
     } catch (err) {
       setToast({ show: true, message: err.message, type: 'error' });
@@ -176,7 +172,7 @@ setResult(data.image);
 
   return (
     <Layout title="Enhance Product Image" description="Enhance your product images with AI">
-      <main className={${poppins.className} min-h-screen py-20}>
+      <main className={`${poppins.className} min-h-screen py-20`}>
         <Toast show={toast.show} message={toast.message} type={toast.type} />
         <div className="px-4 sm:px-6 md:px-12 lg:px-24 mx-auto space-y-32 max-w-4xl">
           {/* Upload */}
