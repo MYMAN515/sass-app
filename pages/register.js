@@ -47,35 +47,15 @@ export default function Register() {
       const { error: signUpError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
+        options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email` || 'http://localhost:3000/verify-email',
+        },
       });
+
       if (signUpError) throw new Error(signUpError.message);
 
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
-      });
-      if (loginError) throw new Error('Login failed after signup');
-
-      const token = loginData?.session?.access_token;
-      if (!token) throw new Error('Failed to get session token');
-
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
-
-      window.location.href = '/dashboard';
+      // ✅ مباشرة إلى صفحة التحقق
+      router.push('/verify-email');
     } catch (err) {
       setError(err.message || 'Registration failed. Try again.');
     } finally {
@@ -154,39 +134,23 @@ export default function Register() {
               />
               <label className="text-zinc-600 dark:text-zinc-300">
                 I agree to the{' '}
-                <a
-                  href="/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-purple-500 hover:underline"
-                >
+                <a href="/privacy" target="_blank" className="text-purple-500 hover:underline">
                   Privacy Policy
                 </a>{' '}
                 and{' '}
-                <a
-                  href="/terms"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-purple-500 hover:underline"
-                >
+                <a href="/terms" target="_blank" className="text-purple-500 hover:underline">
                   Terms of Service
                 </a>
               </label>
             </div>
 
-            {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
-            )}
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
             <motion.button
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading || !form.agree}
-              className={`w-full py-3 rounded-xl font-semibold transition ${
-                !form.agree
-                  ? 'bg-zinc-400 cursor-not-allowed text-white'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
-              }`}
+              className={`w-full py-3 rounded-xl font-semibold transition ${!form.agree ? 'bg-zinc-400 cursor-not-allowed text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
             >
               {loading ? 'Creating...' : 'Register'}
             </motion.button>
@@ -194,9 +158,7 @@ export default function Register() {
 
           <div className="flex items-center justify-center gap-2">
             <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              or continue with
-            </span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">or continue with</span>
             <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
           </div>
 
@@ -216,10 +178,7 @@ export default function Register() {
 
           <p className="text-sm text-center text-zinc-500 dark:text-zinc-400">
             Already have an account?{' '}
-            <Link
-              href="/login"
-              className="text-purple-600 hover:underline dark:text-purple-300"
-            >
+            <Link href="/login" className="text-purple-600 hover:underline dark:text-purple-300">
               Login
             </Link>
           </p>
