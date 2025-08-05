@@ -1,5 +1,3 @@
-// pages/api/enhance.js
-
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = {
@@ -10,14 +8,19 @@ export const config = {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Only POST requests allowed' });
+    return res.status(405).json({ error: 'Only POST allowed' });
   }
 
-  const { imageUrl, prompt } = req.body;
-  console.log('[DEBUG] Received:', { imageUrl, prompt });
+  const { imageUrl, prompt, plan, user_email } = req.body;
+  const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 
-  if (!imageUrl || !prompt) {
-    return res.status(400).json({ error: 'Missing imageUrl or prompt' });
+  if (!REPLICATE_TOKEN) {
+    console.error("❌ Missing REPLICATE_API_TOKEN");
+    return res.status(500).json({ error: 'Missing Replicate token' });
+  }
+
+  if (!imageUrl || !prompt || !user_email) {
+    return res.status(400).json({ error: 'Missing required fields' });
   }
 
   const supabase = createPagesServerClient({ req, res });
@@ -27,98 +30,86 @@ export default async function handler(req, res) {
     error: sessionError,
   } = await supabase.auth.getSession();
 
-  console.log('[DEBUG] Session:', session);
   if (!session || sessionError) {
-    console.error('[ERROR] Session error:', sessionError);
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const userEmail = session.user.email;
-  console.log('[DEBUG] userEmail:', userEmail);
-
+  // 🧠 Fetch user data
   const { data: userData, error: userError } = await supabase
     .from('Data')
     .select('credits, plan')
-    .eq('email', userEmail)
+    .eq('email', user_email)
     .single();
 
-  console.log('[DEBUG] userData:', userData);
   if (userError || !userData) {
-    console.error('[ERROR] Supabase user fetch error:', userError);
     return res.status(404).json({ error: 'User not found' });
   }
 
   if (userData.plan !== 'Pro' && userData.credits <= 0) {
-    console.warn('[WARNING] No credits left');
     return res.status(403).json({ error: 'No credits left' });
   }
 
-  // ✅ Step 1: Send initial request to Replicate
-  const predictionRes = await fetch('https://api.replicate.com/v1/predictions', {
+  // 🧠 Replicate request
+  const start = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
-      Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`,
+      Authorization: `Token ${REPLICATE_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      version: 'black-forest-labs/flux-kontext-max',
+      version: 'black-forest-labs/flux-kontext-pro',
       input: {
-        input_image: imageUrl,
         prompt,
-        aspect_ratio: '1:1',
+        input_image: imageUrl,
+        aspect_ratio: 'match_input_image',
+        output_format: 'jpg',
+        safety_tolerance: 2,
       },
     }),
   });
 
-  const prediction = await predictionRes.json();
-  console.log('[DEBUG] Replicate prediction response:', prediction);
+  const startData = await start.json();
 
-  if (!prediction?.urls?.get) {
-    console.error('[ERROR] No prediction get URL');
-    return res.status(500).json({ error: 'Failed to get prediction' });
+  if (!start.ok || !startData?.urls?.get) {
+    return res.status(500).json({
+      error: startData?.error || 'Failed to start image generation',
+      detail: startData,
+    });
   }
 
-  // ✅ Step 2: Poll until image is ready
-  let finalResult = null;
+  const statusUrl = startData.urls.get;
+  let output = null;
+
   for (let i = 0; i < 20; i++) {
-    const statusRes = await fetch(prediction.urls.get, {
-      headers: {
-        Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`,
-      },
+    const statusRes = await fetch(statusUrl, {
+      headers: { Authorization: `Token ${REPLICATE_TOKEN}` },
     });
+
     const statusData = await statusRes.json();
 
-    console.log(`[DEBUG] Polling status [${i}]:`, statusData.status);
-
     if (statusData.status === 'succeeded') {
-      finalResult = statusData;
+      output = statusData.output;
       break;
-    } else if (statusData.status === 'failed') {
-      console.error('[ERROR] Image generation failed inside Replicate');
-      return res.status(500).json({ error: 'Image generation failed (model error)' });
+    }
+
+    if (statusData.status === 'failed') {
+      return res.status(500).json({ error: 'Image generation failed' });
     }
 
     await new Promise((r) => setTimeout(r, 1500));
   }
 
-  if (!finalResult?.output) {
-    return res.status(500).json({ error: 'Image generation did not complete in time' });
+  if (!output) {
+    return res.status(500).json({ error: 'Image generation timed out' });
   }
 
-  const generatedImage = finalResult.output[0];
-  console.log('[DEBUG] Final generated image:', generatedImage);
+  const generatedImage = Array.isArray(output) ? output[0] : output;
 
-  // ✅ Deduct credit only if successful
+  // ✅ Deduct credit if needed
   if (userData.plan !== 'Pro') {
-    const { error: rpcError } = await supabase.rpc('decrement_credit', {
-      user_email: userEmail,
+    await supabase.rpc('decrement_credit', {
+      user_email,
     });
-
-    if (rpcError) {
-      console.error('[ERROR] Failed to decrement credit:', rpcError);
-    } else {
-      console.log('[DEBUG] Credit decremented successfully');
-    }
   }
 
   return res.status(200).json({ success: true, image: generatedImage });
