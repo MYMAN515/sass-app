@@ -1,5 +1,3 @@
-// pages/api/enhance.js
-
 import { addWatermarkToImage } from '@/lib/addWatermarkToImage';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -20,6 +18,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' });
   }
 
+  // ✅ Get session to extract user_id
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  const user_id = session?.user?.id;
+
+  if (!user_id) {
+    return res.status(401).json({ error: 'User not authenticated' });
+  }
+
+  // ✅ Credit check for paid users
   if (plan !== 'Free') {
     const { data, error } = await supabase
       .from('Data')
@@ -41,6 +52,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Replicate API token not set' });
   }
 
+  // ✅ Start replicate generation
   const startRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -96,39 +108,39 @@ export default async function handler(req, res) {
   }
 
   let finalOutput = output;
-// 👇 بعد finalOutput = ...
-if (plan !== 'Free') {
-  const { error: creditError } = await supabase.rpc('decrement_credit', {
-    user_email: user_email,
-  });
-
-  if (creditError) {
-    console.error('Credit deduction failed:', creditError);
+  if (plan === 'Free') {
+    try {
+      finalOutput = await addWatermarkToImage(output);
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to apply watermark', detail: err.message });
+    }
   }
-}
 
-// ✅ أضف هذا الإدخال الجديد:
-const {
-  data: { session },
-  error: sessionError,
-} = await supabase.auth.getSession();
+  if (plan !== 'Free') {
+    const { error: creditError } = await supabase.rpc('decrement_credit', {
+      user_email: user_email,
+    });
 
-const user_id = session?.user?.id;
+    if (creditError) {
+      console.error('Credit deduction failed:', creditError);
+    }
+  }
 
-if (!user_id) {
-  return res.status(401).json({ error: 'User not authenticated' });
-}
-
-await supabase
-  .from('Data')
-  .insert([
+  // ✅ Insert the enhancement into the Data table with user_id
+  const { error: insertError } = await supabase.from('Data').insert([
     {
       email: user_email,
       user_id,
-      image_url,
+      image_url: imageUrl,
       prompt,
       plan,
     },
   ]);
 
-return res.status(200).json({ output: finalOutput });
+  if (insertError) {
+    console.error('Insert failed:', insertError);
+    return res.status(500).json({ error: 'Failed to insert enhancement log', detail: insertError.message });
+  }
+
+  return res.status(200).json({ output: finalOutput });
+}
