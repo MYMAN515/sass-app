@@ -11,10 +11,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  // ✅ Prevent infinite redirect loop if already logged in
+  // ✅ Prevent infinite redirect loop
   useEffect(() => {
-    const token = Cookies.get('token');
-    if (token && router.pathname === '/login') {
+    const storedUser = Cookies.get('user');
+    if (storedUser && router.pathname === '/login') {
       router.replace('/dashboard');
     }
   }, [router]);
@@ -31,11 +31,9 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login failed');
+      if (!res.ok) throw new Error(data.error || 'Login failed');
 
-      // ✅ Store token only — avoid duplicate cookies
-      Cookies.set('token', data.token, { expires: 7, path: '/' });
-
+      Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
       router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Something went wrong');
