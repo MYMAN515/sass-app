@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { supabase } from '@/lib/supabaseClient';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Cookies from 'js-cookie';
 import { MoonIcon, SunIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Navbar() {
+  const supabase = createBrowserSupabaseClient();
   const [isDark, setIsDark] = useState(false);
   const [user, setUser] = useState(null);
   const [plan, setPlan] = useState(null);
@@ -17,7 +18,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
 
-  // Respect system preference on first load
+  // Detect dark mode
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const savedTheme = localStorage.getItem('theme');
@@ -26,44 +27,6 @@ export default function Navbar() {
     setIsDark(dark);
   }, []);
 
-  // Scroll header effect
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // Get user from cookies
-  useEffect(() => {
-    const raw = Cookies.get('user');
-    if (raw) {
-      try {
-        setUser(JSON.parse(raw));
-      } catch {
-        Cookies.remove('user');
-      }
-    }
-  }, []);
-
-  // Get credits and plan
-  useEffect(() => {
-    const getData = async () => {
-      if (user?.email) {
-        const { data, error } = await supabase
-          .from('Data')
-          .select('plan, credits')
-          .eq('email', user.email)
-          .single();
-
-        if (!error && data) {
-          setPlan(data.plan);
-          setCredits(data.credits);
-        }
-      }
-    };
-    getData();
-  }, [user]);
-
   const toggleTheme = () => {
     const next = !isDark;
     setIsDark(next);
@@ -71,11 +34,47 @@ export default function Navbar() {
     localStorage.setItem('theme', next ? 'dark' : 'light');
   };
 
-const handleLogout = async () => {
-  await fetch('/api/logout');
-  await supabase.auth.signOut(); // 🧠 مهم لتسجيل الخروج من Supabase
-  router.push('/login'); // ✅ توجيه بعد تسجيل الخروج
-};
+  // Scroll shadow
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // ✅ Get session + set user
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const supaUser = session?.user;
+      if (!supaUser) return;
+
+      setUser(supaUser);
+      Cookies.set('user', JSON.stringify({ email: supaUser.email }), { expires: 7 });
+
+      const { data, error } = await supabase
+        .from('Data')
+        .select('plan, credits')
+        .eq('email', supaUser.email)
+        .single();
+
+      if (!error && data) {
+        setPlan(data.plan);
+        setCredits(data.credits);
+      }
+    };
+
+    fetchUser();
+  }, [supabase]);
+
+  const handleLogout = async () => {
+    Cookies.remove('user');
+    await fetch('/api/logout');
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   const links = [
     { label: 'Home', href: '/' },
@@ -135,9 +134,7 @@ const handleLogout = async () => {
               <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800 px-4 py-2 rounded-xl shadow-inner">
                 <span className="text-sm font-medium text-zinc-800 dark:text-zinc-100">{user.email}</span>
                 <span className="bg-purple-600 text-white text-xs font-semibold px-2 py-1 rounded-full">{plan || 'Free'}</span>
-                <span className="bg-emerald-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                  {credits ?? 0} credits
-                </span>
+                <span className="bg-emerald-600 text-white text-xs font-semibold px-2 py-1 rounded-full">{credits ?? 0} credits</span>
                 <button
                   onClick={handleLogout}
                   className="text-xs text-red-500 hover:underline font-medium ml-2"
@@ -163,7 +160,7 @@ const handleLogout = async () => {
             )}
           </div>
 
-          {/* Hamburger */}
+          {/* Mobile toggle */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="md:hidden p-2 rounded-lg bg-zinc-100 dark:bg-zinc-700 text-purple-500"
@@ -175,81 +172,77 @@ const handleLogout = async () => {
       </motion.header>
 
       {/* Mobile Menu */}
-<AnimatePresence>
-  {menuOpen && (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.95 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-        onClick={() => setMenuOpen(false)}
-      />
-      <motion.nav
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: -10, opacity: 0 }}
-        className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 shadow-md p-6 rounded-b-2xl"
-      >
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-lg font-bold text-zinc-800 dark:text-zinc-100">Menu</span>
-          <button onClick={() => setMenuOpen(false)} aria-label="Close menu">
-            <XMarkIcon className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
-          </button>
-        </div>
-        <ul className="flex flex-col gap-4 text-zinc-800 dark:text-zinc-100 font-medium mb-6">
-          {links.map(({ label, href }) => (
-            <li key={href}>
-              <Link
-                href={href}
-                onClick={() => setMenuOpen(false)}
-                className="block py-1"
-              >
-                {label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        {/* Mobile Auth Section */}
-        <div className="flex flex-col gap-3">
-          {user ? (
-            <div className="flex flex-col gap-2 p-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 shadow-inner text-sm">
-              <span className="font-medium text-zinc-800 dark:text-zinc-100">{user.email}</span>
-              <div className="flex gap-2 flex-wrap">
-                <span className="bg-purple-600 text-white text-xs font-semibold px-2 py-1 rounded-full">{plan || 'Free'}</span>
-                <span className="bg-emerald-600 text-white text-xs font-semibold px-2 py-1 rounded-full">{credits ?? 0} credits</span>
+      <AnimatePresence>
+        {menuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.95 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+              onClick={() => setMenuOpen(false)}
+            />
+            <motion.nav
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -10, opacity: 0 }}
+              className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 shadow-md p-6 rounded-b-2xl"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-lg font-bold text-zinc-800 dark:text-zinc-100">Menu</span>
+                <button onClick={() => setMenuOpen(false)} aria-label="Close menu">
+                  <XMarkIcon className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+                </button>
               </div>
-              <button
-                onClick={handleLogout}
-                className="text-red-500 text-xs font-medium hover:underline text-left mt-2"
-              >
-                Logout
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <Link
-                href="/login"
-                onClick={() => setMenuOpen(false)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-semibold text-center"
-              >
-                Login
-              </Link>
-              <Link
-                href="/register"
-                onClick={() => setMenuOpen(false)}
-                className="border border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white px-4 py-2 rounded-xl text-sm font-semibold text-center"
-              >
-                Register
-              </Link>
-            </div>
-          )}
-        </div>
-      </motion.nav>
-    </>
-  )}
-</AnimatePresence>
+              <ul className="flex flex-col gap-4 text-zinc-800 dark:text-zinc-100 font-medium mb-6">
+                {links.map(({ label, href }) => (
+                  <li key={href}>
+                    <Link href={href} onClick={() => setMenuOpen(false)} className="block py-1">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Auth section */}
+              <div className="flex flex-col gap-3">
+                {user ? (
+                  <div className="flex flex-col gap-2 p-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 shadow-inner text-sm">
+                    <span className="font-medium text-zinc-800 dark:text-zinc-100">{user.email}</span>
+                    <div className="flex gap-2 flex-wrap">
+                      <span className="bg-purple-600 text-white text-xs font-semibold px-2 py-1 rounded-full">{plan || 'Free'}</span>
+                      <span className="bg-emerald-600 text-white text-xs font-semibold px-2 py-1 rounded-full">{credits ?? 0} credits</span>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="text-red-500 text-xs font-medium hover:underline text-left mt-2"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <Link
+                      href="/login"
+                      onClick={() => setMenuOpen(false)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-semibold text-center"
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      href="/register"
+                      onClick={() => setMenuOpen(false)}
+                      className="border border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white px-4 py-2 rounded-xl text-sm font-semibold text-center"
+                    >
+                      Register
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </motion.nav>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }
