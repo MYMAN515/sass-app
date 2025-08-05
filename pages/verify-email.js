@@ -21,7 +21,7 @@ export default function VerifyEmailPage() {
 
     const params = new URLSearchParams(hash.substring(1));
     const access_token = params.get('access_token');
-    const type = params.get('type'); // optional: can be "signup"
+    const refresh_token = params.get('refresh_token');
 
     const loginWithToken = async () => {
       try {
@@ -29,22 +29,34 @@ export default function VerifyEmailPage() {
 
         const { data, error } = await supabase.auth.setSession({
           access_token,
-          refresh_token: '', // optional
+          refresh_token,
         });
 
         if (error) throw error;
 
         const user = data?.user || data?.session?.user;
+
         if (user?.email) {
           Cookies.set('user', JSON.stringify({ email: user.email }), {
             expires: 7,
             path: '/',
+          });
+
+          await supabase.from('Data').upsert({
+            user_id: user.id,
+            email: user.email,
+            name: user.user_metadata?.name || '',
+            Provider: user.app_metadata?.provider || 'email',
+            created_at: new Date().toISOString(),
+            credits: 10,
+            plan: 'Free',
           });
         }
 
         setStatus('success');
         setTimeout(() => router.replace('/dashboard'), 1500);
       } catch (err) {
+        console.error(err);
         setStatus('error');
         setError('Failed to verify email. Please try again.');
       }
@@ -56,16 +68,16 @@ export default function VerifyEmailPage() {
   const getMessage = () => {
     switch (status) {
       case 'waiting':
-        return 'We sent a confirmation link to your email. Please check your inbox.';
+        return '✅ We sent a confirmation link to your email. Please check your inbox.';
       case 'verifying':
-        return 'Verifying your email...';
+        return '⏳ Verifying your email...';
       case 'success':
-        return '✅ Email verified successfully! Redirecting...';
+        return '🎉 Email verified successfully! Redirecting...';
       case 'error':
         return error;
       case 'loading':
       default:
-        return 'Checking...';
+        return '⏳ Checking...';
     }
   };
 
