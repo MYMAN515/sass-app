@@ -13,7 +13,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  // ✅ Prevent already logged-in users from accessing /login
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -39,9 +38,13 @@ export default function LoginPage() {
         throw new Error(loginError?.message || 'Login failed');
       }
 
-      // ✅ Store in cookie for Navbar
-      Cookies.set('user', JSON.stringify({ email: data.user.email }), { expires: 7, path: '/' });
+      const confirmed = data.user.email_confirmed_at;
+      if (!confirmed) {
+        await supabase.auth.signOut();
+        throw new Error('Please confirm your email before logging in.');
+      }
 
+      Cookies.set('user', JSON.stringify({ email: data.user.email }), { expires: 7, path: '/' });
       router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Something went wrong');
@@ -56,7 +59,6 @@ export default function LoginPage() {
         transition={{ duration: 0.7 }}
         className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl p-8 space-y-6 relative"
       >
-        {/* Back Button */}
         <button
           onClick={() => router.back()}
           className="absolute top-4 left-4 text-sm text-purple-600 dark:text-purple-300 hover:underline"
@@ -68,7 +70,6 @@ export default function LoginPage() {
           Welcome Back <span className="inline-block animate-wiggle">👋</span>
         </h1>
 
-        {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <input
             type="email"
@@ -97,14 +98,12 @@ export default function LoginPage() {
           )}
         </form>
 
-        {/* OR Divider */}
         <div className="flex items-center justify-center gap-2">
           <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
           <span className="text-xs text-zinc-500 dark:text-zinc-400">or continue with</span>
           <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
         </div>
 
-        {/* Google Login */}
         <button
           onClick={() => (window.location.href = '/api/login-with-google')}
           className="w-full flex items-center justify-center gap-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:shadow-md transition py-3 rounded-xl"
