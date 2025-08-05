@@ -1,108 +1,93 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
-import { motion } from 'framer-motion';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export default function LoginPage() {
+export default function Login() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const token = Cookies.get('token');
-    if (token) router.replace('/dashboard');
-  }, [router]);
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
+    setLoading(true);
     setError('');
+
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch('/api/loginapi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(form),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login failed');
 
-      Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      // Save tokens in cookies (optional if needed)
+      Cookies.set('token', data.token, { expires: 7 });
+      Cookies.set('user', JSON.stringify(data.user), { expires: 7 });
+
+      // 🧠 Important: Set session for Supabase client
+      const supabase = createClientComponentClient();
+
+      await supabase.auth.setSession({
+        access_token: data.token,
+        refresh_token: data.refreshToken, // ✅ Make sure your API returns this
+      });
+
       router.push('/dashboard');
     } catch (err) {
-      setError(err.message || 'Something went wrong');
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-zinc-900 via-indigo-800 to-purple-900 flex items-center justify-center px-4 py-16">
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7 }}
-        className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl p-8 space-y-6 relative"
-      >
-        <button
-          onClick={() => router.back()}
-          className="absolute top-4 left-4 text-sm text-purple-600 dark:text-purple-300 hover:underline"
-        >
-          ← Back
-        </button>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-zinc-900 px-4">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-zinc-800 p-8 rounded-lg shadow-md w-full max-w-md space-y-4">
+        <h2 className="text-2xl font-bold text-center dark:text-white">Login</h2>
 
-        <h1 className="text-3xl font-extrabold text-center text-zinc-900 dark:text-white">
-          Login to AI Store Assistant
-        </h1>
+        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button
-            type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition"
-          >
-            Login
-          </button>
-          {error && (
-            <p className="text-red-500 text-center font-medium mt-2">{error}</p>
-          )}
-        </form>
-
-        <div className="flex items-center justify-center gap-2">
-          <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">or continue with</span>
-          <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
-        </div>
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={handleChange}
+          required
+          className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange}
+          required
+          className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
 
         <button
-          onClick={() => (window.location.href = '/api/login-with-google')}
-          className="w-full flex items-center justify-center gap-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:shadow-md transition py-3 rounded-xl"
+          type="submit"
+          disabled={loading}
+          className="w-full bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700 transition"
         >
-          <img
-            src="https://www.svgrepo.com/show/475656/google-color.svg"
-            alt="Google"
-            className="w-5 h-5"
-          />
-          <span className="text-sm font-medium text-zinc-700 dark:text-white">
-            Sign in with Google
-          </span>
+          {loading ? 'Logging in...' : 'Login'}
         </button>
-      </motion.div>
-    </main>
+      </form>
+    </div>
   );
 }
