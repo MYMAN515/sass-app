@@ -96,23 +96,39 @@ export default async function handler(req, res) {
   }
 
   let finalOutput = output;
-  if (plan === 'Free') {
-    try {
-      finalOutput = await addWatermarkToImage(output);
-    } catch (err) {
-      return res.status(500).json({ error: 'Failed to apply watermark', detail: err.message });
-    }
+// 👇 بعد finalOutput = ...
+if (plan !== 'Free') {
+  const { error: creditError } = await supabase.rpc('decrement_credit', {
+    user_email: user_email,
+  });
+
+  if (creditError) {
+    console.error('Credit deduction failed:', creditError);
   }
-
-  if (plan !== 'Free') {
-    const { error: creditError } = await supabase.rpc('decrement_credit', {
-      user_email: user_email,
-    });
-
-    if (creditError) {
-      console.error('Credit deduction failed:', creditError);
-    }
-  }
-
-  return res.status(200).json({ output: finalOutput });
 }
+
+// ✅ أضف هذا الإدخال الجديد:
+const {
+  data: { session },
+  error: sessionError,
+} = await supabase.auth.getSession();
+
+const user_id = session?.user?.id;
+
+if (!user_id) {
+  return res.status(401).json({ error: 'User not authenticated' });
+}
+
+await supabase
+  .from('Data')
+  .insert([
+    {
+      email: user_email,
+      user_id,
+      image_url,
+      prompt,
+      plan,
+    },
+  ]);
+
+return res.status(200).json({ output: finalOutput });
