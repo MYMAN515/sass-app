@@ -1,62 +1,58 @@
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs'
 
 export const config = {
   api: {
     bodyParser: true,
   },
-};
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Only POST allowed' });
+    return res.status(405).json({ error: 'Only POST allowed' })
   }
 
   try {
-    const { imageUrl, prompt, plan = 'Free', user_email } = req.body || {};
-
+    const { imageUrl, prompt, plan = 'Free', user_email } = req.body || {}
     if (!imageUrl || !prompt || !user_email) {
-      return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' });
+      return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' })
     }
 
-    const supabase = createPagesServerClient({ req, res });
+    const supabase = createPagesServerClient({ req, res })
 
     const {
       data: { session },
       error: sessionError,
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getSession()
 
-    if (sessionError) {
-      return res.status(500).json({ error: 'Failed to get session', detail: sessionError.message });
+    if (sessionError || !session?.user) {
+      return res.status(401).json({ error: 'User not authenticated' })
     }
 
-    const user_id = session?.user?.id;
-    if (!user_id) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
+    const user_id = session.user.id
 
-    // ✅ Check available credits (if not Free plan)
+    // ✅ Check available credits if not Free plan
     if (plan !== 'Free') {
-      const { data, error } = await supabase
+      const { data: creditData, error: creditError } = await supabase
         .from('Data')
         .select('credits')
         .eq('user_id', user_id)
-        .single();
+        .single()
 
-      if (error || !data) {
-        return res.status(500).json({ error: 'Failed to fetch user credits' });
+      if (creditError || !creditData) {
+        return res.status(500).json({ error: 'Failed to fetch user credits' })
       }
 
-      if (data.credits <= 0) {
-        return res.status(403).json({ error: 'No credits remaining. Please upgrade your plan.' });
+      if (creditData.credits <= 0) {
+        return res.status(403).json({ error: 'No credits remaining. Please upgrade your plan.' })
       }
     }
 
-    const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
+    const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN
     if (!REPLICATE_TOKEN) {
-      return res.status(500).json({ error: 'Replicate API token not set' });
+      return res.status(500).json({ error: 'Replicate API token not set' })
     }
 
-    let startData;
+    // 🧠 Call Replicate API
     const startRes = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
@@ -73,84 +69,70 @@ export default async function handler(req, res) {
           safety_tolerance: 2,
         },
       }),
-    });
+    })
 
+    let startData
     try {
-      startData = await startRes.json();
+      startData = await startRes.json()
     } catch (err) {
-      const text = await startRes.text();
+      const text = await startRes.text()
       return res.status(500).json({
         error: 'Invalid JSON from Replicate',
         detail: text.slice(0, 300),
-      });
+      })
     }
 
     if (!startRes.ok || !startData?.urls?.get) {
       return res.status(400).json({
         error: startData?.error || 'Replicate API failed to start generation',
         detail: startData,
-      });
+      })
     }
 
-    // ✅ Polling
-    const statusUrl = startData.urls.get;
-    let output = null;
-    let pollCount = 0;
-    const maxPolls = 30;
+    // 🌀 Poll for result
+    const statusUrl = startData.urls.get
+    let output = null
+    let pollCount = 0
+    const maxPolls = 30
 
     while (pollCount < maxPolls) {
       const pollRes = await fetch(statusUrl, {
         headers: { Authorization: `Token ${REPLICATE_TOKEN}` },
-      });
-      const pollData = await pollRes.json();
+      })
+      const pollData = await pollRes.json()
 
       if (pollData.status === 'succeeded') {
-        output = pollData.output;
-        break;
+        output = pollData.output
+        break
       }
 
       if (pollData.status === 'failed') {
-        return res.status(500).json({ error: 'AI generation failed', detail: pollData });
+        return res.status(500).json({ error: 'AI generation failed', detail: pollData })
       }
 
-      await new Promise((r) => setTimeout(r, 2000));
-      pollCount++;
+      await new Promise((r) => setTimeout(r, 2000))
+      pollCount++
     }
 
     if (!output) {
-      return res.status(504).json({ error: 'Timed out waiting for AI result' });
+      return res.status(504).json({ error: 'Timed out waiting for AI result' })
     }
 
-    // ✅ Decrement credit via RPC
+    // ✅ Decrement credit using RPC
     if (plan !== 'Free') {
-      const { error: creditError } = await supabase.rpc('decrement_credit', {
+      const { error: rpcError } = await supabase.rpc('decrement_credit', {
         user_uuid: user_id,
-      });
+      })
 
-      if (creditError) {
-        console.error('Credit deduction failed:', creditError);
+      if (rpcError) {
+        console.error('Failed to decrement credit:', rpcError)
+        return res.status(500).json({ error: 'Credit deduction failed', detail: rpcError.message })
       }
     }
 
-    // ✅ Insert log
-    const { error: insertError } = await supabase.from('Data').insert([
-      {
-        email: user_email,
-        user_id,
-        image_url: imageUrl,
-        prompt,
-        plan,
-      },
-    ]);
-
-    if (insertError) {
-      console.error('Insert failed:', insertError);
-      return res.status(500).json({ error: 'Failed to insert enhancement log', detail: insertError.message });
-    }
-
-    return res.status(200).json({ output });
+    return res.status(200).json({ output })
   } catch (err) {
-    console.error('Unhandled server error:', err);
-    return res.status(500).json({ error: 'Unhandled server error', detail: err.message });
+    console.error('Unhandled error:', err)
+    return res.status(500).json({ error: 'Unhandled server error', detail: err.message })
   }
 }
