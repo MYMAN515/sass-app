@@ -1,11 +1,12 @@
 // pages/api/enhance.js
 
-import { createClient } from '@supabase/supabase-js';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY // يجب أن يكون هذا المفتاح في .env.local
-);
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,7 +15,14 @@ export default async function handler(req, res) {
 
   const { imageUrl, prompt } = req.body;
 
-  // 1. تحقق من الجلسة
+  if (!imageUrl || !prompt) {
+    return res.status(400).json({ error: 'Missing imageUrl or prompt' });
+  }
+
+  // ✅ Create supabase client (reads cookies from req/res)
+  const supabase = createPagesServerClient({ req, res });
+
+  // ✅ Get current session from cookie
   const {
     data: { session },
     error: sessionError,
@@ -26,7 +34,7 @@ export default async function handler(req, res) {
 
   const userEmail = session.user.email;
 
-  // 2. جلب بيانات المستخدم
+  // ✅ Fetch user data (credits + plan)
   const { data: userData, error: userError } = await supabase
     .from('Data')
     .select('credits, plan')
@@ -37,12 +45,12 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // 3. تحقق من الكريدت
+  // ✅ Check credits
   if (userData.plan !== 'Pro' && userData.credits <= 0) {
     return res.status(403).json({ error: 'No credits left' });
   }
 
-  // 4. أرسل الصورة إلى Replicate
+  // ✅ Send request to Replicate
   const replicateRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -72,7 +80,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Image generation failed' });
   }
 
-  // 5. خصم كريدت واحد إذا الخطة Free ونجحت الصورة
+  // ✅ Deduct credit for Free plan
   if (userData.plan !== 'Pro') {
     await supabase.rpc('decrement_credit', { user_email: userEmail });
   }
