@@ -53,6 +53,9 @@ export default function TryOnPage() {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [useCustom, setUseCustom] = useState(false);
+  const [userId, setUserId] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [userPlan, setUserPlan] = useState('Free');
   const [customPrompt, setCustomPrompt] = useState('');
   const [options, setOptions] = useState({});
   const [result, setResult] = useState(null);
@@ -100,7 +103,12 @@ export default function TryOnPage() {
       const res = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: url, prompt: finalPrompt }),
+        body: JSON.stringify({ 
+imageUrl: url, 
+prompt: finalPrompt,
+          plan: userPlan,
+          user_email: userEmail,
+}),
       });
 
       const data = await res.json();
