@@ -120,51 +120,43 @@ export default function EnhancePage() {
     try {
       const imageUrl = await uploadImageToSupabase(file);
       const res = await fetch('/api/enhance', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    imageUrl,
-    prompt,
-    plan: userPlan,
-    user_email: userEmail,
-  }),
-});
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl,
+          prompt,
+          plan: userPlan,
+          user_email: userEmail,
+        }),
+      });
 
-const text = await res.text();
-let data;
-try {
-  data = JSON.parse(text);
-} catch (err) {
-  setToast({
-    show: true,
-    message: `Server Error (non-JSON): ${text.slice(0, 150)}`,
-    type: 'error',
-  });
-  setLoading(false);
-  return;
-}
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        setToast({ show: true, message: `Server Error (non-JSON): ${text.slice(0, 150)}`, type: 'error' });
+        setLoading(false);
+        return;
+      }
 
-if (!res.ok) {
-  let errorMessage = `Server Error: ${data?.error || 'Unknown error'}`;
-  if (data?.detail) {
-    errorMessage += `\nDetails: ${data.detail}`;
-  }
+      if (!res.ok) {
+        let errorMessage = `Server Error: ${data?.error || 'Unknown error'}`;
+        if (data?.detail) {
+          errorMessage += `\nDetails: ${data.detail}`;
+        }
+        setToast({ show: true, message: errorMessage, type: 'error' });
+        setLoading(false);
+        return;
+      }
 
-  setToast({
-    show: true,
-    message: errorMessage,
-    type: 'error',
-  });
-  setLoading(false);
-  return;
-}
-
-setResult(data.output);
-setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
-
-
-      setResult(data.output);
+      setResult(data.image);
       setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
+
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }, 500);
+
     } catch (err) {
       setToast({ show: true, message: err.message, type: 'error' });
     } finally {
@@ -172,12 +164,23 @@ setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
     }
   };
 
+  const downloadImage = () => {
+    if (!result) return;
+    const link = document.createElement('a');
+    link.href = result;
+    link.download = `enhanced-image-${Date.now()}.webp`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <Layout title="Enhance Product Image" description="Enhance your product images with AI">
       <main className={`${poppins.className} min-h-screen py-20`}>
         <Toast show={toast.show} message={toast.message} type={toast.type} />
         <div className="px-4 sm:px-6 md:px-12 lg:px-24 mx-auto space-y-32 max-w-4xl">
-          {/* Upload */}
+
+          {/* Upload Section */}
           <section>
             <h2 className="text-3xl font-semibold text-center mb-6">Upload Product Photo</h2>
             <div className="bg-white dark:bg-zinc-800 p-6 rounded-3xl shadow-xl">
@@ -191,7 +194,7 @@ setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
             </div>
           </section>
 
-          {/* Modal */}
+          {/* Customize Modal */}
           <AnimatePresence>
             {showEnhanceModal && (
               <motion.div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -208,24 +211,45 @@ setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
             )}
           </AnimatePresence>
 
-          {/* Result */}
-          {result && (
-            <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <h2 className="text-2xl font-semibold text-center mb-4">Enhanced Result</h2>
-              <motion.img
-                src={result}
-                alt="result"
-                className="w-full max-w-md mx-auto rounded-2xl border border-purple-600 shadow-xl"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-              />
+          {/* Result Section */}
+          {result && !loading && (
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="text-center"
+            >
+              <h2 className="text-2xl font-semibold mb-4">Enhanced Result</h2>
+              <div className="relative inline-block">
+                <motion.img
+                  src={result}
+                  alt="Enhanced Result"
+                  className="w-full max-w-md rounded-3xl border-2 border-purple-600 shadow-xl transition-transform duration-300 hover:scale-105"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                />
+              </div>
+              <button
+                onClick={downloadImage}
+                className="mt-6 inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg transition-all duration-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                Download Image
+              </button>
             </motion.section>
           )}
 
-          {/* Spinner */}
-          {loading && !result && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="flex items-center justify-center min-h-[300px] px-4">
+          {/* Spinner while loading */}
+          {loading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4 }}
+              className="flex items-center justify-center min-h-[300px] px-4"
+            >
               <Spinner />
             </motion.div>
           )}
