@@ -1,4 +1,4 @@
-// /pages/api/enhance.js
+// pages/api/enhance.js
 
 import { addWatermarkToImage } from '@/lib/addWatermarkToImage';
 import { supabase } from '@/lib/supabaseClient';
@@ -20,7 +20,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' });
   }
 
-  // 🧠 Step 1: Check credits for paid plans
   if (plan !== 'Free') {
     const { data, error } = await supabase
       .from('Data')
@@ -37,7 +36,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // ⚡ Step 2: Generate enhanced image via Replicate API
   const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
   if (!REPLICATE_TOKEN) {
     return res.status(500).json({ error: 'Replicate API token not set' });
@@ -70,7 +68,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // ⏳ Step 3: Poll for status
   const statusUrl = startData.urls.get;
   let output = null;
   let pollCount = 0;
@@ -98,7 +95,6 @@ export default async function handler(req, res) {
     return res.status(504).json({ error: 'Timed out waiting for AI result' });
   }
 
-  // 🖋️ Step 4: Add watermark if Free plan
   let finalOutput = output;
   if (plan === 'Free') {
     try {
@@ -108,17 +104,15 @@ export default async function handler(req, res) {
     }
   }
 
-  // 📉 Step 5: Deduct 1 credit for paid users
   if (plan !== 'Free') {
     const { error: creditError } = await supabase.rpc('decrement_credit', {
-      user_email,
+      user_email: user_email,
     });
 
     if (creditError) {
-      console.error('❌ Credit deduction failed:', creditError);
+      console.error('Credit deduction failed:', creditError);
     }
   }
 
-  // ✅ Step 6: Final response
   return res.status(200).json({ output: finalOutput });
 }
