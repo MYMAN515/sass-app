@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  // ✅ Prevent infinite redirect loop
+  // ✅ Prevent infinite redirect loop if already logged in
   useEffect(() => {
     const token = Cookies.get('token');
     if (token && router.pathname === '/login') {
@@ -33,11 +33,10 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
 
-      Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
+      // ✅ Store token only — avoid duplicate cookies
+      Cookies.set('token', data.token, { expires: 7, path: '/' });
 
-      if (window.location.pathname !== '/dashboard') {
-        router.push('/dashboard');
-      }
+      router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Something went wrong');
     }
