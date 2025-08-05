@@ -1,6 +1,6 @@
 // pages/api/enhance.js
 
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = {
   api: {
@@ -20,8 +20,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing imageUrl or prompt' });
   }
 
-  // ✅ Create Supabase client (server-side)
-  const supabase = createServerSupabaseClient({ req, res });
+  // ✅ Create Supabase client
+  const supabase = createPagesServerClient({ req, res });
 
   // ✅ Get session
   const {
@@ -52,13 +52,12 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // ✅ Check credits
   if (userData.plan !== 'Pro' && userData.credits <= 0) {
     console.warn('[WARNING] No credits left');
     return res.status(403).json({ error: 'No credits left' });
   }
 
-  // ✅ Call Replicate API
+  // ✅ Send request to Replicate
   console.log('[DEBUG] Sending request to Replicate...');
   const replicateRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
@@ -67,11 +66,11 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      version: 'black-forest-labs/flux-kontext-max', // ✅ تأكد من وجود هذا الموديل على Replicate
+      version: 'black-forest-labs/flux-kontext-max',
       input: {
         input_image: imageUrl,
         prompt,
-        aspect_ratio: 'square',
+        aspect_ratio: 'match_input_image', // ✅ FIXED HERE
       },
     }),
   });
