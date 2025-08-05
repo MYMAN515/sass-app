@@ -1,3 +1,5 @@
+// pages/api/login.js
+
 import { supabase } from '@/lib/supabaseClient';
 
 export default async function handler(req, res) {
@@ -30,8 +32,11 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     success: true,
-    user,
+    user: {
+      id: user?.id,
+      email: user?.email,
+    },
     token,
-    refreshToken,
+    refresh_token: refreshToken,
   });
 }
