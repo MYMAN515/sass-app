@@ -119,21 +119,44 @@ export default function EnhancePage() {
 
     try {
       const imageUrl = await uploadImageToSupabase(file);
-
       const res = await fetch('/api/enhance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrl,
-          prompt,
-          plan: userPlan,
-          user_email: userEmail,
-          user_id: userId, // إذا حبيت تمرره أيضًا
-        }),
-      });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    imageUrl,
+    prompt,
+    plan: userPlan,
+    user_email: userEmail,
+  }),
+});
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Enhancement failed');
+// 🛡️ حماية ضد JSON غير صالح
+const text = await res.text();
+let data;
+try {
+  data = JSON.parse(text);
+} catch (err) {
+  setToast({
+    show: true,
+    message: `Server Error (non-JSON): ${text.slice(0, 150)}`,
+    type: 'error',
+  });
+  setLoading(false);
+  return;
+}
+
+if (!res.ok) {
+  setToast({
+    show: true,
+    message: data?.error || 'Enhancement failed',
+    type: 'error',
+  });
+  setLoading(false);
+  return;
+}
+
+setResult(data.output);
+setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
 
       setResult(data.output);
       setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
