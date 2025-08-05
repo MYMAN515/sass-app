@@ -12,7 +12,7 @@ import TryOnCustomizer from '@/components/TryOnCustomizer';
 import { uploadImageToSupabase } from '@/lib/uploadImageToSupabase';
 // lib/generateDynamicPrompt.js
 
-export default function generateDynamicPrompt({
+const generateDynamicPrompt({
   gender = 'Female',
   Age = 'Adult',
   product = 'Shirt',
