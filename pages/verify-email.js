@@ -37,11 +37,17 @@ export default function VerifyEmailPage() {
         const user = data?.user || data?.session?.user;
 
         if (user?.email) {
+          // ✅ Save to cookies
           Cookies.set('user', JSON.stringify({ email: user.email }), {
             expires: 7,
             path: '/',
           });
 
+          // ✅ Save to localStorage
+          localStorage.setItem('access_token', access_token);
+          localStorage.setItem('refresh_token', refresh_token);
+
+          // ✅ Save user to DB if needed
           await supabase.from('Data').upsert({
             user_id: user.id,
             email: user.email,
@@ -54,7 +60,7 @@ export default function VerifyEmailPage() {
         }
 
         setStatus('success');
-        setTimeout(() => router.replace('/dashboard'), 2000);
+        setTimeout(() => router.replace('/dashboard'), 1500);
       } catch (err) {
         console.error(err);
         setStatus('error');
@@ -75,6 +81,7 @@ export default function VerifyEmailPage() {
         return '🎉 Email verified successfully! Redirecting...';
       case 'error':
         return error;
+      case 'loading':
       default:
         return '⏳ Checking...';
     }
