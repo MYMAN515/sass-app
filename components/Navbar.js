@@ -55,10 +55,13 @@ export default function Navbar() {
       Cookies.set('user', JSON.stringify({ email: supaUser.email }), { expires: 7 });
 
       const { data, error } = await supabase
-        .from('Data')
-        .select('plan, credits')
-        .eq('email', supaUser.email)
-        .single();
+  .from('Data')
+  .select('plan, credits')
+  .eq('user_id', supaUser.id)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
+
 
       if (!error && data) {
         setPlan(data.plan);
