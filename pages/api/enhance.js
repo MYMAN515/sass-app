@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY // لا تستخدم هذا في الكلاينت
+  process.env.SUPABASE_SERVICE_ROLE_KEY // يجب أن يكون هذا المفتاح في .env.local
 );
 
 export default async function handler(req, res) {
@@ -12,13 +12,21 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Only POST requests allowed' });
   }
 
-  const { imageUrl, prompt, user_email: userEmail } = req.body;
+  const { imageUrl, prompt } = req.body;
 
-  if (!userEmail) {
-    return res.status(401).json({ error: 'Unauthorized - Missing email' });
+  // 1. تحقق من الجلسة
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (!session || sessionError) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // 1. جلب بيانات المستخدم
+  const userEmail = session.user.email;
+
+  // 2. جلب بيانات المستخدم
   const { data: userData, error: userError } = await supabase
     .from('Data')
     .select('credits, plan')
@@ -29,12 +37,12 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // 2. تحقق من الكريدت
+  // 3. تحقق من الكريدت
   if (userData.plan !== 'Pro' && userData.credits <= 0) {
     return res.status(403).json({ error: 'No credits left' });
   }
 
-  // 3. أرسل الصورة إلى Replicate
+  // 4. أرسل الصورة إلى Replicate
   const replicateRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -54,12 +62,17 @@ export default async function handler(req, res) {
   const replicateData = await replicateRes.json();
 
   if (!replicateData || replicateData.error) {
+    console.error('Replicate error:', replicateData?.error);
     return res.status(500).json({ error: 'Failed to generate image' });
   }
 
   const generatedImage = replicateData?.urls?.get;
 
-  // 4. خصم كريدت واحد إذا الخطة Free
+  if (!generatedImage) {
+    return res.status(500).json({ error: 'Image generation failed' });
+  }
+
+  // 5. خصم كريدت واحد إذا الخطة Free ونجحت الصورة
   if (userData.plan !== 'Pro') {
     await supabase.rpc('decrement_credit', { user_email: userEmail });
   }
