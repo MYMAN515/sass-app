@@ -7,71 +7,56 @@ import { supabase } from '@/lib/supabaseClient';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const [checking, setChecking] = useState(true);
-  const [confirmed, setConfirmed] = useState(false);
+  const [status, setStatus] = useState('Verifying...');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      setChecking(true);
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.substring(1));
+    const access_token = params.get('access_token');
+    const type = params.get('type'); // usually "signup"
+
+    const autoSignIn = async () => {
       try {
-        // 🔁 تأكد من تحديث الجلسة أولًا
-        await supabase.auth.refreshSession();
-
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) throw error;
-
-        const emailConfirmed = session?.user?.email_confirmed_at;
-        if (emailConfirmed) {
-          clearInterval(interval);
-          setConfirmed(true);
-          setTimeout(() => router.push('/dashboard'), 1500); // ⏳ بعد 1.5 ثانية للانتقال
-        } else {
-          setConfirmed(false);
+        if (!access_token) {
+          setStatus('No token found in URL.');
+          return;
         }
-      } catch (err) {
-        setError('Something went wrong while checking email verification.');
-        clearInterval(interval);
-      } finally {
-        setChecking(false);
-      }
-    }, 4000); // ⏳ كل 4 ثواني
 
-    return () => clearInterval(interval);
+        // ✅ تسجيل الجلسة يدويًا باستخدام التوكن
+        const { data, error } = await supabase.auth.setSession({
+          access_token,
+          refresh_token: '', // لا يوجد refresh_token في الرابط، لكن مسموح تمريره كـ ''
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        setStatus('Email verified successfully! Redirecting...');
+        setTimeout(() => {
+          router.replace('/dashboard');
+        }, 1500);
+      } catch (err) {
+        console.error(err);
+        setError('Failed to verify your email. Please try logging in manually.');
+        setStatus('');
+      }
+    };
+
+    autoSignIn();
   }, [router]);
 
   return (
     <>
       <Head>
-        <title>Verify Email - AI Store Assistant</title>
+        <title>Verifying Email - AI Store Assistant</title>
       </Head>
       <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-indigo-800 to-purple-900 px-4 py-20">
         <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-2xl p-8 shadow-2xl text-center space-y-4">
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
-            {confirmed ? 'Email Verified 🎉' : 'Waiting for Email Confirmation...'}
-          </h1>
-
-          <p className="text-zinc-600 dark:text-zinc-400">
-            {confirmed
-              ? 'Redirecting you to your dashboard...'
-              : 'Please check your email and click the confirmation link. This page will auto-update.'}
-          </p>
-
-          {checking && !confirmed && (
-            <p className="text-purple-600 font-medium">Checking status...</p>
-          )}
-
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-
-          <div className="mt-6">
-            <p className="text-xs text-zinc-400">
-              Didn’t receive the email? Check your spam folder or try signing up again.
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Email Verification</h1>
+          <p className="text-zinc-600 dark:text-zinc-400">{status}</p>
+          {error && <p className="text-red-500">{error}</p>}
         </div>
       </main>
     </>
