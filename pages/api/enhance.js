@@ -1,4 +1,3 @@
-import { addWatermarkToImage } from '@/lib/addWatermarkToImage';
 import { createServerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
@@ -119,18 +118,6 @@ export default async function handler(req, res) {
   }
 
   let finalOutput = output;
-  if (plan === 'Free') {
-    try {
-      finalOutput = await addWatermarkToImage(output, supabase);
-    } catch (err) {
-      console.error('Watermark error:', err);
-      return res.status(500).json({
-        error: 'Failed to apply watermark',
-        detail: `${err.message || 'Unknown error'}`,
-      });
-    }
-  }
-
   if (plan !== 'Free') {
     const { error: creditError } = await supabase.rpc('decrement_credit', {
       user_email: user_email,
