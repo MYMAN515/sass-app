@@ -4,24 +4,24 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { supabase } from '@/lib/supabaseClient';
+import Cookies from 'js-cookie';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const [status, setStatus] = useState('loading'); // loading | waiting | verifying | success | error
+  const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
 
   useEffect(() => {
     const hash = window.location.hash;
 
-    // ✅ حالة 1: المستخدم فتح الصفحة يدويًا بدون ما يضغط الرابط
     if (!hash || !hash.includes('access_token')) {
-      setStatus('waiting'); // Show: check your email message
+      setStatus('waiting');
       return;
     }
 
-    // ✅ حالة 2: المستخدم فتح رابط التفعيل من الإيميل
     const params = new URLSearchParams(hash.substring(1));
     const access_token = params.get('access_token');
+    const type = params.get('type'); // optional: can be "signup"
 
     const loginWithToken = async () => {
       try {
@@ -29,10 +29,18 @@ export default function VerifyEmailPage() {
 
         const { data, error } = await supabase.auth.setSession({
           access_token,
-          refresh_token: '', // we don't need this for verification
+          refresh_token: '', // optional
         });
 
         if (error) throw error;
+
+        const user = data?.user || data?.session?.user;
+        if (user?.email) {
+          Cookies.set('user', JSON.stringify({ email: user.email }), {
+            expires: 7,
+            path: '/',
+          });
+        }
 
         setStatus('success');
         setTimeout(() => router.replace('/dashboard'), 1500);
