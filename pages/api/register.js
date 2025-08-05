@@ -11,7 +11,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing fields or token' });
   }
 
-  // ✅ إنشاء Supabase client مع التوكن لتمرير auth.uid() إلى RLS
+  const normalizedEmail = email.trim().toLowerCase();
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -24,7 +25,6 @@ export default async function handler(req, res) {
     }
   );
 
-  // ✅ الحصول على المستخدم من التوكن
   const {
     data: { user },
     error: userError,
@@ -34,26 +34,23 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Invalid token or user not found' });
   }
 
-  // ✅ التأكد من أن البريد غير مسجل مسبقًا
   const { data: existingUser } = await supabase
     .from('Data')
     .select('email')
-    .eq('email', email)
+    .eq('email', normalizedEmail)
     .single();
 
-  if (existingUser) {
-    return res.status(409).json({ error: 'Email already registered' });
+  if (existingUser?.email) {
+    return res.status(409).json({ error: `Email "${normalizedEmail}" already registered` });
   }
 
-  // ✅ تشفير كلمة المرور قبل التخزين
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // ✅ إدخال المستخدم في جدول Data باستخدام user_id الصحيح
   const { error: insertError } = await supabase.from('Data').insert([
     {
       user_id: user.id,
       name,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       Provider: 'Default',
     },
