@@ -1,5 +1,7 @@
 import { addWatermarkToImage } from '@/lib/addWatermarkToImage';
-import { supabase } from '@/lib/supabaseClient';
+import { createServerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+const supabase = createServerClient({ cookies });
 
 export const config = {
   api: {
@@ -51,6 +53,7 @@ export default async function handler(req, res) {
   if (!REPLICATE_TOKEN) {
     return res.status(500).json({ error: 'Replicate API token not set' });
   }
+console.log('session user?', (await supabase.auth.getUser()).data?.user);
 
   // ✅ Start replicate generation
   const startRes = await fetch('https://api.replicate.com/v1/predictions', {
