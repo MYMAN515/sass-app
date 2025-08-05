@@ -10,7 +10,6 @@ import Button from '@/components/Button';
 import Layout from '@/components/Layout';
 import TryOnCustomizer from '@/components/TryOnCustomizer';
 import { uploadImageToSupabase } from '@/lib/uploadImageToSupabase';
-// lib/generateDynamicPrompt.js
 
 function generateDynamicPrompt({
   gender = 'Female',
@@ -42,9 +41,9 @@ Fabric Detail: Ensure full preservation of garment features including patterns, 
 
 Photographic Quality: The final output must look like a professionally shot image for a premium clothing brand’s digital catalog or storefront.
 
-Output Requirements: High-resolution, crisp edges, no watermark, no logos, no text overlays.
-  `.trim();
+Output Requirements: High-resolution, crisp edges, no watermark, no logos, no text overlays.`.trim();
 }
+
 const poppins = Poppins({ subsets: ['latin'], weight: ['400', '600', '700'], display: 'swap' });
 
 export default function TryOnPage() {
@@ -55,13 +54,19 @@ export default function TryOnPage() {
   const [useCustom, setUseCustom] = useState(false);
   const [userId, setUserId] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [userPlan, setUserPlan] = useState('Free');
   const [customPrompt, setCustomPrompt] = useState('');
   const [options, setOptions] = useState({});
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [showCustomizer, setShowCustomizer] = useState(false);
+
+  useEffect(() => {
+    if (session?.user) {
+      setUserEmail(session.user.email);
+      setUserId(session.user.id);
+    }
+  }, [session]);
 
   useEffect(() => () => previewUrl && URL.revokeObjectURL(previewUrl), [previewUrl]);
 
@@ -94,28 +99,26 @@ export default function TryOnPage() {
       return setToast({ show: true, message: 'Prompt is missing or incomplete.', type: 'error' });
     }
 
-
     setLoading(true);
 
     try {
       const url = await uploadImageToSupabase(file);
- 
+
       const res = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-imageUrl: url, 
-prompt: finalPrompt,
-          plan: userPlan,
+          imageUrl: url, 
+          prompt: finalPrompt,
           user_email: userEmail,
-}),
+        }),
       });
 
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error || 'Generation failed');
 
-      setResult(Array.isArray(data.output) ? data.output[0] : data.output);
+      setResult(Array.isArray(data.image) ? data.image[0] : data.image);
       setToast({ show: true, message: 'Done!', type: 'success' });
     } catch (err) {
       setToast({ show: true, message: err.message, type: 'error' });
@@ -129,7 +132,6 @@ prompt: finalPrompt,
       <main className={`${poppins.className} min-h-screen bg-gradient-to-b from-white to-purple-50 dark:from-zinc-900 dark:to-purple-900 text-gray-900 dark:text-gray-100 py-20`}>
         <Toast show={toast.show} message={toast.message} type={toast.type} />
 
-        {/* Upload Section */}
         <section className="max-w-md mx-auto mb-20">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <h2 className="text-3xl font-semibold mb-4 text-center">Upload Clothing Photo</h2>
@@ -153,7 +155,6 @@ prompt: finalPrompt,
           </motion.div>
         </section>
 
-        {/* Modal Popup */}
         <AnimatePresence>
           {showCustomizer && (
             <motion.div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -167,7 +168,6 @@ prompt: finalPrompt,
           )}
         </AnimatePresence>
 
-        {/* Generate Button */}
         {!showCustomizer && (
           <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className="text-center mt-20">
             <Button onClick={handleGenerate} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg transition">
@@ -176,7 +176,6 @@ prompt: finalPrompt,
           </motion.section>
         )}
 
-        {/* Result Section */}
         {result && (
           <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mt-16">
             <h2 className="text-3xl font-semibold mb-4 text-center">Result</h2>
