@@ -1,93 +1,123 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 
-export default function Login() {
+export default function LoginPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  useEffect(() => {
+    const token = Cookies.get('token');
+    if (token) router.replace('/dashboard');
+  }, [router]);
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-
-    setLoading(true);
     setError('');
-
+    setLoading(true);
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Login failed');
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Login failed');
-      }
-
-      // Save tokens in cookies (optional if needed)
-      Cookies.set('token', data.token, { expires: 7 });
-      Cookies.set('user', JSON.stringify(data.user), { expires: 7 });
-
-      // 🧠 Important: Set session for Supabase client
-      const supabase = createClientComponentClient();
-
-      await supabase.auth.setSession({
-        access_token: data.token,
-        refresh_token: data.refreshToken, // ✅ Make sure your API returns this
-      });
-
+      Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
       router.push('/dashboard');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-zinc-900 px-4">
-      <form onSubmit={handleSubmit} className="bg-white dark:bg-zinc-800 p-8 rounded-lg shadow-md w-full max-w-md space-y-4">
-        <h2 className="text-2xl font-bold text-center dark:text-white">Login</h2>
+    <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-indigo-900 to-purple-950 flex items-center justify-center px-4 py-16">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl shadow-xl p-10 space-y-6 relative backdrop-blur-md"
+      >
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 left-4 text-sm text-purple-400 hover:underline"
+        >
+          ← Back
+        </button>
 
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+        <h1 className="text-3xl font-extrabold text-center text-white tracking-tight">
+          Welcome Back 👋
+        </h1>
 
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={handleChange}
-          required
-          className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-        />
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange}
-          required
-          className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-        />
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-zinc-300 mb-1">Email</label>
+            <input
+              type="email"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-800 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-600"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-zinc-300 mb-1">Password</label>
+            <input
+              type="password"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-800 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-600"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 className="animate-spin h-5 w-5" /> : 'Login'}
+          </button>
+
+          {error && (
+            <p className="text-red-500 text-center font-medium mt-2 text-sm">{error}</p>
+          )}
+        </form>
+
+        <div className="flex items-center justify-center gap-2">
+          <span className="h-px bg-zinc-700 w-1/4" />
+          <span className="text-xs text-zinc-500">or continue with</span>
+          <span className="h-px bg-zinc-700 w-1/4" />
+        </div>
 
         <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700 transition"
+          onClick={() => (window.location.href = '/api/login-with-google')}
+          className="w-full flex items-center justify-center gap-3 bg-white dark:bg-zinc-800 border border-zinc-700 hover:shadow-md transition py-3 rounded-xl"
         >
-          {loading ? 'Logging in...' : 'Login'}
+          <img
+            src="https://www.svgrepo.com/show/475656/google-color.svg"
+            alt="Google"
+            className="w-5 h-5"
+          />
+          <span className="text-sm font-medium text-zinc-800 dark:text-white">
+            Sign in with Google
+          </span>
         </button>
-      </form>
-    </div>
+      </motion.div>
+    </main>
   );
 }
