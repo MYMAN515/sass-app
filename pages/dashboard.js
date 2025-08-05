@@ -31,20 +31,13 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const stored = Cookies.get('user');
-    if (!stored) {
-      router.replace('/login');
-      return;
-    }
+    const token = Cookies.get('token');
 
-    try {
-      const parsed = JSON.parse(stored);
-      if (!parsed?.email) throw new Error('Invalid user object');
-      setUser(parsed);
-    } catch (err) {
-      console.error('Invalid cookie:', err);
-      Cookies.remove('user');
+    if (!token) {
       router.replace('/login');
+    } else {
+      // You can enhance this by decoding the token or fetching user info
+      setUser({ email: 'authenticated' }); 
     }
   }, []);
 
