@@ -53,6 +53,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Replicate API token not set' });
   }
 
+  let startData;
   const startRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -71,7 +72,16 @@ export default async function handler(req, res) {
     }),
   });
 
-  const startData = await startRes.json();
+  try {
+    startData = await startRes.json();
+  } catch (err) {
+    const text = await startRes.text();
+    console.error('Non-JSON response from Replicate:', text);
+    return res.status(500).json({
+      error: 'Invalid JSON from Replicate',
+      detail: text.slice(0, 300),
+    });
+  }
 
   if (!startRes.ok || !startData?.urls?.get) {
     return res.status(400).json({
@@ -110,17 +120,16 @@ export default async function handler(req, res) {
 
   let finalOutput = output;
   if (plan === 'Free') {
-  try {
-    finalOutput = await addWatermarkToImage(output, supabase);
-  } catch (err) {
-    console.error('Watermark error:', err);
-    return res.status(500).json({
-      error: 'Failed to apply watermark',
-      detail: `${err.message || 'Unknown error'}`,
-    });
+    try {
+      finalOutput = await addWatermarkToImage(output, supabase);
+    } catch (err) {
+      console.error('Watermark error:', err);
+      return res.status(500).json({
+        error: 'Failed to apply watermark',
+        detail: `${err.message || 'Unknown error'}`,
+      });
+    }
   }
-}
-
 
   if (plan !== 'Free') {
     const { error: creditError } = await supabase.rpc('decrement_credit', {
