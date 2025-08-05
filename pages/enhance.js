@@ -13,7 +13,7 @@ import { Poppins } from 'next/font/google';
 
 const poppins = Poppins({ subsets: ['latin'], weight: ['400', '600', '700'], display: 'swap' });
 
-function generateEnhancePrompt = ({
+const generateEnhancePrompt = ({
   photographyStyle = '',
   background = '',
   lighting = '',
