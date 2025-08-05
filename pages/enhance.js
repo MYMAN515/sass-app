@@ -130,7 +130,6 @@ export default function EnhancePage() {
   }),
 });
 
-// 🛡️ حماية ضد JSON غير صالح
 const text = await res.text();
 let data;
 try {
@@ -146,9 +145,14 @@ try {
 }
 
 if (!res.ok) {
+  let errorMessage = `Server Error: ${data?.error || 'Unknown error'}`;
+  if (data?.detail) {
+    errorMessage += `\nDetails: ${data.detail}`;
+  }
+
   setToast({
     show: true,
-    message: data?.error || 'Enhancement failed',
+    message: errorMessage,
     type: 'error',
   });
   setLoading(false);
@@ -157,6 +161,7 @@ if (!res.ok) {
 
 setResult(data.output);
 setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
+
 
       setResult(data.output);
       setToast({ show: true, message: 'Enhancement complete!', type: 'success' });
