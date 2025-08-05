@@ -5,34 +5,17 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   const { name, email, password } = req.body;
-  const token = req.headers.authorization?.split(' ')[1]; // Bearer <token>
 
-  if (!name || !email || !password || !token) {
-    return res.status(400).json({ error: 'Missing fields or token' });
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Missing fields' });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    }
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return res.status(401).json({ error: 'Invalid token or user not found' });
-  }
 
   const { data: existingUser } = await supabase
     .from('Data')
@@ -45,6 +28,21 @@ export default async function handler(req, res) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
+
+  const { data: authData, error: signUpError } = await supabase.auth.signUp({
+    email: normalizedEmail,
+    password,
+  });
+
+  if (signUpError) {
+    console.error('[Auth SignUp Error]', signUpError);
+    return res.status(500).json({ error: signUpError.message });
+  }
+
+  const user = authData?.user;
+  if (!user) {
+    return res.status(500).json({ error: 'Failed to create user' });
+  }
 
   const { error: insertError } = await supabase.from('Data').insert([
     {
@@ -61,5 +59,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: insertError.message });
   }
 
-  return res.status(201).json({ success: true, message: 'User registered' });
+  return res.status(201).json({ success: true, message: 'User registered. Please confirm your email.' });
 }
