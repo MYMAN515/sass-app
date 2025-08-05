@@ -1,9 +1,10 @@
 // pages/api/enhance.js
 
 import { createClient } from '@supabase/supabase-js';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY  // هذا لازم يكون service role token
+  process.env.SUPABASE_SERVICE_ROLE_KEY // لا تستخدم هذا في الكلاينت
 );
 
 export default async function handler(req, res) {
@@ -11,21 +12,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Only POST requests allowed' });
   }
 
-  const { imageUrl, prompt } = req.body;
+  const { imageUrl, prompt, user_email: userEmail } = req.body;
 
-  // 1. التحقق من الجلسة
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
-
-  if (!session || sessionError) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (!userEmail) {
+    return res.status(401).json({ error: 'Unauthorized - Missing email' });
   }
 
-  const userEmail = session.user.email;
-
-  // 2. جلب بيانات المستخدم من جدول Data
+  // 1. جلب بيانات المستخدم
   const { data: userData, error: userError } = await supabase
     .from('Data')
     .select('credits, plan')
@@ -36,12 +29,12 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // 3. التحقق من الكريدت قبل الإرسال
+  // 2. تحقق من الكريدت
   if (userData.plan !== 'Pro' && userData.credits <= 0) {
     return res.status(403).json({ error: 'No credits left' });
   }
 
-  // 4. إرسال الصورة إلى Replicate API
+  // 3. أرسل الصورة إلى Replicate
   const replicateRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -60,23 +53,16 @@ export default async function handler(req, res) {
 
   const replicateData = await replicateRes.json();
 
-  if (!replicateData || replicateData.error || !replicateData.urls?.get) {
+  if (!replicateData || replicateData.error) {
     return res.status(500).json({ error: 'Failed to generate image' });
   }
 
-  const generatedImage = replicateData.urls.get;
+  const generatedImage = replicateData?.urls?.get;
 
-  // 5. خصم كريدت واحد إذا المستخدم في الخطة المجانية
+  // 4. خصم كريدت واحد إذا الخطة Free
   if (userData.plan !== 'Pro') {
-    const { error: decrementError } = await supabase.rpc('decrement_credit', {
-      user_email: userEmail,
-    });
-
-    if (decrementError) {
-      return res.status(500).json({ error: 'Failed to decrement credit' });
-    }
+    await supabase.rpc('decrement_credit', { user_email: userEmail });
   }
 
-  // 6. إرسال النتيجة النهائية
   return res.status(200).json({ success: true, image: generatedImage });
 }
