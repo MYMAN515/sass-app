@@ -9,7 +9,6 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-    const supabase = createServerClient({ req, res });
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
@@ -20,7 +19,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing imageUrl, prompt, or user_email' });
   }
 
-  // ✅ Get session to extract user_id
+  const supabase = createServerClient({ cookies });
+
   const {
     data: { session },
     error: sessionError,
@@ -32,7 +32,6 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
 
-  // ✅ Credit check for paid users
   if (plan !== 'Free') {
     const { data, error } = await supabase
       .from('Data')
@@ -53,9 +52,7 @@ export default async function handler(req, res) {
   if (!REPLICATE_TOKEN) {
     return res.status(500).json({ error: 'Replicate API token not set' });
   }
-console.log('session user?', (await supabase.auth.getUser()).data?.user);
 
-  // ✅ Start replicate generation
   const startRes = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -98,6 +95,7 @@ console.log('session user?', (await supabase.auth.getUser()).data?.user);
       output = pollData.output;
       break;
     }
+
     if (pollData.status === 'failed') {
       return res.status(500).json({ error: 'AI generation failed', detail: pollData });
     }
@@ -112,11 +110,7 @@ console.log('session user?', (await supabase.auth.getUser()).data?.user);
 
   let finalOutput = output;
   if (plan === 'Free') {
-    try {
-      finalOutput = await addWatermarkToImage(output);
-    } catch (err) {
-      return res.status(500).json({ error: 'Failed to apply watermark', detail: err.message });
-    }
+    finalOutput = await addWatermarkToImage(output, supabase);
   }
 
   if (plan !== 'Free') {
@@ -129,7 +123,6 @@ console.log('session user?', (await supabase.auth.getUser()).data?.user);
     }
   }
 
-  // ✅ Insert the enhancement into the Data table with user_id
   const { error: insertError } = await supabase.from('Data').insert([
     {
       email: user_email,
