@@ -121,14 +121,15 @@ const supabase = createPagesServerClient({ req, res });
     }
 
     if (plan !== 'Free') {
-      const { error: creditError } = await supabase.rpc('decrement_credit', {
-        user_email,
-      });
+  const { error: creditError } = await supabase.rpc('decrement_credit', {
+    user_uuid: user_id,
+  });
 
-      if (creditError) {
-        console.error('Credit deduction failed:', creditError);
-      }
-    }
+  if (creditError) {
+    console.error('Credit deduction failed:', creditError);
+  }
+}
+
 
     const { error: insertError } = await supabase.from('Data').insert([
       {
