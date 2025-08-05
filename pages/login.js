@@ -4,36 +4,44 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
 import { motion } from 'framer-motion';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = createBrowserSupabaseClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  // ✅ Prevent infinite redirect loop
+  // ✅ Prevent already logged-in users from accessing /login
   useEffect(() => {
-    const storedUser = Cookies.get('user');
-    if (storedUser && router.pathname === '/login') {
-      router.replace('/dashboard');
-    }
-  }, [router]);
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        Cookies.set('user', JSON.stringify({ email: session.user.email }), { expires: 7, path: '/' });
+        router.replace('/dashboard');
+      }
+    };
+    checkUser();
+  }, [supabase, router]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
 
     try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
+      if (loginError || !data?.user) {
+        throw new Error(loginError?.message || 'Login failed');
+      }
 
-      Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
+      // ✅ Store in cookie for Navbar
+      Cookies.set('user', JSON.stringify({ email: data.user.email }), { expires: 7, path: '/' });
+
       router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Something went wrong');
@@ -56,7 +64,6 @@ export default function LoginPage() {
           ← Back
         </button>
 
-        {/* Heading */}
         <h1 className="text-3xl font-extrabold text-center text-zinc-900 dark:text-white">
           Welcome Back <span className="inline-block animate-wiggle">👋</span>
         </h1>
