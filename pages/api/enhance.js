@@ -1,7 +1,6 @@
 import { addWatermarkToImage } from '@/lib/addWatermarkToImage';
 import { createServerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-const supabase = createServerClient({ cookies });
 
 export const config = {
   api: {
@@ -10,6 +9,7 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+    const supabase = createServerClient({ req, res });
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
