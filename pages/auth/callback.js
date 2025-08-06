@@ -1,4 +1,5 @@
 'use client';
+
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
@@ -9,18 +10,15 @@ export default function Callback() {
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      const hash = window.location.hash;
-      const params = new URLSearchParams(hash.substring(1));
-
-      const access_token = params.get('access_token');
-      const refresh_token = params.get('refresh_token');
+      const { access_token, refresh_token } = router.query;
 
       if (!access_token || !refresh_token) {
+        console.warn('❌ Missing tokens from URL query');
         router.replace('/login');
         return;
       }
 
-      // ✅ 1. تفعيل الجلسة
+      // ✅ 1. Set the session
       const { error: sessionError } = await supabase.auth.setSession({
         access_token,
         refresh_token,
@@ -32,7 +30,7 @@ export default function Callback() {
         return;
       }
 
-      // ✅ 2. الحصول على بيانات المستخدم
+      // ✅ 2. Get user info
       const { data: { user }, error } = await supabase.auth.getUser();
 
       if (!user || error) {
@@ -48,18 +46,15 @@ export default function Callback() {
         avatar: user.user_metadata?.avatar_url || '',
       };
 
-    //   console.log('✅ User:', userData);
-
-      // ✅ 3. التأكد من وجود الجلسة (اختياري للعرض)
-      const session = await supabase.auth.getSession();
-    //   console.log('✅ Session:', session.data.session);
-
-      // ✅ 4. upsert في جدول Data مع user_id لدعم RLS
+      // ✅ 3. Insert into Data table (if not exists)
       const { error: insertError } = await supabase.from('Data').upsert({
-        user_id: userData.id,       // ضروري للبوليصة
+        user_id: userData.id,
         email: userData.email,
         name: userData.name,
         Provider: 'Google',
+        created_at: new Date().toISOString(),
+        credits: 10,
+        plan: 'Free',
       }, {
         onConflict: ['user_id'],
       });
@@ -68,15 +63,17 @@ export default function Callback() {
         console.error('❌ Error inserting user into Data table:', insertError);
       }
 
-      // ✅ 5. حفظ البيانات في الكوكيز
+      // ✅ 4. Save cookies
       Cookies.set('token', access_token, { path: '/', expires: 1 });
       Cookies.set('user', JSON.stringify(userData), { path: '/', expires: 1 });
 
-      // ✅ 6. التوجيه للداشبورد
+      // ✅ 5. Redirect to dashboard
       router.replace('/dashboard');
     };
 
-    handleOAuthCallback();
+    if (router.isReady) {
+      handleOAuthCallback();
+    }
   }, [router]);
 
   return (
