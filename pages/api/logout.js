@@ -1,25 +1,33 @@
-// pages/api/logout.js
-import * as cookie from 'cookie';
+'use client';
 
-export default async function handler(req, res) {
-  res.setHeader('Set-Cookie', [
-    cookie.serialize('token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      expires: new Date(0),
-      sameSite: 'lax',
-      path: '/',
-    }),
-    cookie.serialize('user', '', {
-      httpOnly: false,
-      expires: new Date(0),
-      sameSite: 'lax',
-      path: '/',
-    }),
-  ]);
+import { useRouter } from 'next/router';
+import { useState } from 'react';
 
-  // يمكنك إعادة توجيه المستخدم
-  // res.writeHead(302, { Location: '/' }).end();
+export default function LogoutButton() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  return res.status(200).json({ message: 'Logged out successfully' });
+  const handleLogout = async () => {
+    setLoading(true);
+    try {
+      await fetch('/api/logout', {
+        method: 'POST',
+      });
+      router.replace('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleLogout}
+      className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded transition duration-200 shadow"
+      disabled={loading}
+    >
+      {loading ? 'Logging out...' : 'Logout'}
+    </button>
+  );
 }
