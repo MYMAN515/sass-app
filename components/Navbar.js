@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
 import { MoonIcon, SunIcon } from '@heroicons/react/24/solid';
-import { MenuIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Navbar() {
@@ -58,14 +58,11 @@ export default function Navbar() {
   const links = [
     { label: 'Home', href: '/' },
     { label: 'Pricing', href: '/pricing' },
-    { label: 'Dashboard', href: '/dashboard' },
   ];
 
   return (
     <motion.header
-      className={`fixed top-0 w-full z-50 backdrop-blur bg-white/70 dark:bg-zinc-900/70 shadow-sm transition-all ${
-        scrolled ? 'py-2' : 'py-4'
-      }`}
+      className={`fixed top-0 w-full z-50 backdrop-blur bg-white/70 dark:bg-zinc-900/70 shadow-sm transition-all ${scrolled ? 'py-2' : 'py-4'}`}
       initial={{ y: -50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
     >
@@ -79,7 +76,7 @@ export default function Navbar() {
             onClick={() => setMenuOpen(!menuOpen)}
             className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800"
           >
-            {menuOpen ? <XMarkIcon className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
+            {menuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
           </button>
         </div>
 
