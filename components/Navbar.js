@@ -44,31 +44,36 @@ export default function Navbar() {
   // ✅ Get session + set user
 useEffect(() => {
   const fetchUser = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      setUser(session.user);
+      Cookies.set('user', JSON.stringify({ email: session.user.email }), { expires: 7 });
 
-    const supaUser = session?.user;
-    if (!supaUser) return;
+      const { data } = await supabase
+        .from('Data')
+        .select('plan, credits')
+        .eq('user_id', session.user.id)
+        .single();
 
-    setUser(supaUser);
-    Cookies.set('user', JSON.stringify({ email: supaUser.email }), { expires: 7 });
-
-    const { data, error } = await supabase
-      .from('Data')
-      .select('plan, credits')
-      .eq('email', supaUser.email)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!error && data) {
-      setPlan(data.plan);
-      setCredits(data.credits);
+      if (data) {
+        setPlan(data.plan);
+        setCredits(data.credits);
+      }
+    } else {
+      setUser(null);
     }
   };
 
   fetchUser();
+
+  // ✅ Listen for login/logout changes
+  const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+    fetchUser();
+  });
+
+  return () => {
+    authListener.subscription.unsubscribe();
+  };
 }, [supabase]);
 
   const handleLogout = async () => {
