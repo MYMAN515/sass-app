@@ -14,7 +14,7 @@ export default function Register() {
     email: '',
     password: '',
     confirm: '',
-    agree: false,
+    agree: false, // ✅ New
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -44,6 +44,7 @@ export default function Register() {
     setError('');
 
     try {
+      // ✅ Step 1: Sign up (with redirect to verify-email)
       const { error: signUpError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
@@ -57,6 +58,35 @@ export default function Register() {
 
       if (signUpError) throw new Error(signUpError.message);
 
+      // ✅ Step 2: Login after signup (to get token)
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+
+      if (loginError) throw new Error('Login failed after signup');
+
+      const token = loginData?.session?.access_token;
+      if (!token) throw new Error('Failed to get session token');
+
+      // ✅ Step 3: Send to backend
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+      // ✅ Step 4: Redirect to verify-email page
       router.push('/verify-email');
     } catch (err) {
       setError(err.message || 'Registration failed. Try again.');
@@ -92,7 +122,7 @@ export default function Register() {
             <input
               name="name"
               placeholder="Full Name"
-              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
               value={form.name}
               onChange={handleChange}
               required
@@ -125,6 +155,7 @@ export default function Register() {
               required
             />
 
+            {/* ✅ Privacy & Terms checkbox */}
             <div className="flex items-start gap-2 text-sm">
               <input
                 type="checkbox"
@@ -152,7 +183,11 @@ export default function Register() {
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading || !form.agree}
-              className={`w-full py-3 rounded-xl font-semibold transition ${!form.agree ? 'bg-zinc-400 cursor-not-allowed text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+              className={`w-full py-3 rounded-xl font-semibold transition ${
+                !form.agree
+                  ? 'bg-zinc-400 cursor-not-allowed text-white'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white'
+              }`}
             >
               {loading ? 'Creating...' : 'Register'}
             </motion.button>
@@ -160,7 +195,9 @@ export default function Register() {
 
           <div className="flex items-center justify-center gap-2">
             <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">or continue with</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              or continue with
+            </span>
             <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
           </div>
 
