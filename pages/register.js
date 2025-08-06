@@ -48,7 +48,7 @@ export default function Register() {
         email: form.email,
         password: form.password,
         options: {
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email`,
+        emailRedirectTo: 'https://aistoreassistant.app/verify-email',
           data: {
             name: form.name,
           },
