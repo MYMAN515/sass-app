@@ -1,13 +1,11 @@
-// pages/dashboard.js
-
-"use client";
+'use client';
 
 import { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import Head from 'next/head';
-import Cookies from 'js-cookie';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 const features = [
   {
@@ -29,17 +27,21 @@ const features = [
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const supabase = createBrowserSupabaseClient();
 
   useEffect(() => {
-    const token = Cookies.get('token');
+    const checkSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    if (!token) {
-      router.replace('/login');
-    } else {
-      // You can enhance this by decoding the token or fetching user info
-      setUser({ email: 'authenticated' }); 
-    }
-  }, []);
+      if (!session || error) {
+        router.replace('/login');
+      } else {
+        setUser(session.user);
+      }
+    };
+
+    checkSession();
+  }, [router, supabase]);
 
   if (!user) return null;
 
@@ -54,6 +56,7 @@ export default function Dashboard() {
         </Head>
 
         <div className="relative flex-1 bg-gradient-to-br from-[#0b0519] via-[#1c0c35] to-[#0e031a] px-4 sm:px-6 lg:px-12 py-10 sm:py-16 text-white font-sans overflow-hidden transition-colors">
+          {/* Background Effects */}
           <div className="absolute top-10 left-10 w-48 h-48 bg-purple-600 rounded-full blur-[120px] opacity-30 z-0 animate-pulse" />
           <div className="absolute bottom-10 right-10 w-64 h-64 bg-fuchsia-600 rounded-full blur-[150px] opacity-20 z-0 animate-pulse" />
 
@@ -63,7 +66,7 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            Welcome back, <span className="bg-gradient-to-r from-purple-400 to-pink-500 text-transparent bg-clip-text">Visionary</span>
+            Welcome back, <span className="bg-gradient-to-r from-purple-400 to-pink-500 text-transparent bg-clip-text">{user.user_metadata?.name || user.email}</span>
           </motion.h1>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto z-10 relative">
