@@ -1,112 +1,139 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { MoonIcon, SunIcon, Bars3Icon } from '@heroicons/react/24/solid';
+import { MoonIcon, SunIcon } from '@heroicons/react/24/solid';
 
 export default function Navbar() {
-  const router = useRouter();
-  const supabase = createClientComponentClient();
-  const [user, setUser] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState(false);
+  const [user, setUser] = useState(null);
+  const router = useRouter();
 
-  // 🌙 Theme toggle
+  // Theme setup
   useEffect(() => {
     const isDark = localStorage.getItem('theme') === 'dark';
     setDark(isDark);
     document.documentElement.classList.toggle('dark', isDark);
   }, []);
 
-  const toggleDarkMode = () => {
-    const newTheme = !dark;
-    setDark(newTheme);
-    document.documentElement.classList.toggle('dark', newTheme);
-    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
-  };
-
-  // ✅ Check session and update user state
+  // Detect scroll to shrink navbar
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      console.log("🔍 Navbar Session:", session);
-      if (session?.user) {
-        setUser(session.user);
-        Cookies.set('user', JSON.stringify({ email: session.user.email }), { expires: 7, path: '/' });
-      } else {
-        setUser(null);
+    const scrollHandler = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', scrollHandler);
+    return () => window.removeEventListener('scroll', scrollHandler);
+  }, []);
+
+  // ✅ Get user from cookie
+  useEffect(() => {
+    const cookieUser = Cookies.get('user');
+    if (cookieUser) {
+      try {
+        const parsed = JSON.parse(cookieUser); // cookie is now clean JSON
+        setUser(parsed);
+      } catch (err) {
+        console.error('Invalid user cookie', err);
         Cookies.remove('user');
       }
-    };
+    }
+  }, []);
 
-    checkSession();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("🟡 Auth State Changed:", event);
-      if (session?.user) {
-        setUser(session.user);
-        Cookies.set('user', JSON.stringify({ email: session.user.email }), { expires: 7, path: '/' });
-      } else {
-        setUser(null);
-        Cookies.remove('user');
-      }
-    });
-
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
-  }, [supabase]);
-
-  // ⛔ Handle logout
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    Cookies.remove('user');
-    router.push('/');
+  const toggleTheme = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
   };
+
+  const handleLogout = async () => {
+  await fetch('/api/logout');
+  Cookies.remove('user', { path: '/' }); // Redundant but safe
+  setUser(null);
+  router.push('/');
+};
+
+
+  const links = [
+    { label: 'Home', href: '/' },
+    { label: 'Pricing', href: '/pricing' },
+    { label: 'Dashboard', href: '/dashboard' },
+  ];
 
   return (
-    <nav className="fixed w-full z-50 bg-zinc-950 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-        <Link href="/" className="text-xl font-bold bg-gradient-to-r from-fuchsia-500 to-pink-500 bg-clip-text text-transparent">
+    <motion.header
+      className={`fixed top-0 w-full z-50 backdrop-blur bg-white/70 dark:bg-zinc-900/70 shadow-sm transition-all ${
+        scrolled ? 'py-2' : 'py-4'
+      }`}
+      initial={{ y: -50, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+    >
+      <div className="max-w-7xl mx-auto flex justify-between items-center px-6">
+        <Link href="/" className="text-xl font-bold text-purple-600 dark:text-purple-300">
           AI Store Assistant
         </Link>
 
-        <div className="flex items-center space-x-4">
-          <Link href="/pricing" className="hover:text-purple-400">Pricing</Link>
-          <Link href="/dashboard" className="hover:text-purple-400">Dashboard</Link>
+        <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
+          {links.map(({ label, href }) => (
+            <Link key={href} href={href} className="relative group">
+              <span
+                className={`text-gray-700 dark:text-gray-300 ${
+                  router.pathname === href ? 'font-semibold text-purple-600 dark:text-purple-400' : ''
+                }`}
+              >
+                {label}
+              </span>
+              {router.pathname === href && (
+                <motion.span
+                  layoutId="underline"
+                  className="absolute left-0 -bottom-1 h-0.5 w-full bg-purple-500"
+                />
+              )}
+            </Link>
+          ))}
+        </nav>
 
-          {/* 🌙 Theme toggle */}
-          <button onClick={toggleDarkMode}>
-            {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+        <div className="flex items-center gap-4">
+          <button onClick={toggleTheme} className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+            {dark ? (
+              <SunIcon className="w-5 h-5 text-yellow-300" />
+            ) : (
+              <MoonIcon className="w-5 h-5 text-purple-600" />
+            )}
           </button>
 
-          {/* 🔁 Conditional buttons */}
           {user ? (
-            <>
-              <span className="text-sm text-purple-400 hidden sm:inline">{user.email}</span>
+            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+              <span>{user.email}</span>
               <button
                 onClick={handleLogout}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-sm"
+                className="text-purple-500 hover:underline font-medium ml-2"
               >
-                Logout
+                Log out
               </button>
-            </>
+            </div>
           ) : (
             <>
-              <Link href="/login" className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-sm">
-                Login
+              <Link href="/register">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  className="px-4 py-2 rounded-full bg-zinc-200 hover:bg-zinc-300 text-sm dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                >
+                  Register
+                </motion.button>
               </Link>
-              <Link href="/register" className="border border-purple-400 hover:bg-purple-700 text-purple-300 hover:text-white px-3 py-1 rounded-lg text-sm">
-                Register
+              <Link href="/login">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  className="px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow"
+                >
+                  Login
+                </motion.button>
               </Link>
             </>
           )}
         </div>
       </div>
-    </nav>
+    </motion.header>
   );
 }
