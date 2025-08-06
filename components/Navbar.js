@@ -42,35 +42,34 @@ export default function Navbar() {
   }, []);
 
   // ✅ Get session + set user
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+useEffect(() => {
+  const fetchUser = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-      const supaUser = session?.user;
-      if (!supaUser) return;
+    const supaUser = session?.user;
+    if (!supaUser) return;
 
-      setUser(supaUser);
-      Cookies.set('user', JSON.stringify({ email: supaUser.email }), { expires: 7 });
+    setUser(supaUser);
+    Cookies.set('user', JSON.stringify({ email: supaUser.email }), { expires: 7 });
 
-      const { data, error } = await supabase
-  .from('Data')
-  .select('plan, credits')
-  .eq('user_id', supaUser.id)
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .single();
+    const { data, error } = await supabase
+      .from('Data')
+      .select('plan, credits')
+      .eq('email', supaUser.email)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
+    if (!error && data) {
+      setPlan(data.plan);
+      setCredits(data.credits);
+    }
+  };
 
-      if (!error && data) {
-        setPlan(data.plan);
-        setCredits(data.credits);
-      }
-    };
-
-    fetchUser();
-  }, [supabase]);
+  fetchUser();
+}, [supabase]);
 
   const handleLogout = async () => {
     Cookies.remove('user');
