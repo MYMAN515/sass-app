@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { supabase } from '@/lib/supabaseClient';
 import Cookies from 'js-cookie';
+import { Loader2, CheckCircle, AlertCircle, MailCheck } from 'lucide-react';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -37,17 +38,14 @@ export default function VerifyEmailPage() {
         const user = data?.user || data?.session?.user;
 
         if (user?.email) {
-          // ✅ Save to cookies
           Cookies.set('user', JSON.stringify({ email: user.email }), {
             expires: 7,
             path: '/',
           });
 
-          // ✅ Save to localStorage
           localStorage.setItem('access_token', access_token);
           localStorage.setItem('refresh_token', refresh_token);
 
-          // ✅ Save user to DB if needed
           await supabase.from('Data').upsert({
             user_id: user.id,
             email: user.email,
@@ -71,19 +69,45 @@ export default function VerifyEmailPage() {
     loginWithToken();
   }, [router]);
 
-  const getMessage = () => {
+  const renderContent = () => {
     switch (status) {
-      case 'waiting':
-        return '✅ We sent a confirmation link to your email. Please check your inbox.';
-      case 'verifying':
-        return '⏳ Verifying your email...';
-      case 'success':
-        return '🎉 Email verified successfully! Redirecting...';
-      case 'error':
-        return error;
       case 'loading':
+        return (
+          <>
+            <Loader2 className="animate-spin h-8 w-8 text-white mx-auto" />
+            <p>Checking...</p>
+          </>
+        );
+      case 'waiting':
+        return (
+          <>
+            <MailCheck className="h-8 w-8 text-green-400 mx-auto" />
+            <p>✅ We sent a confirmation link to your email. Please check your inbox.</p>
+          </>
+        );
+      case 'verifying':
+        return (
+          <>
+            <Loader2 className="animate-spin h-8 w-8 text-yellow-300 mx-auto" />
+            <p>⏳ Verifying your email...</p>
+          </>
+        );
+      case 'success':
+        return (
+          <>
+            <CheckCircle className="h-8 w-8 text-green-500 mx-auto" />
+            <p>🎉 Email verified successfully! Redirecting...</p>
+          </>
+        );
+      case 'error':
+        return (
+          <>
+            <AlertCircle className="h-8 w-8 text-red-500 mx-auto" />
+            <p className="text-red-400">{error}</p>
+          </>
+        );
       default:
-        return '⏳ Checking...';
+        return null;
     }
   };
 
@@ -92,10 +116,10 @@ export default function VerifyEmailPage() {
       <Head>
         <title>Email Verification</title>
       </Head>
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-indigo-800 to-purple-900 px-4 py-20">
-        <div className="max-w-md w-full bg-black/80 text-white rounded-2xl p-8 shadow-xl text-center space-y-4">
-          <h1 className="text-2xl font-bold">Email Verification</h1>
-          <p>{getMessage()}</p>
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-tr from-gray-900 via-purple-900 to-indigo-900 px-4 py-20">
+        <div className="max-w-md w-full bg-white/5 backdrop-blur-xl text-white rounded-2xl p-8 shadow-2xl text-center space-y-6 border border-white/10">
+          <h1 className="text-3xl font-bold tracking-tight">Verify your Email</h1>
+          {renderContent()}
         </div>
       </main>
     </>
