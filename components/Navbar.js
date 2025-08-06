@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
-import { MoonIcon, SunIcon, MenuIcon, XIcon } from '@heroicons/react/24/solid';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { MoonIcon, SunIcon } from '@heroicons/react/24/solid';
+import { MenuIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -14,23 +15,20 @@ export default function Navbar() {
   const [credits, setCredits] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
-  const supabase = createBrowserSupabaseClient();
+  const supabase = createPagesBrowserClient();
 
-  // Theme setup
   useEffect(() => {
     const isDark = localStorage.getItem('theme') === 'dark';
     setDark(isDark);
     document.documentElement.classList.toggle('dark', isDark);
   }, []);
 
-  // Detect scroll to shrink navbar
   useEffect(() => {
     const scrollHandler = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', scrollHandler);
     return () => window.removeEventListener('scroll', scrollHandler);
   }, []);
 
-  // Fetch user and credits from Supabase
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -81,7 +79,7 @@ export default function Navbar() {
             onClick={() => setMenuOpen(!menuOpen)}
             className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800"
           >
-            {menuOpen ? <XIcon className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
+            {menuOpen ? <XMarkIcon className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
           </button>
         </div>
 
@@ -123,7 +121,6 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden px-6 pb-4">
           <nav className="flex flex-col gap-4 mt-4 text-sm">
