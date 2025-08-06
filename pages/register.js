@@ -14,7 +14,7 @@ export default function Register() {
     email: '',
     password: '',
     confirm: '',
-    agree: false, // ✅ New
+    agree: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -44,7 +44,6 @@ export default function Register() {
     setError('');
 
     try {
-      // ✅ Step 1: Sign up (with redirect to verify-email)
       const { error: signUpError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
@@ -58,35 +57,7 @@ export default function Register() {
 
       if (signUpError) throw new Error(signUpError.message);
 
-      // ✅ Step 2: Login after signup (to get token)
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
-      });
-
-      if (loginError) throw new Error('Login failed after signup');
-
-      const token = loginData?.session?.access_token;
-      if (!token) throw new Error('Failed to get session token');
-
-      // ✅ Step 3: Send to backend
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
-
-      // ✅ Step 4: Redirect to verify-email page
+      // ✅ تم التسجيل بنجاح، التوجيه لصفحة التحقق من الإيميل
       router.push('/verify-email');
     } catch (err) {
       setError(err.message || 'Registration failed. Try again.');
@@ -195,9 +166,7 @@ export default function Register() {
 
           <div className="flex items-center justify-center gap-2">
             <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              or continue with
-            </span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">or continue with</span>
             <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
           </div>
 
