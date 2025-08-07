@@ -33,7 +33,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    console.log('📨 Form Submitted:', { formType, email, password, name });
+    console.log('🚀 Form Submitted:', { formType, email, password, name });
 
     try {
       const res = await fetch('/api/auth', {
@@ -50,16 +50,21 @@ export default function LoginPage() {
 
       if (formType === 'register') {
         alert('✅ Registration successful. Please verify your email.');
-        setFormType('login'); // switch to login after successful registration
       } else {
+        // ✅ Save session in cookie
         Cookies.set('user', JSON.stringify({ email: data.user.email }), {
           expires: 7,
           path: '/',
         });
-        router.replace('/dashboard');
+
+        // ✅ Optional small delay to avoid race condition
+        await new Promise((res) => setTimeout(res, 300));
+
+        // ✅ Go to dashboard without React refresh bug
+        window.location.href = '/dashboard';
       }
     } catch (err) {
-      console.error('❌ Submission error:', err.message);
+      console.error('❌ Error:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);
