@@ -6,7 +6,8 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
 import { MoonIcon, SunIcon } from '@heroicons/react/24/solid';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import Cookies from 'js-cookie';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -15,7 +16,7 @@ export default function Navbar() {
   const [credits, setCredits] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
-  const supabase = createPagesBrowserClient();
+  const supabase = createBrowserSupabaseClient();
 
   useEffect(() => {
     const isDark = localStorage.getItem('theme') === 'dark';
@@ -34,12 +35,21 @@ export default function Navbar() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-        const { data } = await supabase.from('Data').select('credits').eq('user_id', session.user.id).single();
+        const { data } = await supabase
+          .from('Data')
+          .select('credits')
+          .eq('user_id', session.user.id)
+          .single();
         if (data) setCredits(data.credits);
+      } else {
+        const cookieUser = Cookies.get('user');
+        if (cookieUser) {
+          setUser(JSON.parse(cookieUser));
+        }
       }
     };
     fetchUser();
-  }, [supabase]);
+  }, []);
 
   const toggleTheme = () => {
     const next = !dark;
@@ -50,6 +60,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await fetch('/api/logout', { method: 'POST' });
+    Cookies.remove('user');
     setUser(null);
     setCredits(null);
     router.push('/');
@@ -95,25 +106,18 @@ export default function Navbar() {
 
           {user ? (
             <div className="flex flex-col items-end gap-0 text-sm text-gray-600 dark:text-gray-300">
-              <span>{user.user_metadata?.name || user.email}</span>
+              <span>{user?.user_metadata?.name || user.email}</span>
               {credits !== null && <span className="text-xs text-gray-400">Credits: {credits}</span>}
               <button onClick={handleLogout} className="text-purple-500 hover:underline text-xs mt-1">
                 Log out
               </button>
             </div>
           ) : (
-            <>
-              <Link href="/register">
-                <motion.button whileTap={{ scale: 0.95 }} className="px-4 py-2 rounded-full bg-zinc-200 hover:bg-zinc-300 text-sm dark:bg-zinc-800 dark:hover:bg-zinc-700">
-                  Register
-                </motion.button>
-              </Link>
-              <Link href="/login">
-                <motion.button whileTap={{ scale: 0.95 }} className="px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow">
-                  Login
-                </motion.button>
-              </Link>
-            </>
+            <Link href="/">
+              <motion.button whileTap={{ scale: 0.95 }} className="px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow">
+                Login / Register
+              </motion.button>
+            </Link>
           )}
         </div>
       </div>
@@ -133,21 +137,16 @@ export default function Navbar() {
             ))}
             {user ? (
               <>
-                <span className="text-xs mt-2 text-gray-500">{user.user_metadata?.name || user.email}</span>
+                <span className="text-xs mt-2 text-gray-500">{user?.user_metadata?.name || user.email}</span>
                 {credits !== null && <span className="text-xs text-gray-400">Credits: {credits}</span>}
                 <button onClick={handleLogout} className="text-purple-500 hover:underline text-sm mt-2">
                   Log out
                 </button>
               </>
             ) : (
-              <>
-                <Link href="/register" onClick={() => setMenuOpen(false)}>
-                  <span className="text-sm">Register</span>
-                </Link>
-                <Link href="/login" onClick={() => setMenuOpen(false)}>
-                  <span className="text-sm">Login</span>
-                </Link>
-              </>
+              <Link href="/login" onClick={() => setMenuOpen(false)}>
+                <span className="text-sm">Login / Register</span>
+              </Link>
             )}
           </nav>
         </div>
