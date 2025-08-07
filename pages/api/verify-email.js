@@ -1,75 +1,96 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import { supabase } from '@/lib/supabaseClient';
+import { useRouter } from 'next/navigation';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Cookies from 'js-cookie';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
+  const supabase = createBrowserSupabaseClient();
   const [status, setStatus] = useState('loading');
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState('Verifying your email…');
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
-    const confirmEmail = async () => {
+    const verifyEmail = async () => {
       const hash = window.location.hash;
-
-      if (!hash) {
-        setStatus('error');
-        setError('Verification link is invalid or expired.');
+      if (!hash.includes('access_token')) {
+        setIsError(true);
+        setMessage('❌ Verification link is invalid or expired.');
+        setStatus('done');
         return;
       }
 
-      // تأكيد التحقق من الجلسة
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const query = new URLSearchParams(hash.substring(1));
+      const access_token = query.get('access_token');
+      const refresh_token = query.get('refresh_token');
 
-      if (sessionError || !sessionData?.session?.user) {
-        setStatus('error');
-        setError('Unable to confirm your session. Please log in again.');
-        return;
-      }
+      try {
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
 
-      const user = sessionData.session.user;
-
-      // التحقق إن كان المستخدم موجود مسبقًا في جدول Data
-      const { data: existingUser, error: checkError } = await supabase
-        .from('Data')
-        .select('*')
-        .eq('email', user.email)
-        .single();
-
-      if (!existingUser) {
-        const insertRes = await supabase.from('Data').insert([
-          {
-            name: user.user_metadata?.name || 'Anonymous',
-            email: user.email,
-            password: null, // يمكنك تعيين قيمة افتراضية أو تركها null
-          },
-        ]);
-
-        if (insertRes.error) {
-          setStatus('error');
-          setError('Failed to save your data. Please try again later.');
-          return;
+        if (sessionError || !data?.session) {
+          throw new Error('❌ Unable to confirm your session. Please log in again.');
         }
+
+        const user = data.session.user;
+        const user_email = user.email || '';
+        const user_name = user.user_metadata?.full_name || user.email || 'Anonymous';
+        const user_id = user.id;
+
+        Cookies.set('user', JSON.stringify({ email: user_email }), { expires: 7, path: '/' });
+
+        const { error: upsertError } = await supabase
+          .from('Data')
+          .upsert(
+            [
+              {
+                user_id,
+                name: user_name,
+                email: user_email,
+                password: null,
+              },
+            ],
+            { onConflict: ['user_id'] }
+          );
+
+        if (upsertError) {
+          console.error('❌ Database upsert error:', upsertError.message);
+        }
+
+        setIsError(false);
+        setMessage('✅ Email verified! Redirecting…');
+        setStatus('success');
+        setTimeout(() => router.replace('/dashboard'), 2000);
+      } catch (err) {
+        setIsError(true);
+        setMessage(err.message || '❌ Something went wrong during verification.');
+        setStatus('done');
       }
-
-      // تخزين الجلسة في الكوكيز (اختياري)
-      Cookies.set('user', JSON.stringify({ email: user.email }), { expires: 7, path: '/' });
-
-      // إعادة التوجيه إلى صفحة الـ Dashboard
-      setStatus('success');
-      router.replace('/dashboard');
     };
 
-    confirmEmail();
-  }, [router]);
+    verifyEmail();
+  }, [supabase, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      {status === 'loading' && <p>Verifying your email...</p>}
-      {status === 'success' && <p>Email verified! Redirecting...</p>}
-      {status === 'error' && <p className="text-red-500">{error}</p>}
+    <div className="flex items-center justify-center h-screen bg-gradient-to-br from-zinc-900 to-zinc-800 px-4">
+      <div className="bg-zinc-850 p-6 rounded-2xl shadow-xl max-w-md w-full text-center">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={message}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={`text-lg font-semibold ${isError ? 'text-red-500' : 'text-green-400'}`}
+          >
+            {message}
+          </motion.p>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
