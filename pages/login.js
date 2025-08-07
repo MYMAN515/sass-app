@@ -5,7 +5,6 @@ import { useRouter } from 'next/router';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Cookies from 'js-cookie';
 import { motion } from 'framer-motion';
-import { MailIcon, LockClosedIcon, UserIcon } from '@heroicons/react/24/solid';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,6 +17,7 @@ export default function AuthPage() {
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
 
+  // ✅ Session + Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) router.replace('/');
@@ -35,6 +35,7 @@ export default function AuthPage() {
     };
   }, []);
 
+  // ✅ Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -58,86 +59,69 @@ export default function AuthPage() {
     }
   };
 
+  // ✅ Google OAuth Handler
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/verify-email`,
+      },
+    });
+    if (error) setError(error.message);
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-zinc-900 to-zinc-800 text-white px-4">
-      <motion.div
-        className="w-full max-w-md bg-zinc-850 p-8 rounded-3xl shadow-2xl border border-zinc-700"
-        initial={{ y: 30, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6 }}
-      >
-        <h2 className="text-3xl font-extrabold mb-6 text-center tracking-tight">
-          {isLogin ? 'Welcome Back 👋' : 'Join the Future 🚀'}
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-zinc-900 to-zinc-800 text-white px-4">
+      <div className="w-full max-w-md bg-zinc-850 p-8 rounded-2xl shadow-2xl">
+        <h2 className="text-3xl font-bold mb-6 text-center">
+          {isLogin ? 'Welcome Back' : 'Create Your Account'}
         </h2>
 
-        {error && (
-          <motion.p
-            className="text-red-500 text-sm mb-4 text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            {error}
-          </motion.p>
-        )}
+        {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
-            <div className="relative">
-              <UserIcon className="absolute left-3 top-3 w-5 h-5 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Full Name"
-                className="w-full p-3 pl-10 rounded-xl bg-zinc-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-          )}
-
-          <div className="relative">
-            <MailIcon className="absolute left-3 top-3 w-5 h-5 text-zinc-400" />
             <input
-              type="email"
-              placeholder="Email"
-              className="w-full p-3 pl-10 rounded-xl bg-zinc-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="Full Name"
+              className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               required
             />
-          </div>
-
-          <div className="relative">
-            <LockClosedIcon className="absolute left-3 top-3 w-5 h-5 text-zinc-400" />
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {!isLogin && (
             <input
               type="password"
-              placeholder="Password"
-              className="w-full p-3 pl-10 rounded-xl bg-zinc-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Confirm Password"
+              className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
               required
             />
-          </div>
-
-          {!isLogin && (
-            <div className="relative">
-              <LockClosedIcon className="absolute left-3 top-3 w-5 h-5 text-zinc-400" />
-              <input
-                type="password"
-                placeholder="Confirm Password"
-                className="w-full p-3 pl-10 rounded-xl bg-zinc-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-              />
-            </div>
           )}
 
           {!isLogin && (
-            <label className="flex items-center text-sm text-gray-300 mt-1">
+            <label className="flex items-center text-sm text-gray-300">
               <input
                 type="checkbox"
-                className="mr-2 accent-purple-600"
+                className="mr-2"
                 checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)}
               />
@@ -145,25 +129,46 @@ export default function AuthPage() {
             </label>
           )}
 
-          <motion.button
-            whileTap={{ scale: 0.95 }}
+          <button
             type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2 font-semibold tracking-wide"
+            className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2"
           >
-            {isLogin ? 'Log In' : 'Create Account'}
-          </motion.button>
+            {isLogin ? 'Log In' : 'Register'}
+          </button>
         </form>
+
+        {/* Divider */}
+        <div className="flex items-center my-4">
+          <div className="flex-grow h-px bg-zinc-600"></div>
+          <span className="mx-3 text-gray-400 text-sm">OR</span>
+          <div className="flex-grow h-px bg-zinc-600"></div>
+        </div>
+
+        {/* Google Sign In Button */}
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          type="button"
+          onClick={handleGoogleLogin}
+          className="w-full bg-white text-black font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition"
+        >
+          <img
+            src="https://www.svgrepo.com/show/475656/google-color.svg"
+            alt="Google"
+            className="w-5 h-5"
+          />
+          Continue with Google
+        </motion.button>
 
         <div className="text-center text-sm text-gray-400 mt-6">
           {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
           <button
-            className="text-purple-400 hover:underline ml-1 font-medium"
+            className="text-purple-400 hover:underline ml-1"
             onClick={() => setIsLogin(!isLogin)}
           >
             {isLogin ? 'Register' : 'Log In'}
           </button>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
