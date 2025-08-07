@@ -17,12 +17,8 @@ export default async function handler(req, res) {
     }
 
     // إذا لم يوجد مستخدم (الجلسة غير صالحة أو المستخدم غير مسجّل دخول)
-    if (!user) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'User is not logged in or session is invalid',
-      });
-    }
+    if (error || !user) return res.status(401).json({ error: 'Unauthorized' });
+
 
     // إذا وجد المستخدم، تجهيز البيانات للإرجاع (البريد أو المعرّف عند غياب البريد)
     const result = user.email 
