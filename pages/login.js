@@ -1,4 +1,3 @@
-// ✅ STEP 1: /login page with no redirect unless login happens
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -15,12 +14,14 @@ export default function AuthPage() {
   const [confirm, setConfirm] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
 
     if (!isLogin && !agreed) {
       setError('You must agree to the terms and privacy policy.');
@@ -28,7 +29,7 @@ export default function AuthPage() {
     }
 
     if (!isLogin && password !== confirm) {
-      setError("Passwords don't match");
+      setError("Passwords don't match.");
       return;
     }
 
@@ -46,6 +47,13 @@ export default function AuthPage() {
         },
       });
       if (error) setError(error.message);
+      else {
+        setSuccessMsg('Confirmation email sent! Please check your inbox.');
+        setEmail('');
+        setPassword('');
+        setConfirm('');
+        setAgreed(false);
+      }
     }
   };
 
@@ -66,7 +74,19 @@ export default function AuthPage() {
           {isLogin ? 'Welcome Back' : 'Create Your Account'}
         </h2>
 
-        {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
+        {/* ✅ SUCCESS MESSAGE */}
+        {successMsg && (
+          <p className="text-green-400 text-sm mb-4 text-center">
+            {successMsg}
+          </p>
+        )}
+
+        {/* ✅ ERROR MESSAGE */}
+        {error && (
+          <p className="text-red-500 text-sm mb-4 text-center">
+            {error}
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
@@ -107,11 +127,19 @@ export default function AuthPage() {
           )}
           {!isLogin && (
             <label className="flex items-center text-sm text-gray-300">
-              <input type="checkbox" className="mr-2" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+              <input
+                type="checkbox"
+                className="mr-2"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
               I agree to the <a href="/terms" className="underline mx-1">Terms</a> & <a href="/privacy" className="underline">Privacy</a>
             </label>
           )}
-          <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2">
+          <button
+            type="submit"
+            className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2"
+          >
             {isLogin ? 'Log In' : 'Register'}
           </button>
         </form>
@@ -128,13 +156,24 @@ export default function AuthPage() {
           onClick={handleGoogleLogin}
           className="w-full bg-white text-black font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition"
         >
-          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
+          <img
+            src="https://www.svgrepo.com/show/475656/google-color.svg"
+            alt="Google"
+            className="w-5 h-5"
+          />
           Continue with Google
         </motion.button>
 
         <div className="text-center text-sm text-gray-400 mt-6">
           {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
-          <button className="text-purple-400 hover:underline ml-1" onClick={() => setIsLogin(!isLogin)}>
+          <button
+            className="text-purple-400 hover:underline ml-1"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+              setSuccessMsg('');
+            }}
+          >
             {isLogin ? 'Register' : 'Log In'}
           </button>
         </div>
