@@ -38,28 +38,27 @@ export default function GoogleAuthCallback() {
       const user_name = user.user_metadata?.full_name || user.email || '';
       const user_id = user.id;
 
-      // ✅ Save cookie
       Cookies.set('user', JSON.stringify({ email: user_email }), {
         expires: 7,
         path: '/',
       });
 
-      // ✅ Insert into "Data" table with default plan & credits
-      await supabase
+      const { error: insertError } = await supabase
         .from('Data')
-        .upsert(
-          [
-            {
-              id: user_id,
-              name: user_name,
-              email: user_email,
-              password: '',
-              plan: 'Free',
-              credits: 5,
-            },
-          ],
-          { onConflict: ['id'] }
-        );
+        .upsert([
+          {
+            id: user_id,
+            name: user_name,
+            email: user_email,
+            password: '',
+            plan: 'Free',
+            credits: 5,
+          },
+        ], { onConflict: ['id'] });
+
+      if (insertError) {
+        console.error('❌ Insert error:', insertError.message);
+      }
 
       router.replace('/dashboard');
     };
