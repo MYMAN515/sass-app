@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
-import Cookies from 'js-cookie';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,6 +14,8 @@ export default function AuthPage() {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
 
@@ -33,38 +34,49 @@ export default function AuthPage() {
       return;
     }
 
-    if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-      else router.push('/dashboard');
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name },
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-        },
-      });
-      if (error) setError(error.message);
-      else {
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) throw error;
+        router.push('/dashboard');
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: { name: name.trim() },
+            emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+          },
+        });
+        if (error) throw error;
         setSuccessMsg('Confirmation email sent! Please check your inbox.');
         setEmail('');
         setPassword('');
         setConfirm('');
         setAgreed(false);
       }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-      },
-    });
-    if (error) setError(error.message);
+    setError('');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
@@ -74,106 +86,56 @@ export default function AuthPage() {
           {isLogin ? 'Welcome Back' : 'Create Your Account'}
         </h2>
 
-        {/* ✅ SUCCESS MESSAGE */}
-        {successMsg && (
-          <p className="text-green-400 text-sm mb-4 text-center">
-            {successMsg}
-          </p>
-        )}
+        <AnimatePresence>
+          {successMsg && (
+            <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-green-400 text-sm mb-4 text-center">
+              {successMsg}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
-        {/* ✅ ERROR MESSAGE */}
-        {error && (
-          <p className="text-red-500 text-sm mb-4 text-center">
-            {error}
-          </p>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-red-500 text-sm mb-4 text-center">
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
-            <input
-              type="text"
-              placeholder="Full Name"
-              className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+            <input type="text" placeholder="Full Name" className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300" value={name} onChange={(e) => setName(e.target.value)} required />
           )}
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <input type="email" placeholder="Email" className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input type="password" placeholder="Password" className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300" value={password} onChange={(e) => setPassword(e.target.value)} required />
           {!isLogin && (
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-            />
+            <input type="password" placeholder="Confirm Password" className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
           )}
           {!isLogin && (
             <label className="flex items-center text-sm text-gray-300">
-              <input
-                type="checkbox"
-                className="mr-2"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-              />
+              <input type="checkbox" className="mr-2" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
               I agree to the <a href="/terms" className="underline mx-1">Terms</a> & <a href="/privacy" className="underline">Privacy</a>
             </label>
           )}
-          <button
-            type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2"
-          >
-            {isLogin ? 'Log In' : 'Register'}
+          <button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2 disabled:opacity-50">
+            {loading ? 'Please wait…' : isLogin ? 'Log In' : 'Register'}
           </button>
         </form>
 
         <div className="flex items-center my-4">
-          <div className="flex-grow h-px bg-zinc-600"></div>
+          <div className="flex-grow h-px bg-zinc-600" />
           <span className="mx-3 text-gray-400 text-sm">OR</span>
-          <div className="flex-grow h-px bg-zinc-600"></div>
+          <div className="flex-grow h-px bg-zinc-600" />
         </div>
 
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          type="button"
-          onClick={handleGoogleLogin}
-          className="w-full bg-white text-black font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition"
-        >
-          <img
-            src="https://www.svgrepo.com/show/475656/google-color.svg"
-            alt="Google"
-            className="w-5 h-5"
-          />
+        <motion.button whileTap={{ scale: 0.95 }} type="button" onClick={handleGoogleLogin} disabled={loading} className="w-full bg-white text-black font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition disabled:opacity-50">
+          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
           Continue with Google
         </motion.button>
 
         <div className="text-center text-sm text-gray-400 mt-6">
           {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
-          <button
-            className="text-purple-400 hover:underline ml-1"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
-              setSuccessMsg('');
-            }}
-          >
+          <button className="text-purple-400 hover:underline ml-1" onClick={() => { setIsLogin(!isLogin); setError(''); setSuccessMsg(''); }}>
             {isLogin ? 'Register' : 'Log In'}
           </button>
         </div>
