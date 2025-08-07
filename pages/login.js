@@ -33,7 +33,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    console.log('🚀 Submitting form:', { formType, email, password, name });
+    console.log('📨 Form Submitted:', { formType, email, password, name });
 
     try {
       const res = await fetch('/api/auth', {
@@ -44,12 +44,13 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      console.log('📦 API response:', data);
+      console.log('📦 API Response:', data);
 
       if (!res.ok) throw new Error(data.error || 'Login/Registration failed');
 
       if (formType === 'register') {
         alert('✅ Registration successful. Please verify your email.');
+        setFormType('login'); // switch to login after successful registration
       } else {
         Cookies.set('user', JSON.stringify({ email: data.user.email }), {
           expires: 7,
@@ -58,14 +59,14 @@ export default function LoginPage() {
         router.replace('/dashboard');
       }
     } catch (err) {
-      console.error('❌ Error:', err.message);
+      console.error('❌ Submission error:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  if (checkingSession) return null; // Prevents UI flashing while checking session
+  if (checkingSession) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black">
