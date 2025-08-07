@@ -12,12 +12,15 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [userName, setUserName] = useState(null);
+  const [user, setUser] = useState(null);
+  const [credits, setCredits] = useState(null);
+  const [plan, setPlan] = useState(null);
+  const [loading, setLoading] = useState(true); // ✅ لتأخير التصيير حتى تحميل الجلسة
 
   const supabase = createBrowserSupabaseClient();
   const router = useRouter();
 
-  // Dark mode toggle
+  // ✅ Dark mode setup
   useEffect(() => {
     const isDark = localStorage.getItem('theme') === 'dark';
     setDark(isDark);
@@ -31,14 +34,14 @@ export default function Navbar() {
     document.documentElement.classList.toggle('dark', newDark);
   };
 
-  // Handle scroll shadow
+  // ✅ Scroll effect
   useEffect(() => {
     const scrollHandler = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', scrollHandler);
     return () => window.removeEventListener('scroll', scrollHandler);
   }, []);
 
-  // Fetch user from Supabase Data table
+  // ✅ Fetch user session and data
   useEffect(() => {
     const fetchUserData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -46,31 +49,36 @@ export default function Navbar() {
       if (session?.user) {
         const { data, error } = await supabase
           .from('Data')
-          .select('name')
+          .select('name, credits, plan')
           .eq('user_id', session.user.id)
           .single();
 
         if (data) {
-          setUserName(data.name);
+          setUser({ name: data.name, email: session.user.email });
+          setCredits(data.credits);
+          setPlan(data.plan);
         } else {
-          setUserName(null);
-          Cookies.remove('user'); // clear stale cookie if any
+          setUser(null);
+          Cookies.remove('user');
         }
       } else {
-        setUserName(null);
+        setUser(null);
         Cookies.remove('user');
       }
+
+      setLoading(false); // ✅ تم تحميل كل شيء
     };
 
     fetchUserData();
   }, []);
 
-  // Logout handler
   const handleLogout = async () => {
     await supabase.auth.signOut();
     Cookies.remove('user');
     router.push('/login');
   };
+
+  if (loading) return null; // ✅ لا ترسم الـ Navbar قبل تحميل البيانات
 
   return (
     <header className={`fixed top-0 z-50 w-full transition-all ${scrolled ? 'shadow-md bg-black/70' : 'bg-transparent'}`}>
@@ -86,11 +94,13 @@ export default function Navbar() {
             {dark ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
           </button>
 
-          {/* Auth status */}
-          {userName ? (
+          {/* User info */}
+          {user ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">{userName}</span>
-              <button onClick={handleLogout} className="text-purple-400 text-sm underline">Log out</button>
+              <span className="text-sm font-semibold">{user.name || user.email}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-600">{plan || 'Free'}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-green-500">{credits} credits</span>
+              <button onClick={handleLogout} className="text-purple-400 text-sm underline ml-2">Logout</button>
             </div>
           ) : (
             <Link href="/login" className="text-sm font-medium">Login</Link>
