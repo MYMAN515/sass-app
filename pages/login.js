@@ -64,7 +64,7 @@ export default function AuthPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/verify-email`,
+        redirectTo: `https://www.aistoreassistant.app/verify-email`,
       },
     });
     if (error) setError(error.message);
