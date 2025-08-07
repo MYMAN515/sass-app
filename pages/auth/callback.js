@@ -36,7 +36,7 @@ export default function GoogleAuthCallback() {
         .from('Data')
         .upsert([
           {
-            id: user_id,
+            user_id: user_id,
             name: user_name,
             email: user_email,
             password: '', // OAuth user
@@ -63,3 +63,4 @@ export default function GoogleAuthCallback() {
     </div>
   );
 }
+
