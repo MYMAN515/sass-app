@@ -107,8 +107,8 @@ export default function TryOnPage() {
       const res = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          imageUrl: url, 
+        body: JSON.stringify({
+          imageUrl: url,
           prompt: finalPrompt,
           user_email: userEmail,
         }),
@@ -136,17 +136,26 @@ export default function TryOnPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <h2 className="text-3xl font-semibold mb-4 text-center">Upload Clothing Photo</h2>
             <div className="bg-white dark:bg-zinc-800 rounded-3xl p-8 shadow-xl">
-              <label className="block mb-4">
-                <div className="bg-gray-100 dark:bg-zinc-700 rounded-lg p-4 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-600 transition cursor-pointer">
-                  <span>{file?.name || 'Click to choose an image'}</span>
-                  <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
-                </div>
-              </label>
+              <div className="mb-4 relative">
+                <label htmlFor="image-upload" className="block">
+                  <div className="bg-gray-100 dark:bg-zinc-700 rounded-lg p-4 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-600 transition cursor-pointer">
+                    <span>{file?.name || 'Click to choose an image'}</span>
+                  </div>
+                </label>
+                <input
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+
               {previewUrl && (
                 <motion.img
                   src={previewUrl}
                   alt="preview"
-                  className="rounded-2xl"
+                  className="rounded-2xl mt-2"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 />
@@ -181,7 +190,16 @@ export default function TryOnPage() {
             <h2 className="text-3xl font-semibold mb-4 text-center">Result</h2>
             <div className="flex justify-center mb-6"><div className="w-20 h-1 bg-purple-600 rounded" /></div>
             <AnimatePresence>
-              {!loading && <motion.img src={result} alt="result" className="w-full max-w-md mx-auto rounded-2xl border border-purple-600 shadow-xl" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} />}
+              {!loading && (
+                <motion.img
+                  src={result}
+                  alt="result"
+                  className="w-full max-w-md mx-auto rounded-2xl border border-purple-600 shadow-xl"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                />
+              )}
             </AnimatePresence>
           </motion.section>
         )}
