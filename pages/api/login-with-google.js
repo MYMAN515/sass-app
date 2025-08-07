@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email`, // مثال: https://aistoreassistant.app/verify-email
+  redirectTo: 'https://aistoreassistant.app/auth/callback',
     },
   });
 
