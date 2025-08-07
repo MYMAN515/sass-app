@@ -1,58 +1,68 @@
-// app/auth/callback.js
+// pages/auth/callback.js
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Cookies from 'js-cookie';
-import { supabase } from '@/lib/supabaseClient';
 
-export default function Callback() {
+export default function GoogleAuthCallback() {
+  const supabase = createBrowserSupabaseClient();
+  const searchParams = useSearchParams();
   const router = useRouter();
 
   useEffect(() => {
-    const handleCallback = async () => {
-      const hash = window.location.hash;
-      const params = new URLSearchParams(hash.substring(1));
-      const access_token = params.get('access_token');
-      const refresh_token = params.get('refresh_token');
+    const access_token = searchParams.get('access_token');
+    const refresh_token = searchParams.get('refresh_token');
 
-      if (!access_token || !refresh_token) {
-        router.replace('/login');
-        return;
-      }
+    if (!access_token || !refresh_token) {
+      router.replace('/auth-failed?reason=missing_tokens');
+      return;
+    }
 
-      const { error: sessionError } = await supabase.auth.setSession({
+    const finalizeAuth = async () => {
+      const { data, error } = await supabase.auth.setSession({
         access_token,
         refresh_token,
       });
 
-      if (sessionError) {
-        console.error(sessionError);
-        return router.replace('/login');
+      if (error || !data?.session) {
+        router.replace('/auth-failed?reason=invalid_session');
+        return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = data.session.user;
+      const user_email = user.email || '';
+      const user_name = user.user_metadata?.full_name || user.email || '';
+      const user_id = user.id;
 
-      await supabase.from('Data').upsert({
-        user_id: user.id,
-        email: user.email,
-        name: user.user_metadata?.full_name || '',
-        Provider: 'Google',
-        created_at: new Date().toISOString(),
-        credits: 5,
-        plan: 'Free',
+      // Save cookie
+      Cookies.set('user', JSON.stringify({ email: user_email }), {
+        expires: 7,
+        path: '/',
       });
 
-      Cookies.set('user', JSON.stringify({ email: user.email }), { expires: 7 });
+      // Insert into "Data" table if not exists
+      await supabase
+        .from('Data')
+        .upsert([
+          {
+            id: user_id,
+            name: user_name,
+            email: user_email,
+            password: '', // empty because it's OAuth
+          },
+        ], { onConflict: ['id'] });
+
       router.replace('/dashboard');
     };
 
-    if (router.isReady) handleCallback();
-  }, [router]);
+    finalizeAuth();
+  }, [searchParams]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center text-white">
-      Logging you in with Google...
+    <div className="flex items-center justify-center h-screen">
+      <p className="text-xl font-semibold">⏳ Logging you in with Google...</p>
     </div>
   );
 }
