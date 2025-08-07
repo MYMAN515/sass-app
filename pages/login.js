@@ -16,7 +16,7 @@ export default function LoginPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        router.replace('/home'); // أو dashboard حسب ما تريد
+        router.replace('/'); // أو dashboard حسب ما تريد
       }
     });
 
