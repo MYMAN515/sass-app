@@ -5,62 +5,81 @@ import { useRouter } from 'next/router';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Cookies from 'js-cookie';
 
-export default function LoginPage() {
+export default function AuthPage() {
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
 
-  // ✅ تابع التحقق من الجلسة بعد التفعيل من الإيميل أو تسجيل الدخول
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        router.replace('/'); // أو dashboard حسب ما تريد
-      }
+      if (session?.user) router.replace('/');
     });
 
-    // ✅ راقب التغيير بالحالة (بدون polling)
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          Cookies.set('user', JSON.stringify({ email: session.user.email }), { expires: 7 });
-          router.replace('/home'); // أو dashboard
-        }
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        Cookies.set('user', JSON.stringify({ email: session.user.email }), { expires: 7 });
+        router.replace('/');
       }
-    );
+    });
 
     return () => {
       authListener?.subscription?.unsubscribe?.();
     };
   }, []);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    if (!isLogin && !agreed) {
+      setError('You must agree to the terms and privacy policy.');
+      return;
+    }
 
-    if (error) {
-      setError(error.message);
+    if (!isLogin && password !== confirm) {
+      setError("Passwords don't match");
+      return;
+    }
+
+    if (isLogin) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setError(error.message);
     } else {
-      // سيتم التوجيه تلقائيًا في onAuthStateChange
+      const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+      if (error) setError(error.message);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-900 text-white">
-      <div className="w-full max-w-md bg-zinc-800 p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold mb-4 text-center">Welcome Back</h2>
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-        <form onSubmit={handleLogin}>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-zinc-900 to-zinc-800 text-white px-4">
+      <div className="w-full max-w-md bg-zinc-850 p-8 rounded-2xl shadow-2xl">
+        <h2 className="text-3xl font-bold mb-6 text-center">
+          {isLogin ? 'Welcome Back' : 'Create Your Account'}
+        </h2>
+
+        {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <input
+              type="text"
+              placeholder="Full Name"
+              className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          )}
           <input
             type="email"
             placeholder="Email"
-            className="w-full mb-3 p-2 rounded"
+            className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -68,18 +87,51 @@ export default function LoginPage() {
           <input
             type="password"
             placeholder="Password"
-            className="w-full mb-4 p-2 rounded"
+            className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+          {!isLogin && (
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              className="w-full p-3 rounded bg-zinc-700 placeholder-gray-300"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+            />
+          )}
+
+          {!isLogin && (
+            <label className="flex items-center text-sm text-gray-300">
+              <input
+                type="checkbox"
+                className="mr-2"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
+              I agree to the <a href="/terms" className="underline mx-1">Terms</a> & <a href="/privacy" className="underline">Privacy</a>
+            </label>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white p-2 rounded"
+            className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2"
           >
-            Log In
+            {isLogin ? 'Log In' : 'Register'}
           </button>
         </form>
+
+        <div className="text-center text-sm text-gray-400 mt-6">
+          {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
+          <button
+            className="text-purple-400 hover:underline ml-1"
+            onClick={() => setIsLogin(!isLogin)}
+          >
+            {isLogin ? 'Register' : 'Log In'}
+          </button>
+        </div>
       </div>
     </div>
   );
