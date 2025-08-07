@@ -13,30 +13,22 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing fields or action' });
   }
 
-  if (action === 'login') {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return res.status(401).json({ error: error.message });
-    return res.status(200).json({ user: data.user, session: data.session });
+if (action === 'register') {
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { credits: 5 } } });
+  if (error) {
+    const msg = error.message.toLowerCase().includes('already') ? 'هذا البريد مسجل' : 'خطأ في التسجيل';
+    return res.status(error.message.toLowerCase().includes('already') ? 400 : 500)
+              .json({ success: false, error: msg });
   }
+  return res.status(201).json({ success: true, user: data.user, message: 'تم التسجيل مع 5 credits' });
+}
 
-  if (action === 'register') {
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
-    if (signUpError) return res.status(500).json({ error: signUpError.message });
+if (action === 'login') {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return res.status(401).json({ success: false, error: 'بيانات الدخول غير صحيحة' });
+  return res.status(200).json({ success: true, user: data.user });
+}
 
-    const userId = signUpData.user?.id;
-
-    const { error: insertErr } = await supabase.from('Data').insert({
-      user_id: userId,
-      name,
-      email,
-      Provider: 'Default',
-      credits: 5 // ✅ يمنح 5 Credits تلقائيًا
-    });
-
-    if (insertErr) return res.status(500).json({ error: insertErr.message });
-
-    return res.status(201).json({ user: signUpData.user, message: 'Registered with 5 credits' });
-  }
 
   return res.status(400).json({ error: 'Invalid action' });
 }
