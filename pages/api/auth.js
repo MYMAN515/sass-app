@@ -15,11 +15,12 @@ export default async function handler(req, res) {
 
   try {
     if (type === 'register') {
-      // تسجيل مستخدم جديد
+      // ✅ تسجيل مستخدم جديد
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email`, // تأكيد الإيميل
           data: {
             full_name: name || '',
           },
@@ -28,35 +29,29 @@ export default async function handler(req, res) {
 
       if (signUpError) throw signUpError;
 
-      const user = signUpData.user;
-
-      // إدخال بيانات المستخدم في جدول Data
-      await supabase.from('Data').upsert({
-        user_id: user.id,
-        email: email,
-        name: name || '',
-        Provider: 'email',
-        credits: 5,
-        plan: 'Free',
-        created_at: new Date().toISOString(),
-      });
-
-      return res.status(200).json({ success: true, message: 'Registration successful, verify email' });
+      // ✅ لا تُدرج في جدول Data الآن (سيتم الإدراج في verify-email.js بعد التفعيل)
+      return res.status(200).json({ success: true, message: 'Registration successful, please verify your email.' });
     }
 
     if (type === 'login') {
+      // ✅ تسجيل دخول
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message === 'Email not confirmed') {
+          return res.status(403).json({ success: false, error: 'Please verify your email before logging in.' });
+        }
+        throw error;
+      }
 
       const user = data.user;
       const session = data.session;
 
       if (!user || !session) {
-        return res.status(401).json({ success: false, error: 'Invalid session' });
+        return res.status(401).json({ success: false, error: 'Invalid session or user' });
       }
 
       return res.status(200).json({
@@ -73,7 +68,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: 'Invalid type. Must be "login" or "register"' });
 
   } catch (err) {
-    console.error('🔥 Auth API Error:', err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('🔥 Auth API Error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Internal Server Error' });
   }
 }
