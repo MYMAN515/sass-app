@@ -4,64 +4,76 @@ import { supabase } from '@/lib/supabaseClient';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Only POST allowed' });
+    return res.status(405).json({ success: false, error: 'Only POST requests allowed' });
   }
 
-  const { action, email, password, name } = req.body;
+  const { email, password, name, type } = req.body;
 
-  if (!email || !password || !action) {
-    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  if (!email || !password || !type) {
+    return res.status(400).json({ success: false, error: 'Email, password, and type are required' });
   }
 
-  if (action === 'register') {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name, credits: 5 },
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email`, // يجب تحديد هذا المتغير في .env
+  try {
+    if (type === 'register') {
+      // تسجيل مستخدم جديد
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name || '',
+          },
+        },
+      });
+
+      if (signUpError) throw signUpError;
+
+      const user = signUpData.user;
+
+      // إدخال بيانات المستخدم في جدول Data
+      await supabase.from('Data').upsert({
+        user_id: user.id,
+        email: email,
+        name: name || '',
+        Provider: 'email',
+        credits: 5,
+        plan: 'Free',
+        created_at: new Date().toISOString(),
+      });
+
+      return res.status(200).json({ success: true, message: 'Registration successful, verify email' });
+    }
+
+    if (type === 'login') {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      const user = data.user;
+      const session = data.session;
+
+      if (!user || !session) {
+        return res.status(401).json({ success: false, error: 'Invalid session' });
       }
-    });
 
-    if (error) {
-      const msg = error.message.toLowerCase().includes('already') ? 'هذا البريد مسجل' : 'خطأ في التسجيل';
-      return res.status(400).json({ success: false, error: msg });
+      return res.status(200).json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+        },
+        token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: 'تم التسجيل. يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب.',
-    });
+    return res.status(400).json({ success: false, error: 'Invalid type. Must be "login" or "register"' });
+
+  } catch (err) {
+    console.error('🔥 Auth API Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
-
-  if (action === 'login') {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      return res.status(401).json({ success: false, error: 'بيانات الدخول غير صحيحة' });
-    }
-
-    const user = data?.user;
-    const token = data?.session?.access_token;
-    const refreshToken = data?.session?.refresh_token;
-
-    if (!token || !refreshToken) {
-      return res.status(500).json({ success: false, error: 'لم يتم إنشاء الجلسة بشكل صحيح' });
-    }
-
-    return res.status(200).json({
-      success: true,
-      user: {
-        id: user?.id,
-        email: user?.email,
-      },
-      token,
-      refresh_token: refreshToken,
-    });
-  }
-
-  return res.status(400).json({ success: false, error: 'Invalid action' });
 }
