@@ -37,23 +37,22 @@ export default function VerifyEmailPage() {
       const user_name = user.user_metadata?.full_name || user.email || '';
       const user_id = user.id;
 
-      // ✅ حفظ الإيميل في الكوكيز
       Cookies.set('user', JSON.stringify({ email: user_email }), {
         expires: 7,
         path: '/',
       });
 
-      // ✅ إدخال البيانات في جدول Data (لو مش موجود)
+      // ✅ تعديل أسماء الأعمدة هنا لتطابق جدول Supabase
       const { error: insertError } = await supabase
         .from('Data')
         .upsert([
           {
-            id: user_id,
+            user_id: user_id,
             name: user_name,
             email: user_email,
-            password: '', // فارغ لأن الحساب مفعل بالإيميل فقط
+            password: '',
           },
-        ], { onConflict: ['id'] }); // ما يتكرر لو موجود
+        ], { onConflict: ['user_id'] });
 
       if (insertError) {
         console.error('❌ Insert error:', insertError.message);
