@@ -1,3 +1,4 @@
+// ✅ الكود بعد تحسين الـ UI مع Spinner
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -177,23 +178,38 @@ export default function EnhancePage() {
         <div className="px-4 sm:px-6 md:px-12 lg:px-24 mx-auto space-y-32 max-w-4xl">
           {/* Upload */}
           <section>
-            <h2 className="text-3xl font-semibold text-center mb-6">Upload Product Photo</h2>
-            <div className="bg-white dark:bg-zinc-800 p-6 rounded-3xl shadow-xl">
+            <h2 className="text-3xl font-bold text-center mb-6 text-purple-700 dark:text-purple-400">Upload Product Photo</h2>
+            <div className="bg-white dark:bg-zinc-800 p-6 rounded-3xl shadow-xl transition-all">
               <label className="block mb-4 relative">
-                <div className="bg-gray-100 dark:bg-zinc-700 rounded-lg p-4 text-center hover:bg-gray-200 dark:hover:bg-zinc-600 transition cursor-pointer">
-                  <span>{file?.name || 'Click to choose an image'}</span>
-                  <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                <div className="bg-gray-100 dark:bg-zinc-700 rounded-xl p-6 text-center hover:bg-gray-200 dark:hover:bg-zinc-600 transition cursor-pointer border-2 border-dashed border-gray-300 dark:border-zinc-600">
+                  <span className="text-lg font-medium text-gray-600 dark:text-gray-300">
+                    {file?.name || 'Click here to select an image'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
                 </div>
               </label>
-              {previewUrl && <img src={previewUrl} alt="preview" className="rounded-2xl mt-4 max-w-full" />}
+              {previewUrl && (
+                <img src={previewUrl} alt="preview" className="rounded-2xl mt-4 max-w-full shadow-md" />
+              )}
             </div>
           </section>
 
           {/* Modal */}
           <AnimatePresence>
             {showEnhanceModal && (
-              <motion.div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <motion.div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-xl w-full sm:max-w-xl md:max-w-2xl" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}>
+              <motion.div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <motion.div
+                  className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-xl w-full sm:max-w-xl md:max-w-2xl"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                >
                   <EnhanceCustomizer
                     onChange={(update) => setOptions((prev) => ({ ...prev, ...update }))}
                     onComplete={(finalOptions) => {
@@ -213,7 +229,7 @@ export default function EnhancePage() {
               <motion.img
                 src={result}
                 alt="result"
-                className="w-full max-w-md mx-auto rounded-2xl border border-purple-600 shadow-xl"
+                className="w-full max-w-md mx-auto rounded-2xl border border-purple-600 shadow-2xl"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
