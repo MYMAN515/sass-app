@@ -1,9 +1,9 @@
-// ✅ Front-end: AuthPage with Google Sign-In button styled for modern SaaS
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -15,10 +15,14 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const user = Cookies.get('user');
-    if (user) {
-      router.replace('/dashboard');
-    }
+    const checkSession = async () => {
+      const supabase = createBrowserSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        router.replace('/dashboard');
+      }
+    };
+    checkSession();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -162,20 +166,3 @@ export default function AuthPage() {
     </div>
   );
 }
-
-// ✅ API: /pages/api/login-with-google.js
-// Create this file separately as instructed:
-
-// import { supabase } from '@/lib/supabaseClient';
-
-// export default async function handler(req, res) {
-//   const { data, error } = await supabase.auth.signInWithOAuth({
-//     provider: 'google',
-//     options: {
-//       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email`,
-//     },
-//   });
-
-//   if (error) return res.status(400).json({ error: error.message });
-//   res.redirect(data.url);
-// }
