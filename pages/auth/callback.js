@@ -8,51 +8,30 @@ import Cookies from 'js-cookie';
 export default function GoogleAuthCallback() {
   const supabase = createBrowserSupabaseClient();
   const router = useRouter();
-  const [status, setStatus] = useState('⏳ Logging you in with Google...');
+  const [status, setStatus] = useState('⏳ Verifying Google login...');
 
   useEffect(() => {
-    const hash = window.location.hash;
-
-    if (!hash || !hash.includes('access_token')) {
-      console.error('❌ No token hash found in URL');
-      router.replace('/auth-failed?reason=missing_hash');
-      return;
-    }
-
-    const query = new URLSearchParams(hash.substring(1));
-    const access_token = query.get('access_token');
-    const refresh_token = query.get('refresh_token');
-
-    if (!access_token || !refresh_token) {
-      console.error('❌ Missing tokens in hash');
-      router.replace('/auth-failed?reason=missing_tokens');
-      return;
-    }
-
     const finalizeAuth = async () => {
-      const { data, error } = await supabase.auth.setSession({
-        access_token,
-        refresh_token,
-      });
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-      if (error || !data?.session) {
-        console.error('❌ Session error:', error?.message);
+      if (error || !session?.user) {
+        console.error('❌ No valid session', error);
         router.replace('/auth-failed?reason=invalid_session');
         return;
       }
 
-      const user = data.session.user;
+      const user = session.user;
       const user_email = user.email || '';
       const user_name = user.user_metadata?.full_name || user.email || '';
       const user_id = user.id;
 
-      // Save session in cookies
+      // Save cookie
       Cookies.set('user', JSON.stringify({ email: user_email }), {
         expires: 7,
         path: '/',
       });
 
-      // Insert into Supabase table "Data"
+      // Insert user into 'Data' table
       const { error: insertError } = await supabase
         .from('Data')
         .upsert([
@@ -60,7 +39,7 @@ export default function GoogleAuthCallback() {
             id: user_id,
             name: user_name,
             email: user_email,
-            password: '', // because Google user has no password
+            password: '', // OAuth user
             plan: 'Free',
             credits: 5,
           },
@@ -69,7 +48,7 @@ export default function GoogleAuthCallback() {
       if (insertError) {
         console.error('❌ Insert error:', insertError.message);
       } else {
-        console.log('✅ User inserted/updated in Data table');
+        console.log('✅ User inserted into Data');
       }
 
       router.replace('/dashboard');
