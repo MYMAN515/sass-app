@@ -1,9 +1,10 @@
 import { supabase } from '@/lib/supabaseClient';
 
 export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
   const { action, name, email, password } = req.body;
 
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!action || !email || !password || (action === 'register' && !name)) {
     return res.status(400).json({ error: 'Missing fields or action' });
   }
@@ -19,17 +20,19 @@ export default async function handler(req, res) {
     if (signUpError) return res.status(500).json({ error: signUpError.message });
 
     const userId = signUpData.user?.id;
+
     const { error: insertErr } = await supabase.from('Data').insert({
       user_id: userId,
       name,
       email,
       Provider: 'Default',
-      credits: 5  // هنا تمنح 5 Credits تلقائيًا
+      credits: 5 // ✅ يمنح 5 Credits تلقائيًا
     });
+
     if (insertErr) return res.status(500).json({ error: insertErr.message });
 
     return res.status(201).json({ user: signUpData.user, message: 'Registered with 5 credits' });
   }
 
-  res.status(400).json({ error: 'Invalid action' });
+  return res.status(400).json({ error: 'Invalid action' });
 }
