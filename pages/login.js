@@ -1,3 +1,4 @@
+// ✅ STEP 1: /login page with no redirect unless login happens
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -17,25 +18,6 @@ export default function AuthPage() {
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
 
-  // ✅ Session + Auth Listener
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) router.replace('/');
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        Cookies.set('user', JSON.stringify({ email: session.user.email }), { expires: 7 });
-        router.replace('/');
-      }
-    });
-
-    return () => {
-      authListener?.subscription?.unsubscribe?.();
-    };
-  }, []);
-
-  // ✅ Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -53,18 +35,25 @@ export default function AuthPage() {
     if (isLogin) {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setError(error.message);
+      else router.push('/dashboard');
     } else {
-      const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name },
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        },
+      });
       if (error) setError(error.message);
     }
   };
 
-  // ✅ Google OAuth Handler
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `https://www.aistoreassistant.app/auth/callback`,
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
       },
     });
     if (error) setError(error.message);
@@ -116,55 +105,36 @@ export default function AuthPage() {
               required
             />
           )}
-
           {!isLogin && (
             <label className="flex items-center text-sm text-gray-300">
-              <input
-                type="checkbox"
-                className="mr-2"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-              />
+              <input type="checkbox" className="mr-2" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
               I agree to the <a href="/terms" className="underline mx-1">Terms</a> & <a href="/privacy" className="underline">Privacy</a>
             </label>
           )}
-
-          <button
-            type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2"
-          >
+          <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2">
             {isLogin ? 'Log In' : 'Register'}
           </button>
         </form>
 
-        {/* Divider */}
         <div className="flex items-center my-4">
           <div className="flex-grow h-px bg-zinc-600"></div>
           <span className="mx-3 text-gray-400 text-sm">OR</span>
           <div className="flex-grow h-px bg-zinc-600"></div>
         </div>
 
-        {/* Google Sign In Button */}
         <motion.button
           whileTap={{ scale: 0.95 }}
           type="button"
           onClick={handleGoogleLogin}
           className="w-full bg-white text-black font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition"
         >
-          <img
-            src="https://www.svgrepo.com/show/475656/google-color.svg"
-            alt="Google"
-            className="w-5 h-5"
-          />
+          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
           Continue with Google
         </motion.button>
 
         <div className="text-center text-sm text-gray-400 mt-6">
           {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
-          <button
-            className="text-purple-400 hover:underline ml-1"
-            onClick={() => setIsLogin(!isLogin)}
-          >
+          <button className="text-purple-400 hover:underline ml-1" onClick={() => setIsLogin(!isLogin)}>
             {isLogin ? 'Register' : 'Log In'}
           </button>
         </div>
