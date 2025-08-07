@@ -19,7 +19,7 @@ export default function Navbar() {
   const supabase = createBrowserSupabaseClient();
   const router = useRouter();
 
-  // ✅ Dark mode
+  // Dark mode setup
   useEffect(() => {
     const isDark = localStorage.getItem('theme') === 'dark';
     setDark(isDark);
@@ -33,14 +33,14 @@ export default function Navbar() {
     document.documentElement.classList.toggle('dark', newDark);
   };
 
-  // ✅ Scroll shadow
+  // Scroll shadow effect
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handler);
     return () => window.removeEventListener('scroll', handler);
   }, []);
 
-  // ✅ Fetch user
+  // Fetch user info from Supabase
   useEffect(() => {
     const fetchUserData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -96,7 +96,12 @@ export default function Navbar() {
               <button onClick={handleLogout} className="text-sm underline text-purple-300 ml-2">Logout</button>
             </div>
           ) : (
-            <Link href="/login" className="text-sm font-medium hover:text-purple-300">Login</Link>
+            <button
+              onClick={() => router.push('/login')}
+              className="text-sm font-medium hover:text-purple-300"
+            >
+              Login
+            </button>
           )}
         </div>
 
@@ -125,7 +130,15 @@ export default function Navbar() {
               <button onClick={handleLogout} className="text-purple-400 underline">Logout</button>
             </div>
           ) : (
-            <Link href="/login" className="block text-purple-400">Login</Link>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                router.push('/login');
+              }}
+              className="block text-purple-400"
+            >
+              Login
+            </button>
           )}
         </div>
       )}
