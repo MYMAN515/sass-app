@@ -100,7 +100,7 @@ export default function Navbar() {
               onClick={() => router.push('/login')}
               className="text-sm font-medium hover:text-purple-300"
             >
-              Login
+              Sign in
             </button>
           )}
         </div>
@@ -137,7 +137,7 @@ export default function Navbar() {
               }}
               className="block text-purple-400"
             >
-              Login
+              Sign in
             </button>
           )}
         </div>
