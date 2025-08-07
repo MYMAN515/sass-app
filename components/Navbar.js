@@ -11,92 +11,92 @@ import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState(false);
-  const [user, setUser] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userName, setUserName] = useState(null);
 
-  const router = useRouter();
   const supabase = createBrowserSupabaseClient();
+  const router = useRouter();
 
+  // Dark mode toggle
   useEffect(() => {
     const isDark = localStorage.getItem('theme') === 'dark';
     setDark(isDark);
     document.documentElement.classList.toggle('dark', isDark);
   }, []);
 
+  const toggleTheme = () => {
+    const newDark = !dark;
+    setDark(newDark);
+    localStorage.setItem('theme', newDark ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', newDark);
+  };
+
+  // Handle scroll shadow
   useEffect(() => {
-    const scrollHandler = () => setScrolled(window.scrollY > 50);
+    const scrollHandler = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', scrollHandler);
     return () => window.removeEventListener('scroll', scrollHandler);
   }, []);
 
-  const toggleTheme = () => {
-    const newTheme = !dark;
-    setDark(newTheme);
-    document.documentElement.classList.toggle('dark', newTheme);
-    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
-  };
-
+  // Fetch user from Supabase Data table
   useEffect(() => {
-    const checkUser = async () => {
+    const fetchUserData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user;
 
-      if (!currentUser) {
+      if (session?.user) {
+        const { data, error } = await supabase
+          .from('Data')
+          .select('name')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (data) {
+          setUserName(data.name);
+        } else {
+          setUserName(null);
+          Cookies.remove('user'); // clear stale cookie if any
+        }
+      } else {
+        setUserName(null);
         Cookies.remove('user');
-        setUser(null);
-        return;
       }
-
-      const { data, error } = await supabase
-        .from('Data')
-        .select('name')
-        .eq('id', currentUser.id)
-        .single();
-
-      if (!data || error) {
-        Cookies.remove('user');
-        setUser(null);
-        return;
-      }
-
-      setUser({ name: data.name });
     };
 
-    checkUser();
+    fetchUserData();
   }, []);
 
+  // Logout handler
   const handleLogout = async () => {
     await supabase.auth.signOut();
     Cookies.remove('user');
-    router.refresh();
-    router.push('/');
+    router.push('/login');
   };
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-black shadow-md' : 'bg-transparent'}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        <Link href="/">
-          <span className="text-xl font-bold text-purple-300">AI Store Assistant</span>
-        </Link>
+    <header className={`fixed top-0 z-50 w-full transition-all ${scrolled ? 'shadow-md bg-black/70' : 'bg-transparent'}`}>
+      <nav className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center text-white">
+        <Link href="/" className="text-lg font-bold text-purple-400">AI Store Assistant</Link>
 
-        <div className="flex items-center space-x-4">
-          <Link href="/" className="text-white hover:text-purple-300">Home</Link>
-          <Link href="/pricing" className="text-white hover:text-purple-300">Pricing</Link>
+        <div className="flex items-center gap-6">
+          <Link href="/" className="font-medium">Home</Link>
+          <Link href="/pricing" className="font-medium">Pricing</Link>
 
-          <button onClick={toggleTheme} className="text-white">
+          {/* Theme toggle */}
+          <button onClick={toggleTheme} className="focus:outline-none">
             {dark ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
           </button>
 
-          {user ? (
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-semibold text-white">{user.name}</span>
-              <button onClick={handleLogout} className="text-purple-400 hover:underline text-sm">Log out</button>
+          {/* Auth status */}
+          {userName ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">{userName}</span>
+              <button onClick={handleLogout} className="text-purple-400 text-sm underline">Log out</button>
             </div>
           ) : (
-            <Link href="/login" className="text-white hover:text-purple-300">Login</Link>
+            <Link href="/login" className="text-sm font-medium">Login</Link>
           )}
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 }
