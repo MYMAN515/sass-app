@@ -1,17 +1,14 @@
 // pages/index.js
-import { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+'use client';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { useState } from 'react';
 
 export default function AuthPage() {
   const [authMode, setAuthMode] = useState('register'); // 'login' or 'register'
   const [email, setEmail] = useState('');
   const [confirmEmail, setConfirmEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
 
   const toggleMode = () => {
@@ -20,6 +17,7 @@ export default function AuthPage() {
     setEmail('');
     setConfirmEmail('');
     setPassword('');
+    setName('');
   };
 
   const handleSubmit = async (e) => {
@@ -29,53 +27,53 @@ export default function AuthPage() {
     const cleanEmail = email.trim().toLowerCase();
     const cleanConfirm = confirmEmail.trim().toLowerCase();
 
-    if (!cleanEmail || !password || (authMode === 'register' && !cleanConfirm)) {
-      setStatusMsg('❌ Please fill in all fields.');
-      return;
+    if (!cleanEmail || !password || (authMode === 'register' && (!cleanConfirm || !name))) {
+      return setStatusMsg('❌ Please fill in all fields.');
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(cleanEmail)) {
-      setStatusMsg(`❌ Email address "${cleanEmail}" is invalid`);
-      return;
+      return setStatusMsg(`❌ Email address "${cleanEmail}" is invalid`);
     }
 
     if (authMode === 'register') {
       if (cleanEmail !== cleanConfirm) {
-        setStatusMsg('❌ Emails do not match.');
-        return;
+        return setStatusMsg('❌ Emails do not match.');
       }
 
       if (password.length < 6) {
-        setStatusMsg('❌ Password must be at least 6 characters.');
-        return;
+        return setStatusMsg('❌ Password must be at least 6 characters.');
       }
+    }
 
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: { credits: 5 }
+    // ✅ Call our custom API instead of direct supabase
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: authMode,
+          email: cleanEmail,
+          password,
+          name,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!result.success) {
+        setStatusMsg(`❌ ${result.error}`);
+      } else {
+        if (authMode === 'register') {
+          setStatusMsg('✅ Registered successfully! Please check your email.');
+        } else {
+          setStatusMsg('✅ Logged in successfully!');
+          // Redirect to dashboard (if needed):
+          // window.location.href = '/dashboard';
         }
-      });
-
-      if (error) {
-        setStatusMsg(`❌ ${error.message}`);
-      } else {
-        setStatusMsg('✅ Registered successfully! Please check your email.');
       }
-
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password
-      });
-
-      if (error) {
-        setStatusMsg(`❌ ${error.message}`);
-      } else {
-        setStatusMsg('✅ Logged in successfully!');
-      }
+    } catch (error) {
+      setStatusMsg('❌ An unexpected error occurred.');
     }
   };
 
@@ -87,6 +85,19 @@ export default function AuthPage() {
         </h2>
 
         <form onSubmit={handleSubmit} noValidate>
+          {authMode === 'register' && (
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-1">Full Name</label>
+              <input
+                type="text"
+                className="w-full border border-gray-300 rounded px-3 py-2"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
           <div className="mb-4">
             <label className="block text-gray-700 font-medium mb-1" htmlFor="email">Email</label>
             <input
