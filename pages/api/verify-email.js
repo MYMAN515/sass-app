@@ -2,55 +2,74 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabaseClient';
 import Cookies from 'js-cookie';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const supabase = createBrowserSupabaseClient();
   const [status, setStatus] = useState('loading');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const checkSessionAndInsert = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
+    const confirmEmail = async () => {
+      const hash = window.location.hash;
 
-      if (session?.user) {
-        const email = session.user.email;
-        const id = session.user.id;
-        const provider = session.user.app_metadata?.provider ?? 'email';
+      if (!hash) {
+        setStatus('error');
+        setError('Verification link is invalid or expired.');
+        return;
+      }
 
-        // ✅ إدخال بيانات المستخدم في جدول Data
-        const { error: insertError } = await supabase.from('Data').insert([
+      // تأكيد التحقق من الجلسة
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !sessionData?.session?.user) {
+        setStatus('error');
+        setError('Unable to confirm your session. Please log in again.');
+        return;
+      }
+
+      const user = sessionData.session.user;
+
+      // التحقق إن كان المستخدم موجود مسبقًا في جدول Data
+      const { data: existingUser, error: checkError } = await supabase
+        .from('Data')
+        .select('*')
+        .eq('email', user.email)
+        .single();
+
+      if (!existingUser) {
+        const insertRes = await supabase.from('Data').insert([
           {
-            id,
-            Provider: provider,
-            user_id: id,
-            credits: 5,
-            plan: 'Free',
-          }
+            name: user.user_metadata?.name || 'Anonymous',
+            email: user.email,
+            password: null, // يمكنك تعيين قيمة افتراضية أو تركها null
+          },
         ]);
 
-        if (insertError) {
-          console.error('Insert error:', insertError);
+        if (insertRes.error) {
+          setStatus('error');
+          setError('Failed to save your data. Please try again later.');
+          return;
         }
-
-        // ✅ حفظ معلومات المستخدم في الكوكيز
-        Cookies.set('user', JSON.stringify({ email }), { expires: 7 });
-
-        // ✅ التوجيه إلى الصفحة الرئيسية
-        router.replace('/dashboard');
-      } else {
-        setStatus('unauthenticated');
       }
+
+      // تخزين الجلسة في الكوكيز (اختياري)
+      Cookies.set('user', JSON.stringify({ email: user.email }), { expires: 7, path: '/' });
+
+      // إعادة التوجيه إلى صفحة الـ Dashboard
+      setStatus('success');
+      router.replace('/dashboard');
     };
 
-    checkSessionAndInsert();
-  }, [supabase, router]);
+    confirmEmail();
+  }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      {status === 'loading' && <p>Verifying...</p>}
-      {status === 'unauthenticated' && <p>Unable to verify session. Please log in.</p>}
+      {status === 'loading' && <p>Verifying your email...</p>}
+      {status === 'success' && <p>Email verified! Redirecting...</p>}
+      {status === 'error' && <p className="text-red-500">{error}</p>}
     </div>
   );
 }
