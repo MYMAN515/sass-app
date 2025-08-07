@@ -1,3 +1,4 @@
+// ✅ Front-end: AuthPage with Google Sign-In button styled for modern SaaS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +7,7 @@ import Cookies from 'js-cookie';
 
 export default function AuthPage() {
   const router = useRouter();
-  const [formType, setFormType] = useState('login'); // 'login' or 'register'
+  const [formType, setFormType] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -31,12 +32,7 @@ export default function AuthPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email,
-          password,
-          name,
-          type: formType,
-        }),
+        body: JSON.stringify({ email, password, name, type: formType }),
       });
 
       const data = await res.json();
@@ -60,48 +56,52 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          {formType === 'login' ? 'Log In' : 'Register'}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black px-4">
+      <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-lg w-full max-w-md space-y-6">
+        <h2 className="text-3xl font-extrabold text-center text-zinc-800 dark:text-white">
+          {formType === 'login' ? 'Welcome Back' : 'Create Account'}
         </h2>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           {formType === 'register' && (
-            <>
-              <label className="block mb-2 text-sm font-medium text-gray-700">Name</label>
+            <div>
+              <label className="block text-sm text-zinc-600 dark:text-zinc-300 mb-1">Full Name</label>
               <input
                 type="text"
-                className="w-full p-2 mb-4 border border-gray-300 rounded"
+                className="w-full p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
-            </>
+            </div>
           )}
 
-          <label className="block mb-2 text-sm font-medium text-gray-700">Email</label>
-          <input
-            type="email"
-            className="w-full p-2 mb-4 border border-gray-300 rounded"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          <div>
+            <label className="block text-sm text-zinc-600 dark:text-zinc-300 mb-1">Email</label>
+            <input
+              type="email"
+              className="w-full p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
 
-          <label className="block mb-2 text-sm font-medium text-gray-700">Password</label>
-          <input
-            type="password"
-            className="w-full p-2 mb-4 border border-gray-300 rounded"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div>
+            <label className="block text-sm text-zinc-600 dark:text-zinc-300 mb-1">Password</label>
+            <input
+              type="password"
+              className="w-full p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition"
           >
             {loading
               ? formType === 'login'
@@ -113,13 +113,33 @@ export default function AuthPage() {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm">
+        <div className="flex items-center justify-center gap-2">
+          <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">or continue with</span>
+          <span className="h-px bg-zinc-300 dark:bg-zinc-700 w-1/4" />
+        </div>
+
+        <button
+          onClick={() => (window.location.href = '/api/login-with-google')}
+          className="w-full flex items-center justify-center gap-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:shadow-md transition py-3 rounded-xl"
+        >
+          <img
+            src="https://www.svgrepo.com/show/475656/google-color.svg"
+            alt="Google"
+            className="w-5 h-5"
+          />
+          <span className="text-sm font-medium text-zinc-700 dark:text-white">
+            Sign in with Google
+          </span>
+        </button>
+
+        <p className="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">
           {formType === 'login' ? (
             <>
-              Don't have an account?{' '}
+              Don’t have an account?{' '}
               <button
                 onClick={() => setFormType('register')}
-                className="text-blue-600 font-semibold underline"
+                className="text-purple-600 dark:text-purple-400 font-semibold underline"
               >
                 Register
               </button>
@@ -129,7 +149,7 @@ export default function AuthPage() {
               Already have an account?{' '}
               <button
                 onClick={() => setFormType('login')}
-                className="text-blue-600 font-semibold underline"
+                className="text-purple-600 dark:text-purple-400 font-semibold underline"
               >
                 Log In
               </button>
@@ -137,10 +157,25 @@ export default function AuthPage() {
           )}
         </p>
 
-        {error && (
-          <p className="text-red-600 text-sm mt-4 text-center">❌ {error}</p>
-        )}
+        {error && <p className="text-red-600 text-sm text-center">❌ {error}</p>}
       </div>
     </div>
   );
 }
+
+// ✅ API: /pages/api/login-with-google.js
+// Create this file separately as instructed:
+
+// import { supabase } from '@/lib/supabaseClient';
+
+// export default async function handler(req, res) {
+//   const { data, error } = await supabase.auth.signInWithOAuth({
+//     provider: 'google',
+//     options: {
+//       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email`,
+//     },
+//   });
+
+//   if (error) return res.status(400).json({ error: error.message });
+//   res.redirect(data.url);
+// }
