@@ -1,20 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { useRouter } from 'next/router';
-import { MoonIcon, SunIcon } from '@heroicons/react/24/solid';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
+import { AnimatePresence, motion } from 'framer-motion';
+import { MoonIcon, SunIcon, Bars3Icon } from '@heroicons/react/24/solid';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState(false);
   const [user, setUser] = useState(null);
-  const [credits, setCredits] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
 
@@ -25,132 +24,79 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    const scrollHandler = () => setScrolled(window.scrollY > 20);
+    const scrollHandler = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', scrollHandler);
     return () => window.removeEventListener('scroll', scrollHandler);
   }, []);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        const { data } = await supabase
-          .from('Data')
-          .select('credits')
-          .eq('user_id', session.user.id)
-          .single();
-        if (data) setCredits(data.credits);
-      } else {
-        const cookieUser = Cookies.get('user');
-        if (cookieUser) {
-          setUser(JSON.parse(cookieUser));
-        }
-      }
-    };
-    fetchUser();
-  }, []);
-
   const toggleTheme = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('theme', next ? 'dark' : 'light');
+    const newTheme = !dark;
+    setDark(newTheme);
+    document.documentElement.classList.toggle('dark', newTheme);
+    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
   };
 
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user;
+
+      if (!currentUser) {
+        Cookies.remove('user');
+        setUser(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('Data')
+        .select('name')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (!data || error) {
+        Cookies.remove('user');
+        setUser(null);
+        return;
+      }
+
+      setUser({ name: data.name });
+    };
+
+    checkUser();
+  }, []);
+
   const handleLogout = async () => {
-    await fetch('/api/logout', { method: 'POST' });
+    await supabase.auth.signOut();
     Cookies.remove('user');
-    setUser(null);
-    setCredits(null);
+    router.refresh();
     router.push('/');
   };
 
-  const links = [
-    { label: 'Home', href: '/' },
-    { label: 'Pricing', href: '/pricing' },
-  ];
-
   return (
-    <motion.header
-      className={`fixed top-0 w-full z-50 backdrop-blur bg-white/70 dark:bg-zinc-900/70 shadow-sm transition-all ${scrolled ? 'py-2' : 'py-4'}`}
-      initial={{ y: -50, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-    >
-      <div className="max-w-7xl mx-auto flex justify-between items-center px-4 md:px-6">
-        <Link href="/" className="text-lg md:text-xl font-bold text-purple-600 dark:text-purple-300">
-          AI Store Assistant
+    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-black shadow-md' : 'bg-transparent'}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <Link href="/">
+          <span className="text-xl font-bold text-purple-300">AI Store Assistant</span>
         </Link>
 
-        <div className="md:hidden">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800"
-          >
-            {menuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
-          </button>
-        </div>
+        <div className="flex items-center space-x-4">
+          <Link href="/" className="text-white hover:text-purple-300">Home</Link>
+          <Link href="/pricing" className="text-white hover:text-purple-300">Pricing</Link>
 
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-          {links.map(({ label, href }) => (
-            <Link key={href} href={href} className={`text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 ${router.pathname === href ? 'font-semibold text-purple-600 dark:text-purple-400' : ''}`}>
-              {label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="hidden md:flex items-center gap-4">
-          <button onClick={toggleTheme} className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
-            {dark ? <SunIcon className="w-5 h-5 text-yellow-300" /> : <MoonIcon className="w-5 h-5 text-purple-600" />}
+          <button onClick={toggleTheme} className="text-white">
+            {dark ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
           </button>
 
           {user ? (
-            <div className="flex flex-col items-end gap-0 text-sm text-gray-600 dark:text-gray-300">
-              <span>{user?.user_metadata?.name || user.email}</span>
-              {credits !== null && <span className="text-xs text-gray-400">Credits: {credits}</span>}
-              <button onClick={handleLogout} className="text-purple-500 hover:underline text-xs mt-1">
-                Log out
-              </button>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-semibold text-white">{user.name}</span>
+              <button onClick={handleLogout} className="text-purple-400 hover:underline text-sm">Log out</button>
             </div>
           ) : (
-            <Link href="/login">
-              <motion.button whileTap={{ scale: 0.95 }} className="px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow">
-                Login / Register
-              </motion.button>
-            </Link>
+            <Link href="/login" className="text-white hover:text-purple-300">Login</Link>
           )}
         </div>
       </div>
-
-      {menuOpen && (
-        <div className="md:hidden px-6 pb-4">
-          <nav className="flex flex-col gap-4 mt-4 text-sm">
-            {links.map(({ label, href }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 ${router.pathname === href ? 'font-semibold text-purple-600 dark:text-purple-400' : ''}`}
-                onClick={() => setMenuOpen(false)}
-              >
-                {label}
-              </Link>
-            ))}
-            {user ? (
-              <>
-                <span className="text-xs mt-2 text-gray-500">{user?.user_metadata?.name || user.email}</span>
-                {credits !== null && <span className="text-xs text-gray-400">Credits: {credits}</span>}
-                <button onClick={handleLogout} className="text-purple-500 hover:underline text-sm mt-2">
-                  Log out
-                </button>
-              </>
-            ) : (
-              <Link href="/login" onClick={() => setMenuOpen(false)}>
-                <span className="text-sm">Login / Register</span>
-              </Link>
-            )}
-          </nav>
-        </div>
-      )}
-    </motion.header>
+    </nav>
   );
 }
