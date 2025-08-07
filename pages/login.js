@@ -69,7 +69,7 @@ export default function AuthPage() {
         } else {
           setStatusMsg('✅ Logged in successfully!');
           // Redirect to dashboard (if needed):
-          // window.location.href = '/dashboard';
+          window.location.href = '/dashboard';
         }
       }
     } catch (error) {
