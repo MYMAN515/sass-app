@@ -1,75 +1,146 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '@/lib/supabaseClient';
 import Cookies from 'js-cookie';
 
-export default function VerifyEmailPage() {
+export default function AuthPage() {
   const router = useRouter();
-  const [status, setStatus] = useState('loading');
+  const [formType, setFormType] = useState('login'); // 'login' or 'register'
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const confirmEmail = async () => {
-      const hash = window.location.hash;
-
-      if (!hash) {
-        setStatus('error');
-        setError('Verification link is invalid or expired.');
-        return;
-      }
-
-      // تأكيد التحقق من الجلسة
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError || !sessionData?.session?.user) {
-        setStatus('error');
-        setError('Unable to confirm your session. Please log in again.');
-        return;
-      }
-
-      const user = sessionData.session.user;
-
-      // التحقق إن كان المستخدم موجود مسبقًا في جدول Data
-      const { data: existingUser, error: checkError } = await supabase
-        .from('Data')
-        .select('*')
-        .eq('email', user.email)
-        .single();
-
-      if (!existingUser) {
-        const insertRes = await supabase.from('Data').insert([
-          {
-            name: user.user_metadata?.name || 'Anonymous',
-            email: user.email,
-            password: null, // يمكنك تعيين قيمة افتراضية أو تركها null
-          },
-        ]);
-
-        if (insertRes.error) {
-          setStatus('error');
-          setError('Failed to save your data. Please try again later.');
-          return;
-        }
-      }
-
-      // تخزين الجلسة في الكوكيز (اختياري)
-      Cookies.set('user', JSON.stringify({ email: user.email }), { expires: 7, path: '/' });
-
-      // إعادة التوجيه إلى صفحة الـ Dashboard
-      setStatus('success');
+    const user = Cookies.get('user');
+    if (user) {
       router.replace('/dashboard');
-    };
+    }
+  }, []);
 
-    confirmEmail();
-  }, [router]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          name,
+          type: formType,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Failed');
+
+      if (formType === 'register') {
+        alert('✅ Registration successful. Please verify your email.');
+      } else {
+        Cookies.set('user', JSON.stringify({ email: data.user.email }), {
+          expires: 7,
+          path: '/',
+        });
+        router.replace('/dashboard');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      {status === 'loading' && <p>Verifying your email...</p>}
-      {status === 'success' && <p>Email verified! Redirecting...</p>}
-      {status === 'error' && <p className="text-red-500">{error}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-6 text-center">
+          {formType === 'login' ? 'Log In' : 'Register'}
+        </h2>
+
+        <form onSubmit={handleSubmit}>
+          {formType === 'register' && (
+            <>
+              <label className="block mb-2 text-sm font-medium text-gray-700">Name</label>
+              <input
+                type="text"
+                className="w-full p-2 mb-4 border border-gray-300 rounded"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </>
+          )}
+
+          <label className="block mb-2 text-sm font-medium text-gray-700">Email</label>
+          <input
+            type="email"
+            className="w-full p-2 mb-4 border border-gray-300 rounded"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+
+          <label className="block mb-2 text-sm font-medium text-gray-700">Password</label>
+          <input
+            type="password"
+            className="w-full p-2 mb-4 border border-gray-300 rounded"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+          >
+            {loading
+              ? formType === 'login'
+                ? 'Logging in...'
+                : 'Registering...'
+              : formType === 'login'
+              ? 'Log In'
+              : 'Register'}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center text-sm">
+          {formType === 'login' ? (
+            <>
+              Don't have an account?{' '}
+              <button
+                onClick={() => setFormType('register')}
+                className="text-blue-600 font-semibold underline"
+              >
+                Register
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{' '}
+              <button
+                onClick={() => setFormType('login')}
+                className="text-blue-600 font-semibold underline"
+              >
+                Log In
+              </button>
+            </>
+          )}
+        </p>
+
+        {error && (
+          <p className="text-red-600 text-sm mt-4 text-center">❌ {error}</p>
+        )}
+      </div>
     </div>
   );
 }
