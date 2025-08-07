@@ -1,15 +1,16 @@
 // pages/api/auth.js
 
 import { supabase } from '@/lib/supabaseClient';
-import { serialize } from 'cookie';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: 'Only POST allowed' });
+  }
 
-  const { action, name, email, password } = req.body;
+  const { action, email, password, name } = req.body;
 
-  if (!action || !email || !password || (action === 'register' && !name)) {
-    return res.status(400).json({ error: 'Missing fields or action' });
+  if (!email || !password || !action) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
 
   if (action === 'register') {
@@ -18,21 +19,19 @@ export default async function handler(req, res) {
       password,
       options: {
         data: { name, credits: 5 },
-      },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/verify-email`, // يجب تحديد هذا المتغير في .env
+      }
     });
 
     if (error) {
-      const msg = error.message.toLowerCase().includes('already')
-        ? 'هذا البريد مسجل'
-        : 'خطأ في التسجيل';
-      return res
-        .status(error.message.toLowerCase().includes('already') ? 400 : 500)
-        .json({ success: false, error: msg });
+      const msg = error.message.toLowerCase().includes('already') ? 'هذا البريد مسجل' : 'خطأ في التسجيل';
+      return res.status(400).json({ success: false, error: msg });
     }
 
-    return res
-      .status(201)
-      .json({ success: true, user: data.user, message: 'تم التسجيل مع 5 credits' });
+    return res.status(200).json({
+      success: true,
+      message: 'تم التسجيل. يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب.',
+    });
   }
 
   if (action === 'login') {
@@ -42,34 +41,27 @@ export default async function handler(req, res) {
     });
 
     if (error) {
-      return res
-        .status(401)
-        .json({ success: false, error: 'بيانات الدخول غير صحيحة' });
+      return res.status(401).json({ success: false, error: 'بيانات الدخول غير صحيحة' });
     }
 
-    // ✅ Store tokens in cookies
-    const accessToken = data.session.access_token;
-    const refreshToken = data.session.refresh_token;
-    const cookieOptions = {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'Strict',
-      path: '/',
-    };
+    const user = data?.user;
+    const token = data?.session?.access_token;
+    const refreshToken = data?.session?.refresh_token;
 
-    res.setHeader('Set-Cookie', [
-      serialize('sb-access-token', accessToken, {
-        ...cookieOptions,
-        maxAge: 60 * 60 * 24 * 7,
-      }),
-      serialize('sb-refresh-token', refreshToken, {
-        ...cookieOptions,
-        maxAge: 60 * 60 * 24 * 30,
-      }),
-    ]);
+    if (!token || !refreshToken) {
+      return res.status(500).json({ success: false, error: 'لم يتم إنشاء الجلسة بشكل صحيح' });
+    }
 
-    return res.status(200).json({ success: true, user: data.user });
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: user?.id,
+        email: user?.email,
+      },
+      token,
+      refresh_token: refreshToken,
+    });
   }
 
-  return res.status(400).json({ error: 'Invalid action' });
+  return res.status(400).json({ success: false, error: 'Invalid action' });
 }
