@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
-export default function AuthPage() {
+export default function LoginPage() {
   const router = useRouter();
   const [formType, setFormType] = useState('login');
   const [email, setEmail] = useState('');
@@ -13,35 +13,40 @@ export default function AuthPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     const checkSession = async () => {
       const supabase = createBrowserSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        console.log('🔐 User already logged in:', session.user.email);
         router.replace('/dashboard');
       }
+      setCheckingSession(false);
     };
     checkSession();
-  }, []);
+  }, [router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    console.log('🚀 Submitting form:', { formType, email, password, name });
+
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, name, type: formType }),
       });
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || 'Failed');
+      console.log('📦 API response:', data);
+
+      if (!res.ok) throw new Error(data.error || 'Login/Registration failed');
 
       if (formType === 'register') {
         alert('✅ Registration successful. Please verify your email.');
@@ -53,14 +58,17 @@ export default function AuthPage() {
         router.replace('/dashboard');
       }
     } catch (err) {
+      console.error('❌ Error:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  if (checkingSession) return null; // Prevents UI flashing while checking session
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black">
       <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-lg w-full max-w-md space-y-6">
         <h2 className="text-3xl font-extrabold text-center text-zinc-800 dark:text-white">
           {formType === 'login' ? 'Welcome Back' : 'Create Account'}
