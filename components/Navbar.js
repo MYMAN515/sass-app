@@ -1,66 +1,97 @@
+// components/Navbar.jsx
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MoonIcon, SunIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/solid';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
+const LINKS = [
+  { href: '/', label: 'Home' },
+  { href: '/pricing', label: 'Pricing' },
+  { href: '/dashboard', label: 'Dashboard' },
+];
+
 export default function Navbar() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [supabase] = useState(() => createBrowserSupabaseClient());
+
   const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
   const [user, setUser] = useState(null);
-  const [credits, setCredits] = useState(null);
-  const [plan, setPlan] = useState(null);
+  const [plan, setPlan] = useState('Free');
+  const [credits, setCredits] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const supabase = createBrowserSupabaseClient();
-  const router = useRouter();
+  // لماذا: تمييز الرابط الحالي بصريًا
+  const isActive = useCallback((href) => {
+    if (href === '/') return pathname === '/';
+    return pathname?.startsWith(href);
+  }, [pathname]);
 
-  // Dark mode setup
+  // Theme init
   useEffect(() => {
-    const isDark = localStorage.getItem('theme') === 'dark';
-    setDark(isDark);
-    document.documentElement.classList.toggle('dark', isDark);
+    const stored = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialDark = stored ? stored === 'dark' : prefersDark;
+    setDark(initialDark);
+    document.documentElement.classList.toggle('dark', initialDark);
   }, []);
 
   const toggleTheme = () => {
-    const newDark = !dark;
-    setDark(newDark);
-    localStorage.setItem('theme', newDark ? 'dark' : 'light');
-    document.documentElement.classList.toggle('dark', newDark);
+    const next = !dark;
+    setDark(next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', next);
   };
 
-  // Scroll shadow effect
+  // Scroll FX
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handler);
-    return () => window.removeEventListener('scroll', handler);
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Fetch user info from Supabase
+  // Session & user data
   useEffect(() => {
-    const fetchUserData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
+        if (!mounted) return;
+
+        setUser({ id: session.user.id, email: session.user.email, name: session.user.user_metadata?.name });
         const { data } = await supabase
           .from('Data')
           .select('name, credits, plan')
           .eq('user_id', session.user.id)
           .single();
 
-        if (data) {
-          setUser({ name: data.name || session.user.email });
-          setCredits(data.credits || 0);
-          setPlan(data.plan || 'Free');
-        }
+        setPlan(data?.plan || 'Free');
+        setCredits(data?.credits ?? 0);
+        setUser((u) => ({ ...u, name: data?.name || u?.name || session.user.email }));
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
-    };
-    fetchUserData();
-  }, []);
+    })();
+    return () => { mounted = false; };
+  }, [supabase]);
+
+  const initials = useMemo(() => {
+    const n = user?.name || user?.email || '';
+    const parts = n.split(' ').filter(Boolean);
+    const first = parts[0]?.[0] || n[0] || 'U';
+    const second = parts[1]?.[0] || '';
+    return (first + second).toUpperCase();
+  }, [user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -68,80 +99,241 @@ export default function Navbar() {
     router.push('/login');
   };
 
-  if (loading) return null;
+  // اغلاق الدرج بالمفتاح ESC
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    if (menuOpen) window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   return (
-    <header className={`fixed top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'shadow-md bg-black/80' : 'bg-transparent'}`}>
-      <nav className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center text-white">
-        {/* Logo */}
-        <Link href="/" className="text-xl font-bold text-purple-400">
-          AI Assistant
-        </Link>
-
-        {/* Desktop Links */}
-        <div className="hidden md:flex items-center gap-6">
-          <Link href="/" className="hover:text-purple-400">Home</Link>
-          <Link href="/pricing" className="hover:text-purple-400">Pricing</Link>
-          <Link href="/dashboard" className="hover:text-purple-400">Dashboard</Link>
-
-          <button onClick={toggleTheme}>
-            {dark ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
-          </button>
-
-          {user ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{user.name}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-600">{plan}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-green-500">{credits} credits</span>
-              <button onClick={handleLogout} className="text-sm underline text-purple-300 ml-2">Logout</button>
+    <header
+      className={[
+        'fixed top-0 z-50 w-full transition-all duration-300',
+        scrolled ? 'shadow-[0_10px_30px_-10px_rgba(0,0,0,.5)]' : '',
+      ].join(' ')}
+      aria-label="Primary"
+    >
+      <div
+        className={[
+          'mx-auto max-w-7xl px-4',
+          'rounded-b-3xl border-b border-white/10',
+          'backdrop-blur-xl',
+          'bg-white/5 dark:bg-zinc-900/50',
+        ].join(' ')}
+        style={{
+          boxShadow: scrolled ? 'inset 0 -1px 0 rgba(255,255,255,.06)' : 'none',
+        }}
+      >
+        <nav className="h-16 flex items-center justify-between text-white">
+          {/* Logo */}
+          <Link href="/" className="group inline-flex items-center gap-2">
+            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
+                <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
+              </svg>
             </div>
-          ) : (
+            <span className="font-semibold tracking-tight">
+              AI Studio
+              <span className="ml-2 inline-block align-middle h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            </span>
+          </Link>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-2">
+            {LINKS.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={[
+                  'relative px-3 py-2 rounded-full text-sm font-medium transition',
+                  'hover:bg-white/10',
+                  isActive(l.href) ? 'text-white' : 'text-white/80',
+                ].join(' ')}
+              >
+                <span className="relative">
+                  {l.label}
+                  {isActive(l.href) && (
+                    <span className="absolute -bottom-1 left-0 right-0 mx-auto h-[2px] w-6 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
+                  )}
+                </span>
+              </Link>
+            ))}
+
             <button
-              onClick={() => router.push('/login')}
-              className="text-sm font-medium hover:text-purple-300"
+              onClick={toggleTheme}
+              className="ml-1 inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-9 transition"
+              aria-label="Toggle theme"
+              title="Toggle theme"
             >
-              Sign in
+              {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
             </button>
-          )}
-        </div>
 
-        {/* Mobile Menu Toggle */}
-        <button className="md:hidden" onClick={() => setMenuOpen(!menuOpen)}>
-          {menuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
-        </button>
-      </nav>
+            {/* User/CTA */}
+            {loading ? (
+              <div className="ml-2 h-9 w-44 rounded-full bg-white/10 animate-pulse" />
+            ) : user ? (
+              <div className="ml-2 flex items-center gap-2">
+                <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
+                  <span className="inline-block size-2 rounded-full bg-emerald-400" />
+                  Plan: <strong className="font-semibold">{plan}</strong>
+                </span>
+                <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
+                  Credits: <strong className="font-semibold">{credits}</strong>
+                </span>
+                <Link
+                  href="/enhance"
+                  className="hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                >
+                  🚀 Launch Studio
+                </Link>
+                <div
+                  title={user.email}
+                  className="ml-1 grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold"
+                >
+                  {initials}
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs underline text-white/80 hover:text-white"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="ml-2 flex items-center gap-2">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                >
+                  Sign in
+                </Link>
+              </div>
+            )}
+          </div>
 
-      {/* Mobile Menu */}
-      {menuOpen && (
-        <div className="md:hidden bg-black/90 text-white px-6 py-4 space-y-4">
-          <Link href="/" onClick={() => setMenuOpen(false)} className="block">Home</Link>
-          <Link href="/pricing" onClick={() => setMenuOpen(false)} className="block">Pricing</Link>
-          <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="block">Dashboard</Link>
-
-          <button onClick={toggleTheme} className="block">
-            {dark ? 'Light Mode' : 'Dark Mode'}
+          {/* Mobile toggle */}
+          <button
+            className="md:hidden inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-10 transition"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Toggle menu"
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
           </button>
+        </nav>
+      </div>
 
-          {user ? (
-            <div className="space-y-2">
-              <div>{user.name}</div>
-              <div className="text-xs bg-purple-600 inline-block px-2 py-0.5 rounded">{plan}</div>
-              <div className="text-xs bg-green-500 inline-block px-2 py-0.5 rounded">{credits} credits</div>
-              <button onClick={handleLogout} className="text-purple-400 underline">Logout</button>
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                router.push('/login');
-              }}
-              className="block text-purple-400"
+      {/* Mobile Drawer */}
+      <AnimatePresence>
+        {menuOpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setMenuOpen(false)}
+            />
+            <motion.aside
+              className="fixed right-0 top-0 bottom-0 z-50 w-[84vw] max-w-sm bg-[#0f0a1f] text-white border-l border-white/10 shadow-2xl"
+              role="dialog" aria-modal="true"
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
             >
-              Sign in
-            </button>
-          )}
-        </div>
-      )}
+              <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
+                <div className="inline-flex items-center gap-2">
+                  <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500">
+                    <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
+                      <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
+                    </svg>
+                  </div>
+                  <span className="font-semibold">AI Studio</span>
+                </div>
+                <button
+                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-10 transition"
+                  onClick={() => setMenuOpen(false)} aria-label="Close menu"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="px-4 py-4 space-y-1">
+                {LINKS.map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={[
+                      'block rounded-xl px-3 py-3 text-sm font-medium transition',
+                      isActive(l.href) ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5',
+                    ].join(' ')}
+                  >
+                    {l.label}
+                  </Link>
+                ))}
+
+                <button
+                  onClick={toggleTheme}
+                  className="mt-2 inline-flex items-center gap-2 rounded-xl px-3 py-3 text-sm font-medium border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                >
+                  {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
+                  {dark ? 'Light Mode' : 'Dark Mode'}
+                </button>
+
+                <div className="pt-4">
+                  {loading ? (
+                    <div className="h-10 w-full rounded-xl bg-white/10 animate-pulse" />
+                  ) : user ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold">
+                          {initials}
+                        </div>
+                        <div className="text-sm font-medium truncate">{user.name || user.email}</div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1">
+                          <span className="inline-block size-2 rounded-full bg-emerald-400" />
+                          Plan: <strong className="font-semibold">{plan}</strong>
+                        </span>
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1">
+                          Credits: <strong className="font-semibold">{credits}</strong>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2">
+                        <Link
+                          href="/enhance"
+                          onClick={() => setMenuOpen(false)}
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                        >
+                          🚀 Launch Studio
+                        </Link>
+                        <button
+                          onClick={() => { setMenuOpen(false); handleLogout(); }}
+                          className="text-xs underline text-white/80 hover:text-white"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Link
+                      href="/login"
+                      onClick={() => setMenuOpen(false)}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                    >
+                      Sign in
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-auto p-4 text-xs text-white/50 border-t border-white/10">
+                © {new Date().getFullYear()} AI Studio
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
