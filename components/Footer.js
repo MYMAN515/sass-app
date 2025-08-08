@@ -21,24 +21,18 @@ const NAV = [
     title: 'Resources',
     links: [
       { label: 'Pricing', href: '/pricing' },
-      { label: 'Docs', href: '/docs' },
-      { label: 'Changelog', href: '/changelog' },
     ],
   },
   {
     title: 'Company',
     links: [
       { label: 'About', href: '/about' },
-      { label: 'Careers', href: '/careers' },
-      { label: 'Contact', href: '/contact' },
     ],
   },
   {
     title: 'Legal',
     links: [
-      { label: 'Privacy', href: '/privacy' },
-      { label: 'Terms', href: '/terms' },
-      { label: 'Security', href: '/security' },
+      { label: 'Privacy-Terms', href: '/privacy-terms' },
     ],
   },
 ];
@@ -46,11 +40,7 @@ const NAV = [
 const SOCIALS = [
   { label: 'X', icon: FaXTwitter, href: 'https://twitter.com' },
   { label: 'Instagram', icon: FaInstagram, href: 'https://instagram.com' },
-  { label: 'YouTube', icon: FaYoutube, href: 'https://youtube.com' },
-  { label: 'TikTok', icon: FaTiktok, href: 'https://tiktok.com' },
   { label: 'LinkedIn', icon: FaLinkedin, href: 'https://linkedin.com' },
-  { label: 'Discord', icon: FaDiscord, href: 'https://discord.com' },
-  { label: 'GitHub', icon: FaGithub, href: 'https://github.com' },
 ];
 
 export default function Footer() {
