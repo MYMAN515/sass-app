@@ -37,7 +37,7 @@ Ensure a ${realism} level that maintains photorealistic integrity and avoids any
 The final image should be in ${outputQuality} resolution — clean, crisp, and flawless.`.trim();
 }
 
-/** ✅ Mobile-first before/after slider with larger handle & full-surface drag */
+/** ✅ Mobile-first before/after slider: bigger handle, full-surface drag, & range control on mobile */
 function CompareSlider({ before, after, altBefore = 'Before', altAfter = 'After' }) {
   const trackRef = useRef(null);
   const [pos, setPos] = useState(50);
@@ -82,19 +82,11 @@ function CompareSlider({ before, after, altBefore = 'Before', altAfter = 'After'
         />
 
         {/* BEFORE mask */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ width: `${pos}%` }}
-        >
-          <img
-            src={before}
-            alt={altBefore}
-            className="w-full h-full object-contain"
-            loading="lazy"
-          />
+        <div className="absolute inset-0 pointer-events-none" style={{ width: `${pos}%` }}>
+          <img src={before} alt={altBefore} className="w-full h-full object-contain" loading="lazy" />
         </div>
 
-        {/* in-frame labels for mobile */}
+        {/* in-frame labels */}
         <div className="absolute left-3 top-3 text-[10px] sm:text-xs px-2 py-1 rounded-full bg-black/55 text-white">
           {altBefore}
         </div>
@@ -128,7 +120,7 @@ function CompareSlider({ before, after, altBefore = 'Before', altAfter = 'After'
           </div>
         </div>
 
-        {/* full-surface drag layer for easier touch control */}
+        {/* full-surface drag */}
         <div
           className="absolute inset-0"
           onPointerDown={onPointerDown}
@@ -138,7 +130,16 @@ function CompareSlider({ before, after, altBefore = 'Before', altAfter = 'After'
         />
       </div>
 
-      {/* bottom labels (optional, keep small & unobtrusive) */}
+      {/* extra mobile control */}
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={pos}
+        onChange={(e) => setPos(Number(e.target.value))}
+        className="mt-3 block w-full sm:hidden accent-fuchsia-500"
+      />
+
       <div className="flex justify-between text-[10px] sm:text-xs text-zinc-600 dark:text-zinc-400 mt-2 px-1">
         <span>{altBefore}</span>
         <span>{altAfter}</span>
@@ -392,7 +393,7 @@ export default function EnhancePage() {
               </motion.div>
             )}
 
-            {/* Preview before generate (✅ mobile-safe aspect ratio + contain) */}
+            {/* Preview before generate */}
             {previewUrl && !resultUrl && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <div className="relative mt-2 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
@@ -414,15 +415,13 @@ export default function EnhancePage() {
               </motion.div>
             )}
 
-            {/* Result with toolbar + compare (✅ toolbar relocates on mobile) */}
+            {/* Result with toolbar + compare */}
             {resultUrl && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 space-y-4">
                 <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
                   <CompareSlider before={previewUrl} after={resultUrl} />
-                  <div
-                    className="absolute right-3 left-3 bottom-3 sm:top-3 sm:right-3 sm:left-auto sm:bottom-auto
-                               flex flex-col sm:flex-row gap-2"
-                  >
+                  {/* Toolbar: under the image on mobile, overlay top-right on desktop */}
+                  <div className="mt-3 px-1 flex flex-col sm:flex-row gap-2 sm:mt-0 sm:absolute sm:top-3 sm:right-3 sm:px-0">
                     <Button size="sm" onClick={downloadImage}>Download</Button>
                     <Button size="sm" variant="secondary" onClick={copyLink}>Copy Link</Button>
                     <Button size="sm" variant="ghost" onClick={() => handleGenerate(options)} disabled={loading}>
@@ -436,7 +435,7 @@ export default function EnhancePage() {
               </motion.div>
             )}
 
-            {/* Loading overlay */}
+            {/* Loading */}
             {loading && !resultUrl && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -449,7 +448,7 @@ export default function EnhancePage() {
             )}
           </section>
 
-          {/* Right: Tips / Steps / Summary */}
+          {/* Right: Tips / Steps */}
           <aside className="space-y-6">
             <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-800 p-6">
               <h3 className="text-lg font-semibold">How it works</h3>
