@@ -1,66 +1,70 @@
+// pages/auth/callback.jsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Cookies from 'js-cookie';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export default function GoogleAuthCallback() {
   const supabase = createBrowserSupabaseClient();
   const router = useRouter();
-  const [status, setStatus] = useState('⏳ Verifying Google login...');
+  const [msg, setMsg] = useState('⏳ Verifying Google login…');
+
+  // غيّر هذا لـ false إذا تبي تبقي upsert من العميل
+  const USE_TRIGGER = true; // لماذا: التريغر آمن ويتجاوز مشاكل RLS للـ INSERT
 
   useEffect(() => {
-    const finalizeAuth = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
+    let cancelled = false;
 
-      if (error || !session?.user) {
-        console.error('❌ No valid session', error);
+    (async () => {
+      // انتظار استقرار الجلسة بعد OAuth
+      for (let i = 0; i < 8; i++) {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (session?.user && !error) {
+          const { user } = session;
+          Cookies.set('user', JSON.stringify({ email: user.email || '' }), { expires: 7, path: '/' });
+
+          if (!USE_TRIGGER) {
+            // بديل: upsert مباشر (يتطلب سياسة RLS INSERT: with check (auth.uid() = user_id))
+            const { error: upsertError } = await supabase
+              .from('Data') // حافظ على نفس اسم جدولك
+              .upsert(
+                {
+                  user_id: user.id,
+                  email: user.email || '',
+                  name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || '',
+                  plan: 'Free',
+                  credits: 5,
+                },
+                { onConflict: 'user_id' } // لماذا: المفتاح المنطقي لصف المستخدم
+              );
+
+            if (upsertError) {
+              console.error('Upsert failed:', upsertError.message);
+              // لا نمنع التوجيه؛ غالبًا الصف موجود أو RLS يمنع الإدراج
+            }
+          }
+
+          setMsg('✅ Signed in. Redirecting…');
+          router.replace('/dashboard');
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 300));
+      }
+
+      if (!cancelled) {
+        setMsg('❌ Could not confirm your session. Please try again.');
         router.replace('/auth-failed?reason=invalid_session');
-        return;
       }
+    })();
 
-      const user = session.user;
-      const user_email = user.email || '';
-      const user_name = user.user_metadata?.full_name || user.email || '';
-      const user_id = user.id;
-
-      // Save cookie
-      Cookies.set('user', JSON.stringify({ email: user_email }), {
-        expires: 7,
-        path: '/',
-      });
-
-      // Insert user into 'Data' table
-      const { error: insertError } = await supabase
-        .from('Data')
-        .upsert([
-          {
-            user_id: user_id,
-            name: user_name,
-            email: user_email,
-            password: '', // OAuth user
-            plan: 'Free',
-            credits: 5,
-          },
-        ], { onConflict: ['id'] });
-
-      if (insertError) {
-        console.error('❌ Insert error:', insertError.message);
-      } else {
-        console.log('✅ User inserted into Data');
-      }
-
-      router.replace('/dashboard');
-    };
-
-    finalizeAuth();
-  }, []);
+    return () => { cancelled = true; };
+  }, [router, supabase]);
 
   return (
-    <div className="flex items-center justify-center h-screen">
-      <p className="text-xl font-semibold">{status}</p>
+    <div className="grid min-h-[60vh] place-items-center">
+      <p className="text-lg font-semibold">{msg}</p>
     </div>
   );
 }
-
