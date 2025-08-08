@@ -1,7 +1,7 @@
 // pages/enhance.js
 'use client';
 
-import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { useEffect, useReducer, useRef, useState } from 'react';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Spinner from '@/components/Spinner';
 import Toast from '@/components/Toast';
@@ -37,9 +37,11 @@ Ensure a ${realism} level that maintains photorealistic integrity and avoids any
 The final image should be in ${outputQuality} resolution — clean, crisp, and flawless.`.trim();
 }
 
+/** ✅ Mobile-first before/after slider with larger handle & full-surface drag */
 function CompareSlider({ before, after, altBefore = 'Before', altAfter = 'After' }) {
   const trackRef = useRef(null);
   const [pos, setPos] = useState(50);
+  const [dragging, setDragging] = useState(false);
 
   const clamp = (v) => Math.max(0, Math.min(100, v));
 
@@ -50,24 +52,57 @@ function CompareSlider({ before, after, altBefore = 'Before', altAfter = 'After'
     setPos(x);
   };
 
-  function onPointerDown(e) {
+  const onPointerDown = (e) => {
     e.preventDefault();
+    setDragging(true);
     e.currentTarget.setPointerCapture?.(e.pointerId);
     move(e.clientX);
-  }
-  function onPointerMove(e) {
-    if (!(e.buttons & 1)) return;
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragging) return;
     move(e.clientX);
-  }
+  };
+
+  const onPointerUp = () => setDragging(false);
 
   return (
-    <div className="relative w-full max-w-3xl mx-auto select-none" aria-label="Before after comparison">
-      <div ref={trackRef} className="relative w-full overflow-hidden rounded-3xl border border-zinc-200 dark:border-zinc-800">
-        <img src={after} alt={altAfter} className="block w-full" loading="lazy" />
-        <div className="absolute inset-0 pointer-events-none" style={{ width: `${pos}%` }}>
-          <img src={before} alt={altBefore} className="block w-full h-full object-cover" loading="lazy" />
+    <div className="w-full max-w-3xl mx-auto select-none" aria-label="Before after comparison">
+      <div
+        ref={trackRef}
+        className="relative w-full mx-auto overflow-hidden rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900
+                   aspect-[4/3] sm:aspect-[16/10]"
+      >
+        {/* AFTER */}
+        <img
+          src={after}
+          alt={altAfter}
+          className="absolute inset-0 w-full h-full object-contain"
+          loading="lazy"
+        />
+
+        {/* BEFORE mask */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ width: `${pos}%` }}
+        >
+          <img
+            src={before}
+            alt={altBefore}
+            className="w-full h-full object-contain"
+            loading="lazy"
+          />
         </div>
 
+        {/* in-frame labels for mobile */}
+        <div className="absolute left-3 top-3 text-[10px] sm:text-xs px-2 py-1 rounded-full bg-black/55 text-white">
+          {altBefore}
+        </div>
+        <div className="absolute right-3 top-3 text-[10px] sm:text-xs px-2 py-1 rounded-full bg-black/55 text-white">
+          {altAfter}
+        </div>
+
+        {/* handle/center line */}
         <div
           role="slider"
           aria-label="Compare before and after"
@@ -75,22 +110,36 @@ function CompareSlider({ before, after, altBefore = 'Before', altAfter = 'After'
           aria-valuemax={100}
           aria-valuenow={Math.round(pos)}
           tabIndex={0}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
+          className="absolute top-0 bottom-0 cursor-ew-resize touch-none"
+          style={{ left: `calc(${pos}% - 1px)` }}
           onKeyDown={(e) => {
             if (e.key === 'ArrowLeft') setPos((p) => clamp(p - 5));
             if (e.key === 'ArrowRight') setPos((p) => clamp(p + 5));
           }}
-          className="absolute top-0 cursor-ew-resize"
-          style={{ left: `calc(${pos}% - 1px)`, height: '100%' }}
         >
-          <div className="h-full w-0.5 bg-white/90 mix-blend-difference shadow-[0_0_0_1px_rgba(0,0,0,.2)]" />
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
-            Drag
+          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] sm:w-0.5 bg-white/90 mix-blend-difference" />
+          <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2
+                          w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-black/65 backdrop-blur
+                          flex items-center justify-center shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="white">
+              <path d="M8 12H4m16 0h-4" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M14 8l-4 4 4 4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
         </div>
+
+        {/* full-surface drag layer for easier touch control */}
+        <div
+          className="absolute inset-0"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+        />
       </div>
-      <div className="flex justify-between text-xs text-zinc-600 dark:text-zinc-400 mt-2 px-1">
+
+      {/* bottom labels (optional, keep small & unobtrusive) */}
+      <div className="flex justify-between text-[10px] sm:text-xs text-zinc-600 dark:text-zinc-400 mt-2 px-1">
         <span>{altBefore}</span>
         <span>{altAfter}</span>
       </div>
@@ -343,11 +392,13 @@ export default function EnhancePage() {
               </motion.div>
             )}
 
-            {/* Preview before generate */}
+            {/* Preview before generate (✅ mobile-safe aspect ratio + contain) */}
             {previewUrl && !resultUrl && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="relative mt-2 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
-                  <img src={previewUrl} alt="preview" className="w-full max-h-[540px] object-contain bg-zinc-50 dark:bg-zinc-950" />
+                <div className="relative mt-2 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
+                  <div className="w-full aspect-[4/3] sm:aspect-[16/10]">
+                    <img src={previewUrl} alt="preview" className="w-full h-full object-contain" />
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Button onClick={() => dispatch({ type: 'SHOW_MODAL', payload: true })} disabled={loading}>
@@ -363,12 +414,15 @@ export default function EnhancePage() {
               </motion.div>
             )}
 
-            {/* Result with toolbar + compare */}
+            {/* Result with toolbar + compare (✅ toolbar relocates on mobile) */}
             {resultUrl && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 space-y-4">
                 <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
                   <CompareSlider before={previewUrl} after={resultUrl} />
-                  <div className="absolute top-3 right-3 flex gap-2">
+                  <div
+                    className="absolute right-3 left-3 bottom-3 sm:top-3 sm:right-3 sm:left-auto sm:bottom-auto
+                               flex flex-col sm:flex-row gap-2"
+                  >
                     <Button size="sm" onClick={downloadImage}>Download</Button>
                     <Button size="sm" variant="secondary" onClick={copyLink}>Copy Link</Button>
                     <Button size="sm" variant="ghost" onClick={() => handleGenerate(options)} disabled={loading}>
