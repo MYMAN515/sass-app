@@ -231,6 +231,21 @@ export default function TryOnPage(){
         dispatch({ type:'LOADING', payload:false });
         return;
       }
+            const mirrored = await mirrorToStorage({ url: data.image });
+
+// 2) نحط الرابط الجديد في الـ state
+dispatch({ type: 'RESULT', payload: { resultUrl: mirrored.publicUrl } });
+
+// 3) نحفظ في history
+await createHistory({
+  kind: 'tryon',
+  input_url: imageUrl,
+  output_url: mirrored.publicUrl,
+  prompt,
+  options: { ...options, source_url: data.image, storage_path: mirrored.path },
+  credits_used: 1,
+  status: 'success',
+});
 
       const image = Array.isArray(data.image) ? data.image[0] : data.image;
       dispatch({ type:'RESULT', payload:{ resultUrl: image }});
