@@ -11,6 +11,9 @@ import { uploadImageToSupabase } from '@/lib/uploadImageToSupabase';
 import Layout from '@/components/Layout';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Poppins } from 'next/font/google';
+import { mirrorToStorage } from '@/lib/mirrorToStorage';
+import { createHistory } from '@/lib/historyClient';
+
 
 const poppins = Poppins({ subsets: ['latin'], weight: ['400', '600', '700'], display: 'swap' });
 
@@ -273,6 +276,22 @@ export default function EnhancePage() {
         dispatch({ type: 'LOADING', payload: false });
         return;
       }
+      const mirrored = await mirrorToStorage({ url: data.image });
+
+// 2) نحط الرابط الجديد في الـ state
+dispatch({ type: 'RESULT', payload: { resultUrl: mirrored.publicUrl } });
+
+// 3) نحفظ في history
+await createHistory({
+  kind: 'enhance',
+  input_url: imageUrl,
+  output_url: mirrored.publicUrl,
+  prompt,
+  options: { ...options, source_url: data.image, storage_path: mirrored.path },
+  credits_used: 1,
+  status: 'success',
+});
+
 
       dispatch({ type: 'RESULT', payload: { resultUrl: data.image } });
       dispatch({ type: 'TOAST', payload: { show: true, message: 'Enhancement complete!', type: 'success' } });
