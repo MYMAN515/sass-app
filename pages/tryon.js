@@ -11,6 +11,8 @@ import TryOnCustomizer from '@/components/TryOnCustomizer';
 import { uploadImageToSupabase } from '@/lib/uploadImageToSupabase';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Poppins } from 'next/font/google';
+import { mirrorToStorage } from '@/lib/mirrorToStorage';
+import { createHistory } from '@/lib/historyClient';
 
 const poppins = Poppins({ subsets: ['latin'], weight: ['400','600','700'], display: 'swap' });
 
