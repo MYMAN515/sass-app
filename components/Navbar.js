@@ -13,6 +13,7 @@ const LINKS = [
   { href: '/', label: 'Home' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/history', label: 'History' },
 ];
 
 export default function Navbar() {
@@ -21,7 +22,7 @@ export default function Navbar() {
   const [supabase] = useState(() => createBrowserSupabaseClient());
 
   const [scrolled, setScrolled] = useState(false);
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const [user, setUser] = useState(null);
