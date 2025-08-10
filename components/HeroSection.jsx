@@ -7,27 +7,44 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * AI Product Imagery Landing — Startup-serious with playful wit
- * - Clear value prop above the fold
- * - Email capture, scarcity cue, strong CTAs
- * - Rich animations (respects prefers-reduced-motion)
- * - Micro-interactions, SVG decor, parallax, marquee, count-up KPIs
- * - All-in-one component for quick drop-in
+ * Landing Body (no Nav, no Footer) — Startup-serious with playful wit
+ * - Clear value prop above the fold (understand instantly)
+ * - Early email capture + strong CTAs
+ * - Rich animations (prefers-reduced-motion respected)
+ * - SVG aurora + floating shapes + marquee + count-up KPIs
+ * - Humor lines without hurting credibility
  */
 
 export default function HeroSection() {
   return (
     <section className="relative w-full overflow-hidden font-sans text-black dark:text-white">
       <BackgroundFX />
-      <NavStrip />
+
+      {/* ===== TOP HERO ===== */}
       <TopHero />
+
+      {/* ===== LOGOS / SOCIAL PROOF ===== */}
       <LogoMarquee />
+
+      {/* ===== METRICS (PSYCHOLOGY: AUTHORITY + MOMENTUM) ===== */}
       <ProofMetrics />
+
+      {/* ===== VALUE PROPS ===== */}
       <ValueProps />
+
+      {/* ===== HOW IT WORKS ===== */}
       <HowItWorks />
+
+      {/* ===== HUMOR BREAK (LIGHT TOUCH) ===== */}
       <HumorBreak />
+
+      {/* ===== TESTIMONIALS TICKER ===== */}
       <TestimonialsTicker />
+
+      {/* ===== BOTTOM CTA (STRONG NUDGE) ===== */}
       <BottomCTA />
+
+      {/* ===== MOBILE FLOATING CTA ===== */}
       <StickyMobileCTA />
     </section>
   );
@@ -44,9 +61,11 @@ function TopHero() {
         transition={{ duration: 0.5 }}
         className="mx-auto max-w-6xl"
       >
-        {/* Badge + subtext */}
+        {/* Badge + micro subtext */}
         <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur-md">SERIOUS STARTUP • LIGHT SENSE OF HUMOR</span>
+          <span className="rounded-full border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur-md">
+            STARTUP SERIOUS • TASTEFULLY FUN
+          </span>
           <span className="text-[11px] text-zinc-600 dark:text-zinc-300">Clarity • Speed • Conversion-first</span>
         </div>
 
@@ -54,21 +73,21 @@ function TopHero() {
           {/* Left copy */}
           <div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.05] tracking-tight">
-              Make <span className="bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-rose-500 bg-clip-text text-transparent">product photos</span> that sell—<span className="whitespace-nowrap">without the studio.</span>
+              Turn <span className="bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-rose-500 bg-clip-text text-transparent">product photos</span> into sales—<span className="whitespace-nowrap">no studio needed.</span>
             </h1>
 
             <p className="mt-4 max-w-xl text-lg md:text-xl text-zinc-700 dark:text-zinc-300">
-              Upload a photo. Get on-brand, studio-grade shots and AI try-ons in seconds. Your mug, your shoes—your empire. (Yes, even that hoodie.)
+              Upload a photo → get on-brand, studio-grade shots and AI try-ons in seconds. It’s like hiring a photo team—minus the coffee drama.
             </p>
 
-            {/* Psychological micro-commitments */}
+            {/* Micro commitments */}
             <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
               <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">No credit card</span>
               <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">Free starter credits</span>
               <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">Cancel anytime</span>
             </div>
 
-            {/* CTAs + Email capture */}
+            {/* CTAs + Email capture (prime action above the fold) */}
             <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center">
               <MagneticCTA href="/dashboard" ariaLabel="Get started for free">
                 Get started free
@@ -77,7 +96,7 @@ function TopHero() {
                 href="#demo"
                 className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/60 px-5 py-3 text-base font-semibold text-zinc-900 backdrop-blur-md transition hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white"
               >
-                See live demo
+                Watch 30s demo
               </a>
             </div>
 
@@ -115,81 +134,6 @@ function TopHero() {
   );
 }
 
-/* ------------------------------- Navigation --------------------------------- */
-
-function NavStrip() {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    onScroll();
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  return (
-    <div
-      className={`sticky top-0 z-40 w-full transition-all ${
-        scrolled
-          ? 'backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-black/40 border-b border-black/5 dark:border-white/10'
-          : ''
-      }`}
-    >
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 md:px-8">
-        <Link href="/" className="group inline-flex items-center gap-2" aria-label="Home">
-          <Logo />
-          <span className="font-semibold tracking-tight">AIStore Assistant</span>
-          <span className="ml-2 rounded-full border border-black/10 bg-white/70 px-2 py-0.5 text-[10px] text-zinc-600 backdrop-blur dark:border-white/15 dark:bg-white/10 dark:text-zinc-300">
-            Beta
-          </span>
-        </Link>
-
-        <div className="hidden items-center gap-6 md:flex">
-          <NavLink href="#features">Features</NavLink>
-          <NavLink href="#how">How it works</NavLink>
-          <NavLink href="#proof">Results</NavLink>
-          <NavLink href="#faq">FAQ</NavLink>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/login"
-            className="hidden rounded-lg border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-white dark:border-white/15 dark:hover:bg-white/10 md:inline-block"
-          >
-            Sign in
-          </Link>
-          <MagneticCTA href="/dashboard">Start free</MagneticCTA>
-        </div>
-      </nav>
-    </div>
-  );
-}
-
-function NavLink({ href, children }) {
-  return (
-    <a href={href} className="text-sm text-zinc-600 transition hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white">
-      {children}
-    </a>
-  );
-}
-
-function Logo() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden>
-      <defs>
-        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stopColor="#6366f1" />
-          <stop offset="50%" stopColor="#ec4899" />
-          <stop offset="100%" stopColor="#f43f5e" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="28" height="28" rx="8" stroke="url(#g)" strokeWidth="2" />
-      <path d="M10 22c3-6 9-6 12 0" stroke="url(#g)" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="12" cy="12" r="2" fill="url(#g)" />
-      <circle cx="20" cy="12" r="2" fill="url(#g)" />
-    </svg>
-  );
-}
-
 /* -------------------------------- Background -------------------------------- */
 
 function BackgroundFX() {
@@ -212,9 +156,8 @@ function BackgroundFX() {
 <rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' opacity=\'0.4\'/></svg>")',
         }}
       />
-      {/* Aurora blobs */}
+      {/* Aurora + Shapes */}
       <AuroraBlobs />
-      {/* Floating SVGs */}
       <FloatingShapes />
     </div>
   );
@@ -318,6 +261,7 @@ function EarlyEmailCapture() {
   const [email, setEmail] = useState('');
   const [state, setState] = useState('idle'); // idle | loading | success | error
   const [msg, setMsg] = useState('');
+
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!/.+@.+\..+/.test(email)) {
@@ -327,7 +271,6 @@ function EarlyEmailCapture() {
     }
     setState('loading');
     setMsg('');
-    // Fake async, then hard-redirect to keep friction low
     setTimeout(() => {
       setState('success');
       setMsg('Invite reserved! Redirecting…');
@@ -356,9 +299,7 @@ function EarlyEmailCapture() {
       >
         {state === 'loading' ? 'Reserving…' : 'Get beta invite'}
       </button>
-      {msg && (
-        <div className={`ml-2 self-center text-xs ${state === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>{msg}</div>
-      )}
+      {msg && <div className={`ml-2 self-center text-xs ${state === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>{msg}</div>}
     </form>
   );
 }
@@ -379,17 +320,10 @@ function CornerBadge() {
     </div>
   );
 }
-
 function SparkleIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 2l1.6 4.4L18 8l-4.4 1.6L12 14l-1.6-4.4L6 8l4.4-1.6L12 2z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        fill="currentColor"
-        opacity="0.9"
-      />
+      <path d="M12 2l1.6 4.4L18 8l-4.4 1.6L12 14l-1.6-4.4L6 8l4.4-1.6L12 2z" stroke="currentColor" strokeWidth="1.2" fill="currentColor" opacity="0.9" />
     </svg>
   );
 }
@@ -554,7 +488,7 @@ function KPI({ label, to, suffix = '', reverse = false }) {
     let start = null;
     const duration = 1000;
     const startVal = reverse ? to : 0;
-    const endVal = reverse ? (to <= 15 ? to : 0) : to; // small gag for "15s avg" staying honest
+    const endVal = reverse ? (to <= 15 ? to : 0) : to;
     const step = (t) => {
       if (!start) start = t;
       const p = Math.min((t - start) / duration, 1);
@@ -574,10 +508,7 @@ function KPI({ label, to, suffix = '', reverse = false }) {
   }, [to, reverse]);
 
   return (
-    <div
-      ref={ref}
-      className="rounded-xl border border-black/10 bg-white p-4 text-center dark:border-white/10 dark:bg-zinc-800"
-    >
+    <div ref={ref} className="rounded-xl border border-black/10 bg-white p-4 text-center dark:border-white/10 dark:bg-zinc-800">
       <div className="text-2xl font-extrabold">
         {val}
         {suffix}
@@ -669,7 +600,7 @@ function HumorBreak() {
   return (
     <div className="relative z-10 mx-auto max-w-5xl px-6 py-14 text-center md:px-12">
       <p className="text-lg text-zinc-700 dark:text-zinc-300">
-        Philosophy of pixels: <span className="font-semibold">beauty persuades</span>, speed convinces, and clarity closes. Also, your coffee mug deserves a modeling career.
+        Pixel philosophy: <span className="font-semibold">beauty persuades</span>, speed convinces, and clarity closes. Also—yes—your coffee mug is now a fashion model.
       </p>
     </div>
   );
@@ -679,10 +610,10 @@ function HumorBreak() {
 
 function TestimonialsTicker() {
   const data = [
-    '“CTR up 27% in 2 weeks.” — UrbanWear',
+    '“CTR up 27% in 14 days.” — UrbanWear',
     '“Returns dropped 18% after try-on.” — SneakLab',
-    '“We shipped a catalog update in a weekend.” — BloomBox',
-    '“Finally consistent brand images. Sanity restored.” — M.J.',
+    '“Catalog refresh in a weekend.” — BloomBox',
+    '“Consistent brand images = team peace.” — M.J.',
   ];
   return (
     <div className="relative z-10 mx-auto mb-2 mt-2 max-w-7xl overflow-hidden px-6 py-6 md:px-12">
@@ -760,21 +691,33 @@ function StickyMobileCTA() {
   );
 }
 
-/* --------------------------------- Utilities -------------------------------- */
+/* --------------------------------- SVG Utils -------------------------------- */
 
-function NavDividerDot() {
-  return <span className="inline-block h-1 w-1 rounded-full bg-zinc-400" />;
-}
-function NavSpacer() {
-  return <span className="mx-2 opacity-40">•</span>;
-}
-
-/* ------------------------------- Helper Components -------------------------- */
-
-function SVGDivider() {
+function SVGMail(props) {
   return (
-    <svg width="100%" height="16" viewBox="0 0 800 16" fill="none" aria-hidden>
-      <path d="M0 8h800" stroke="currentColor" strokeOpacity="0.06" strokeWidth="2" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" {...props} aria-hidden>
+      <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+/* --------------------------------- BG Bits ---------------------------------- */
+
+function Logo() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stopColor="#6366f1" />
+          <stop offset="50%" stopColor="#ec4899" />
+          <stop offset="100%" stopColor="#f43f5e" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="28" height="28" rx="8" stroke="url(#g)" strokeWidth="2" />
+      <path d="M10 22c3-6 9-6 12 0" stroke="url(#g)" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="2" fill="url(#g)" />
+      <circle cx="20" cy="12" r="2" fill="url(#g)" />
     </svg>
   );
 }
