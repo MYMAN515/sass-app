@@ -6,6 +6,8 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Layout from '@/components/Layout';
+import EnhanceCustomizer from '@/components/EnhanceCustomizer';
+import TryOnCustomizer from '@/components/TryOnCustomizer';
 
 /* ---------- utils ---------- */
 const hexToRGBA = (hex, a = 1) => {
@@ -37,6 +39,9 @@ const fileToOptimizedDataURL = (file, maxSide = 1600, quality = 0.9) =>
     reader.readAsDataURL(file);
   });
 
+/* ---------- constants ---------- */
+const STORAGE_BUCKET = 'uploads'; // تأكد أنه موجود و Public في Supabase
+
 /* ---------- studio ---------- */
 const TOOLS = [
   { id: 'removeBg', label: 'Remove BG', emoji: '✂️', ready: true },
@@ -48,11 +53,11 @@ export default function DashboardStudio() {
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
-  const [loading, setLoading]   = useState(true);
-  const [user, setUser]         = useState(null);
-  const [plan, setPlan]         = useState('Free');
-  const [credits, setCredits]   = useState(0);
-  const [err, setErr]           = useState('');
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [plan, setPlan] = useState('Free');
+  const [credits, setCredits] = useState(0);
+  const [err, setErr] = useState('');
 
   // tools
   const [active, setActive] = useState('removeBg');
@@ -62,10 +67,10 @@ export default function DashboardStudio() {
   // images
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState('');   // for removeBg
+  const [imageData, setImageData] = useState(''); // لِـ removeBg فقط
   const [resultUrl, setResultUrl] = useState('');
 
-  // inspector
+  // designer (removeBg preview)
   const [bgMode, setBgMode] = useState('color');
   const [color, setColor] = useState('#0b0b14');
   const [color2, setColor2] = useState('#221a42');
@@ -75,29 +80,27 @@ export default function DashboardStudio() {
   const [shadow, setShadow] = useState(true);
   const [patternOpacity, setPatternOpacity] = useState(0.08);
 
-  // simple prompts for Enhance/Try-On
-  const [enhancePrompt, setEnhancePrompt] = useState('clean e-commerce enhancement, sharp, realistic, soft studio light');
-  const [tryonPrompt, setTryonPrompt] = useState('photo-realistic model try-on, neutral studio background, true colors');
-
+  // history + compare
   const [history, setHistory] = useState([]);
   const [compare, setCompare] = useState(55);
   const dropRef = useRef(null);
 
-  /* auth + load workspace */
+  // modals (pop-ups)
+  const [showEnhance, setShowEnhance] = useState(false);
+  const [showTryon, setShowTryon] = useState(false);
+
+  /* ---------- auth + workspace ---------- */
   useEffect(() => {
     let mounted = true;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
+
       if (!session?.user) { router.replace('/login'); return; }
       setUser(session.user);
 
       try {
-        const { data } = await supabase
-          .from('Data')
-          .select('plan, credits')
-          .eq('email', session.user.email)
-          .single();
+        const { data } = await supabase.from('Data').select('plan, credits').eq('email', session.user.email).single();
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
       } catch {
@@ -107,7 +110,7 @@ export default function DashboardStudio() {
     return () => { mounted = false; };
   }, [supabase, router]);
 
-  // listen credit refresh
+  // listen credits refresh
   useEffect(() => {
     const h = async () => {
       if (!user?.email) return;
@@ -132,7 +135,6 @@ export default function DashboardStudio() {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
     setResultUrl(''); setPhase('idle'); setErr('');
-    // نحتاج dataURL فقط لـ removeBg
     setImageData(await fileToOptimizedDataURL(f, 1600, 0.9));
   };
 
@@ -157,139 +159,119 @@ export default function DashboardStudio() {
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
-  // helper: upload to supabase storage and return public URL
+  /* ---------- helpers ---------- */
+
+  // رفع الملف إلى Storage وإرجاع public URL
   const uploadToStorage = useCallback(async () => {
     if (!file) throw new Error('no file');
     const ext = (file.name?.split('.').pop() || 'png').toLowerCase();
     const path = `${user.id}/${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('img').upload(path, file, {
+    const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
       cacheControl: '3600',
       upsert: false,
       contentType: file.type || 'image/*',
     });
     if (upErr) throw upErr;
-    const { data } = supabase.storage.from('img').getPublicUrl(path);
+    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
     if (!data?.publicUrl) throw new Error('no public url');
     return data.publicUrl;
   }, [file, supabase, user]);
 
-  // helper: normalize various API shapes
-  const extractUrl = (obj) => {
+  const pickFirstUrl = (obj) => {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
     const keys = ['image', 'image_url', 'output', 'result', 'url'];
     for (const k of keys) {
-      if (obj[k]) {
-        const v = obj[k];
-        return Array.isArray(v) ? v[0] : v;
-      }
+      if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
     }
     return '';
   };
 
-  const handleRun = useCallback(async () => {
-    if (!file) { setErr('اختر صورة أولاً'); return; }
+  // توليد prompt اختياري من اختيارات الـ Enhance (إذا API يحتاج نص)
+  const buildEnhancePrompt = (f) =>
+    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
+      .filter(Boolean).join(', ');
 
+  /* ---------- actions ---------- */
+
+  // Remove BG
+  const runRemoveBg = useCallback(async () => {
+    setBusy(true); setErr(''); setPhase('processing');
     try {
-      setBusy(true); setErr(''); setPhase('processing');
-
-      if (active === 'removeBg') {
-        const r = await fetch('/api/remove-bg', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageData }),
-        });
-        if (!r.ok) throw new Error(await r.text());
-        const j = await r.json();
-        const out = extractUrl(j);
-        if (!out) throw new Error('No output from remove-bg');
-        setResultUrl(out);
-      }
-
-      if (active === 'enhance') {
-        const imageUrl = await uploadToStorage();
-        const r = await fetch('/api/enhance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageUrl,
-            prompt: enhancePrompt,
-            plan,
-            user_email: user.email,
-          }),
-        });
-        if (!r.ok) throw new Error(await r.text());
-        const j = await r.json();
-        const out = extractUrl(j);
-        if (!out) throw new Error('No output from enhance');
-        setResultUrl(out);
-      }
-
-      if (active === 'tryon') {
-        const imageUrl = await uploadToStorage();
-        const r = await fetch('/api/tryon', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageUrl,
-            prompt: tryonPrompt,
-            plan,
-            user_email: user.email,
-          }),
-        });
-        if (!r.ok) throw new Error(await r.text());
-        const j = await r.json();
-        const out = extractUrl(j);
-        if (!out) throw new Error('No output from try-on');
-        setResultUrl(out);
-      }
-
+      const r = await fetch('/api/remove-bg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
+      const out = pickFirstUrl(j);
+      if (!out) throw new Error('No output from remove-bg');
+      setResultUrl(out);
+      setHistory((h) => [{ tool: 'removeBg', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 8));
       setPhase('ready');
       window.dispatchEvent(new Event('credits:refresh'));
-      setHistory((h) => [{ tool: active, inputThumb: localUrl, outputUrl: resultUrl, ts: Date.now() }, ...h].slice(0, 8));
     } catch (e) {
-      console.error(e);
-      setPhase('error');
-      setErr('تعذر تنفيذ العملية.');
-    } finally {
-      setBusy(false);
-    }
-  }, [active, file, imageData, uploadToStorage, enhancePrompt, tryonPrompt, plan, user, localUrl, resultUrl]);
+      console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
+    } finally { setBusy(false); }
+  }, [imageData, localUrl]);
 
-  const composeAndDownload = async () => {
-    if (!resultUrl) return;
-    const blob = await fetch(resultUrl, { cache: 'no-store' }).then(r => r.blob());
-    const bmp = await createImageBitmap(blob);
-    const size = Math.max(bmp.width, bmp.height);
-    const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d');
+  // Enhance (from modal selections)
+  const runEnhance = useCallback(async (selections) => {
+    setBusy(true); setErr(''); setPhase('processing');
+    try {
+      const imageUrl = await uploadToStorage();
+      const prompt = buildEnhancePrompt(selections); // لو API لا يحتاجه تجاهله في السيرفر
+      const r = await fetch('/api/enhance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
+      const out = pickFirstUrl(j);
+      if (!out) throw new Error('No output from enhance');
+      setResultUrl(out);
+      setHistory((h) => [{ tool: 'enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 8));
+      setPhase('ready');
+      window.dispatchEvent(new Event('credits:refresh'));
+    } catch (e) {
+      console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
+    } finally { setBusy(false); }
+  }, [uploadToStorage, plan, user, localUrl]);
 
-    if (bgMode === 'color') { ctx.fillStyle = color; ctx.fillRect(0, 0, size, size); }
-    else if (bgMode === 'gradient') {
-      const rad = (angle * Math.PI) / 180, x = Math.cos(rad), y = Math.sin(rad);
-      const g = ctx.createLinearGradient(size*(1-x)/2, size*(1-y)/2, size*(1+x)/2, size*(1+y)/2);
-      g.addColorStop(0, color); g.addColorStop(1, color2);
-      ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
-    } else {
-      ctx.fillStyle = color; ctx.fillRect(0, 0, size, size);
-      ctx.strokeStyle = hexToRGBA(color, patternOpacity); ctx.lineWidth = 1;
-      for (let i = 0; i <= size; i += 24) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, size); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(size, i); ctx.stroke();
-      }
-    }
+  // Try-On (from modal selections)
+  const runTryOn = useCallback(async (selections) => {
+    setBusy(true); setErr(''); setPhase('processing');
+    try {
+      const imageUrl = await uploadToStorage();
+      const r = await fetch('/api/tryon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl, selections, plan, user_email: user.email }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
+      const out = pickFirstUrl(j);
+      if (!out) throw new Error('No output from try-on');
+      setResultUrl(out);
+      setHistory((h) => [{ tool: 'tryon', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 8));
+      setPhase('ready');
+      window.dispatchEvent(new Event('credits:refresh'));
+    } catch (e) {
+      console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
+    } finally { setBusy(false); }
+  }, [uploadToStorage, plan, user, localUrl]);
 
-    const pad = Math.round(size * (padding / 300));
-    const boxW = size - pad * 2, boxH = size - pad * 2;
-    const ratio = Math.min(boxW / bmp.width, boxH / bmp.height);
-    const dw = bmp.width * ratio, dh = bmp.height * ratio;
-    const dx = (size - dw) / 2, dy = (size - dh) / 2;
-    ctx.drawImage(bmp, dx, dy, dw, dh);
+  // زر Run يفتح المودالات للأدوات الجديدة
+  const handleRun = useCallback(() => {
+    if (!file) { setErr('اختر صورة أولاً'); return; }
+    if (active === 'removeBg') { runRemoveBg(); return; }
+    if (active === 'enhance')  { setShowEnhance(true); return; }
+    if (active === 'tryon')    { setShowTryon(true); return; }
+  }, [active, file, runRemoveBg]);
 
-    const url = canvas.toDataURL('image/png');
-    const a = document.createElement('a'); a.href = url; a.download = 'studio-output.png'; a.click();
-  };
+  /* ---------- UI ---------- */
 
   if (loading || !user) {
     return (
@@ -311,7 +293,7 @@ export default function DashboardStudio() {
     <Layout title="Studio">
       <main className="min-h-screen relative overflow-hidden bg-[radial-gradient(90%_80%_at_50%_-10%,#221a42_0%,#0b0b14_55%,#05060a_100%)] text-white">
         <BGFX />
-        <TopBar userName={user.user_metadata?.name || user.email} plan={plan} credits={credits} initials={initials} onExport={composeAndDownload} />
+        <TopBar userName={user.user_metadata?.name || user.email} plan={plan} credits={credits} initials={initials} onExport={async()=>{}} />
 
         <section className="max-w-7xl mx-auto px-4 md:px-8 pb-16">
           <div className="grid gap-6 md:grid-cols-[220px_1fr_320px]">
@@ -320,7 +302,9 @@ export default function DashboardStudio() {
               <div className="px-2 py-1 text-xs text-white/60">Tools</div>
               <div className="mt-2 space-y-1">
                 {TOOLS.map(t => (
-                  <button key={t.id} onClick={() => { setActive(t.id); setErr(''); setPhase('idle'); }}
+                  <button
+                    key={t.id}
+                    onClick={() => { setActive(t.id); setErr(''); setPhase('idle'); }}
                     className={[
                       'w-full text-left rounded-xl px-3 py-2 text-sm flex items-center gap-2 transition',
                       active === t.id ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15',
@@ -346,13 +330,8 @@ export default function DashboardStudio() {
                 onClick={() => document.getElementById('file-input')?.click()}
                 title="Drag & drop or click to upload"
               >
-                <input
-                  id="file-input"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
-                />
+                <input id="file-input" type="file" accept="image/*" className="hidden"
+                       onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }} />
                 {!localUrl ? (
                   <div className="text-center text-white/70">
                     <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white/10">⬆</div>
@@ -371,14 +350,6 @@ export default function DashboardStudio() {
                 >
                   {busy ? 'Processing…' : `Run ${TOOLS.find(t => t.id === active)?.label}`}
                 </button>
-                {resultUrl && (
-                  <button
-                    onClick={composeAndDownload}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
-                  >
-                    Export PNG
-                  </button>
-                )}
                 {err && <div className="text-xs text-rose-300">{err}</div>}
               </div>
             </section>
@@ -422,31 +393,9 @@ export default function DashboardStudio() {
                 </div>
               )}
 
-              {active === 'enhance' && (
-                <div className="space-y-3">
-                  <div className="text-xs text-white/70">Prompt</div>
-                  <textarea
-                    className="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-2 text-sm"
-                    rows={4}
-                    value={enhancePrompt}
-                    onChange={(e)=>setEnhancePrompt(e.target.value)}
-                    placeholder="Describe the enhancement look…"
-                  />
-                  <div className="text-xs text-white/50">Will be sent to /api/enhance</div>
-                </div>
-              )}
-
-              {active === 'tryon' && (
-                <div className="space-y-3">
-                  <div className="text-xs text-white/70">Prompt</div>
-                  <textarea
-                    className="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-2 text-sm"
-                    rows={4}
-                    value={tryonPrompt}
-                    onChange={(e)=>setTryonPrompt(e.target.value)}
-                    placeholder="Describe the try-on style…"
-                  />
-                  <div className="text-xs text-white/50">Will be sent to /api/tryon</div>
+              {active !== 'removeBg' && (
+                <div className="space-y-2 text-xs text-white/70">
+                  <div>اضغط Run لفتح نافذة الإعدادات (Pop-Up) واختيار التفاصيل.</div>
                 </div>
               )}
             </aside>
@@ -473,11 +422,44 @@ export default function DashboardStudio() {
           </div>
         </section>
 
+        {/* ===== Modals (Pop-Ups) ===== */}
+        <AnimatePresence>
+          {showEnhance && (
+            <motion.div
+              className="fixed inset-0 z-[100] grid place-items-center"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            >
+              <div className="absolute inset-0 bg-black/60" onClick={()=>setShowEnhance(false)} />
+              <div className="relative w-full max-w-3xl">
+                <EnhanceCustomizer
+                  onChange={()=>{}}
+                  onComplete={(form) => { setShowEnhance(false); runEnhance(form); }}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {showTryon && (
+            <motion.div
+              className="fixed inset-0 z-[100] grid place-items-center"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            >
+              <div className="absolute inset-0 bg-black/60" onClick={()=>setShowTryon(false)} />
+              <div className="relative w-full max-w-3xl">
+                <TryOnCustomizer
+                  onChange={()=>{}}
+                  onComplete={(form) => { setShowTryon(false); runTryOn(form); }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* toast */}
         <AnimatePresence>
           {err && (
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm backdrop-blur">
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm backdrop-blur">
               {err}
             </motion.div>
           )}
@@ -488,7 +470,7 @@ export default function DashboardStudio() {
 }
 
 /* ---------- small UI ---------- */
-function TopBar({ userName, plan, credits, initials, onExport }) {
+function TopBar({ userName, plan, credits, initials }) {
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 pt-6">
       <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md px-4 sm:px-6 py-3">
@@ -506,10 +488,9 @@ function TopBar({ userName, plan, credits, initials, onExport }) {
             Credits: <strong className="font-semibold">{credits}</strong>
           </span>
         </div>
-        <button onClick={onExport}
-          className="hidden sm:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition">
-          ⬇ Export
-        </button>
+        <div className="inline-flex items-center justify-center size-9 rounded-full bg-white/10 border border-white/15 font-bold">
+          {initials}
+        </div>
       </div>
     </div>
   );
