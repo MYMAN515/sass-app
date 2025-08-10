@@ -97,14 +97,14 @@ export default function RemoveBgStudioPage() {
     try {
       setPhase('upload');
       const fileName = `${Date.now()}-${file.name}`;
-      // NOTE: تأكد أن عندك bucket باسم uploads ومفعل Public
-      const { data, error } = await supabase.storage.from('uploads').upload(fileName, file, { cacheControl: '3600' });
+      // NOTE: تأكد أن عندك bucket باسم img ومفعل Public
+      const { data, error } = await supabase.storage.from('img').upload(fileName, file, { cacheControl: '3600' });
       if (error) throw error;
-      const { data: pub } = supabase.storage.from('uploads').getPublicUrl(data.path);
+      const { data: pub } = supabase.storage.from('img').getPublicUrl(data.path);
       setPublicUrl(pub.publicUrl);
       return pub.publicUrl;
     } catch (e) {
-      setMsg('فشل الرفع إلى Supabase Storage. تأكد أن الباكت "uploads" موجود ومسموح عام.');
+      setMsg('فشل الرفع إلى Supabase Storage. تأكد أن الباكت "img" موجود ومسموح عام.');
       throw e;
     }
   };
