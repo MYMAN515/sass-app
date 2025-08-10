@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Layout from '@/components/Layout';
 import EnhanceCustomizer from '@/components/EnhanceCustomizer';
 import TryOnCustomizer from '@/components/TryOnCustomizer';
@@ -41,7 +41,7 @@ const fileToOptimizedDataURL = (file, maxSide = 1600, quality = 0.9) =>
   });
 
 /* ---------- constants ---------- */
-const STORAGE_BUCKET = 'img'; // تأكد أنه موجود و Public في Supabase
+const STORAGE_BUCKET = 'img';
 
 /* ---------- studio ---------- */
 const TOOLS = [
@@ -52,7 +52,7 @@ const TOOLS = [
 
 export default function DashboardStudio() {
   const router = useRouter();
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const supabase = useMemo(() => createPagesBrowserClient(), []);
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -60,7 +60,6 @@ export default function DashboardStudio() {
   const [credits, setCredits] = useState(0);
   const [err, setErr] = useState('');
 
-  // tools
   const [active, setActive] = useState('removeBg');
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
@@ -68,10 +67,10 @@ export default function DashboardStudio() {
   // images
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState(''); // لِـ removeBg فقط
+  const [imageData, setImageData] = useState(''); // removeBg فقط
   const [resultUrl, setResultUrl] = useState('');
 
-  // designer (removeBg preview)
+  // removeBg designer
   const [bgMode, setBgMode] = useState('color');
   const [color, setColor] = useState('#0b0b14');
   const [color2, setColor2] = useState('#221a42');
@@ -86,7 +85,6 @@ export default function DashboardStudio() {
 
   // modals
   const [showEnhance, setShowEnhance] = useState(false);
-  the
   const [showTryon, setShowTryon] = useState(false);
 
   /* ---------- auth + workspace ---------- */
@@ -100,17 +98,24 @@ export default function DashboardStudio() {
       setUser(session.user);
 
       try {
-        const { data } = await supabase.from('Data').select('plan, credits').eq('email', session.user.email).single();
+        const { data } = await supabase
+          .from('Data')
+          .select('plan, credits')
+          .eq('email', session.user.email)
+          .single();
+
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
       } catch {
         setErr('Failed to load workspace.');
-      } finally { setLoading(false); }
+      } finally {
+        setLoading(false);
+      }
     })();
     return () => { mounted = false; };
   }, [supabase, router]);
 
-  // listen credit refresh
+  // listen credits refresh
   useEffect(() => {
     const h = async () => {
       if (!user?.email) return;
@@ -161,7 +166,6 @@ export default function DashboardStudio() {
 
   /* ---------- helpers ---------- */
 
-  // رفع الملف إلى Storage وإرجاع public URL
   const uploadToStorage = useCallback(async () => {
     if (!file) throw new Error('no file');
     const ext = (file.name?.split('.').pop() || 'png').toLowerCase();
@@ -180,14 +184,13 @@ export default function DashboardStudio() {
   const pickFirstUrl = (obj) => {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
-    const keys = ['image', 'image_url', 'output', 'result,', 'url'];
+    const keys = ['image', 'image_url', 'output', 'result', 'url'];
     for (const k of keys) {
       if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
     }
     return '';
   };
 
-  // توليد prompt اختياري من اختيارات الـ Enhance (إذا API يحتاج نص)
   const buildEnhancePrompt = (f) =>
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
@@ -204,7 +207,6 @@ export default function DashboardStudio() {
 
   /* ---------- actions ---------- */
 
-  // Remove BG
   const runRemoveBg = useCallback(async () => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
@@ -226,12 +228,11 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [imageData, localUrl]);
 
-  // Enhance (from modal selections)
   const runEnhance = useCallback(async (selections) => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
       const imageUrl = await uploadToStorage();
-      const prompt = buildEnhancePrompt(selections); // لو API لا يحتاجه تجاهله في السيرفر
+      const prompt = buildEnhancePrompt(selections);
       const r = await fetch('/api/enhance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -250,13 +251,10 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl]);
 
-  // Try-On (from modal selections) — مع البرومبت
   const runTryOn = useCallback(async (selections) => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
       const imageUrl = await uploadToStorage();
-
-      // ✅ ابنِ البرومبت من اختيارات Try-On وأرسله
       const { prompt, negativePrompt } = buildTryOnPromptBundle(selections);
 
       const r = await fetch('/api/tryon', {
@@ -265,7 +263,7 @@ export default function DashboardStudio() {
         body: JSON.stringify({
           imageUrl,
           prompt,
-          negative_prompt: negativePrompt, // اختياري؛ API ممكن يتجاهله
+          negative_prompt: negativePrompt,
           plan,
           user_email: user.email,
         }),
@@ -283,7 +281,6 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl]);
 
-  // زر Run يفتح المودالات أو يشغّل RemoveBG
   const handleRun = useCallback(() => {
     if (!file) { setErr('اختر صورة أولاً'); return; }
     if (active === 'removeBg') { runRemoveBg(); return; }
@@ -337,7 +334,7 @@ export default function DashboardStudio() {
               </div>
             </aside>
 
-            {/* Canvas — بدون سلايدر */}
+            {/* Canvas — صورة واحدة فقط */}
             <section className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3">
               <div className="flex items-center justify-between px-1 pb-2">
                 <div className="text-sm font-semibold">{TOOLS.find(t => t.id === active)?.label}</div>
@@ -396,7 +393,6 @@ export default function DashboardStudio() {
             <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3">
               <div className="px-1 pb-2 text-sm font-semibold">Inspector</div>
 
-              {/* إعدادات Remove BG فقط */}
               {active === 'removeBg' && (
                 <>
                   <div className="space-y-3">
@@ -422,7 +418,6 @@ export default function DashboardStudio() {
                 </>
               )}
 
-              {/* Final Preview للجميع */}
               <div className="mt-2">
                 <div className="text-xs text-white/60 mb-2">Final Preview</div>
                 <div style={active === 'removeBg' ? frameStyle : undefined} className="relative">
@@ -461,7 +456,7 @@ export default function DashboardStudio() {
           </div>
         </section>
 
-        {/* ===== Modals (Pop-Ups) ===== */}
+        {/* Modals */}
         <AnimatePresence>
           {showEnhance && (
             <motion.div className="fixed inset-0 z-[100] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
