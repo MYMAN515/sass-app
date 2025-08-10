@@ -40,8 +40,8 @@ const fileToOptimizedDataURL = (file, maxSide = 1600, quality = 0.9) =>
 /* ---------- studio ---------- */
 const TOOLS = [
   { id: 'removeBg', label: 'Remove BG', emoji: '✂️', ready: true },
-  { id: 'enhance',  label: 'Enhance',   emoji: '🚀', ready: false },
-  { id: 'tryon',    label: 'Try-On',    emoji: '🧍‍♂️', ready: false },
+  { id: 'enhance',  label: 'Enhance',   emoji: '🚀', ready: true },
+  { id: 'tryon',    label: 'Try-On',    emoji: '🧍‍♂️', ready: true },
 ];
 
 export default function DashboardStudio() {
