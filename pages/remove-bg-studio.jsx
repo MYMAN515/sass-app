@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 /* ---------------- Helpers ---------------- */
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -19,7 +19,7 @@ const hexToRGBA = (hex, a = 1) => {
 /* =============== Remove BG Studio (Page) ============== */
 /* ====================================================== */
 export default function RemoveBgStudioPage() {
-  const supabase = createClientComponentClient();
+  const [supabase] = useState(()=>createBrowserSupabaseClient());
 
   // Auth
   const [sessionEmail, setSessionEmail] = useState('');
