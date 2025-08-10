@@ -40,7 +40,7 @@ const fileToOptimizedDataURL = (file, maxSide = 1600, quality = 0.9) =>
   });
 
 /* ---------- constants ---------- */
-const STORAGE_BUCKET = 'uploads'; // تأكد أنه موجود و Public في Supabase
+const STORAGE_BUCKET = 'img'; // تأكد أنه موجود و Public في Supabase
 
 /* ---------- studio ---------- */
 const TOOLS = [
