@@ -8,7 +8,7 @@ import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Layout from '@/components/Layout';
 import EnhanceCustomizer from '@/components/EnhanceCustomizer';
 import TryOnCustomizer from '@/components/TryOnCustomizer';
-import { Download } from 'lucide-react';
+import { Download, FileJson, X } from 'lucide-react';
 
 /* ---------- utils ---------- */
 const hexToRGBA = (hex, a = 1) => {
@@ -42,7 +42,7 @@ const fileToOptimizedDataURL = (file, maxSide = 1600, quality = 0.9) =>
   });
 
 /* ---------- constants ---------- */
-const STORAGE_BUCKET = 'img'; // تأكد أنه Public
+const STORAGE_BUCKET = 'img';
 
 /* ---------- studio ---------- */
 const TOOLS = [
@@ -66,48 +66,43 @@ export default function DashboardStudio() {
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
 
-  // images
+  // images (منفصلة لكل أداة)
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState(''); // removeBg فقط
+  const [imageData, setImageData] = useState('');
   const [resultUrl, setResultUrl] = useState('');
 
-  // designer (removeBg فقط)
+  // removeBg designer
   const [bgMode, setBgMode] = useState('color'); // color|gradient|pattern
   const [color, setColor] = useState('#0b0b14');
   const [color2, setColor2] = useState('#221a42');
   const [angle, setAngle] = useState(45);
   const [radius, setRadius] = useState(22);
-  const [padding, setPadding] = useState(22); // px نسبة للكانفس
+  const [padding, setPadding] = useState(22);
   const [shadow, setShadow] = useState(true);
   const [patternOpacity, setPatternOpacity] = useState(0.08);
 
-  // history
   const [history, setHistory] = useState([]);
 
   // modals
   const [showEnhance, setShowEnhance] = useState(false);
   const [showTryon, setShowTryon] = useState(false);
+  const [showResponse, setShowResponse] = useState(false);
 
-  // API response (للعرض/النسخ)
+  // API response (يظهر في مودال)
   const [apiResponse, setApiResponse] = useState(null);
 
-  /* ---------- auth + workspace ---------- */
+  /* ---------- auth ---------- */
   useEffect(() => {
     let mounted = true;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
-
       if (!session?.user) { router.replace('/login'); return; }
       setUser(session.user);
 
       try {
-        const { data } = await supabase
-          .from('Data')
-          .select('plan, credits')
-          .eq('email', session.user.email)
-          .single();
+        const { data } = await supabase.from('Data').select('plan, credits').eq('email', session.user.email).single();
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
       } catch {
@@ -139,7 +134,7 @@ export default function DashboardStudio() {
     return () => { el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop); };
   }, []);
 
-  // تغيير الأداة = رفع مستقل (نفضّي كل شي)
+  // تغيير الأداة = نفضّي حالة الرفع/النتيجة (كل أداة لها صورة مستقلة)
   const resetUploadState = useCallback(() => {
     setFile(null);
     setLocalUrl('');
@@ -288,14 +283,11 @@ export default function DashboardStudio() {
     if (active === 'tryon')    { setShowTryon(true); return; }
   }, [active, file, runRemoveBg]);
 
-  /* ---------- download composer (PNG مع تطبيق الإعدادات) ---------- */
+  /* ---------- download composer (PNG) ---------- */
   const composeAndDownload = useCallback(async () => {
     if (!resultUrl) return;
 
-    // حمّل الصورة كـ Blob لتفادي مشاكل CORS في toDataURL
     const blob = await fetch(resultUrl, { cache: 'no-store' }).then(r => r.blob());
-
-    // ImageBitmap إن توفر، وإلا HTMLImage من object URL
     let bmp, imgEl, w, h;
     if ('createImageBitmap' in window) {
       bmp = await createImageBitmap(blob);
@@ -307,13 +299,12 @@ export default function DashboardStudio() {
       w = imgEl.naturalWidth; h = imgEl.naturalHeight;
     }
 
-    // حجم ناتج منطقي (نحدّه 2048 عشان الأداء/الحجم)
     const maxSide = Math.min(2048, Math.max(w, h));
     const canvas = document.createElement('canvas');
     canvas.width = maxSide; canvas.height = maxSide;
     const ctx = canvas.getContext('2d');
 
-    // خلفية/تصميم (نطبّقه فقط لو الأداة removeBg)
+    // خلفية removeBg فقط
     if (active === 'removeBg') {
       if (bgMode === 'color') {
         ctx.fillStyle = color; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -326,7 +317,6 @@ export default function DashboardStudio() {
         g.addColorStop(0, color); g.addColorStop(1, color2);
         ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
       } else {
-        // pattern grid
         ctx.fillStyle = color; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.strokeStyle = hexToRGBA(color, patternOpacity); ctx.lineWidth = 1;
         for (let i = 0; i <= canvas.width; i += 24) {
@@ -335,12 +325,10 @@ export default function DashboardStudio() {
         }
       }
     } else {
-      // للأدوات الأخرى: خلفية شفافة PNG (لا نملأ شيء)
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    // إعدادات الإطار/القص
-    const pad = Math.round(canvas.width * (padding / 300)); // نفس منطق المعاينة
+    const pad = Math.round(canvas.width * (padding / 300));
     const boxW = canvas.width - pad * 2;
     const boxH = canvas.height - pad * 2;
     const ratio = Math.min(boxW / w, boxH / h);
@@ -349,7 +337,6 @@ export default function DashboardStudio() {
     const dx = Math.round((canvas.width - dw) / 2);
     const dy = Math.round((canvas.height - dh) / 2);
 
-    // قص بزوايا دائرية للإطار بالكامل (يشمل الصورة)
     const r = Math.max(0, Math.min(radius, 64));
     const roundedRect = (x, y, w, h, rad) => {
       const rr = Math.min(rad, w/2, h/2);
@@ -366,7 +353,6 @@ export default function DashboardStudio() {
     roundedRect(0, 0, canvas.width, canvas.height, r);
     ctx.clip();
 
-    // ظل للصورة فقط (اختياري)
     if (active === 'removeBg' && shadow) {
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.25)';
@@ -383,21 +369,14 @@ export default function DashboardStudio() {
 
     ctx.restore();
 
-    // نزّل كـ PNG
     const url = canvas.toDataURL('image/png');
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `studio-output.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    // تنظيف
+    a.href = url; a.download = 'studio-output.png';
+    document.body.appendChild(a); a.click(); a.remove();
     if (imgEl?.src?.startsWith('blob:')) URL.revokeObjectURL(imgEl.src);
   }, [resultUrl, active, bgMode, color, color2, angle, patternOpacity, padding, radius, shadow]);
 
   /* ---------- UI ---------- */
-
   if (loading || !user) {
     return (
       <Layout title="Studio">
@@ -421,7 +400,6 @@ export default function DashboardStudio() {
         <TopBar userName={user.user_metadata?.name || user.email} plan={plan} credits={credits} initials={initials} />
 
         <section className="max-w-7xl mx-auto px-4 md:px-8 pb-16">
-          {/* على الموبايل: الشبكة تتحول لعمود */}
           <div className="grid gap-6 md:grid-cols-[220px_1fr_340px]">
             {/* Tools */}
             <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3 h-fit">
@@ -430,7 +408,7 @@ export default function DashboardStudio() {
                 {TOOLS.map(t => (
                   <button
                     key={t.id}
-                    onClick={() => { setActive(t.id); setErr(''); setPhase('idle'); }}
+                    onClick={() => { setActive(t.id); }}
                     className={[
                       'w-full text-left rounded-xl px-3 py-2 text-sm flex items-center gap-2 transition',
                       active === t.id ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15',
@@ -450,7 +428,7 @@ export default function DashboardStudio() {
                 <StepBadge phase={phase} />
               </div>
 
-              {/* منطقة الرفع/المعاينة */}
+              {/* منطقة الرفع/المعاينة (الصورة تملا المربّع بدون قص) */}
               <div
                 ref={dropRef}
                 className="group relative grid place-items-center aspect-[16/10] rounded-xl border-2 border-dashed border-white/15 bg-white/5 hover:bg-white/[.08] transition cursor-pointer overflow-hidden"
@@ -470,12 +448,11 @@ export default function DashboardStudio() {
                     اسحب ملفًا هنا أو اضغط للاختيار
                   </div>
                 ) : (
-                  <div className="w-full h-full grid place-items-center p-2">
-                    {/* عرض الصورة بالكامل بدون قص */}
+                  <div className="relative w-full h-full">
                     <img
                       src={resultUrl || localUrl}
                       alt="preview"
-                      className="max-w-full max-h-full object-contain"
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                   </div>
                 )}
@@ -499,28 +476,17 @@ export default function DashboardStudio() {
                   <Download className="w-4 h-4" /> Download PNG
                 </button>
 
+                {apiResponse && (
+                  <button
+                    onClick={() => setShowResponse(true)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs hover:bg-white/15"
+                  >
+                    <FileJson className="w-4 h-4" /> Response
+                  </button>
+                )}
+
                 {err && <div className="text-xs text-rose-300">{err}</div>}
               </div>
-
-              {/* Response (يتكيف مع الموبايل) */}
-              {apiResponse && (
-                <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs font-semibold text-white/80">Response</div>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard?.writeText(JSON.stringify(apiResponse, null, 2));
-                      }}
-                      className="text-[11px] rounded-md border border-white/20 bg-white/10 px-2 py-1 hover:bg-white/15"
-                    >
-                      Copy JSON
-                    </button>
-                  </div>
-                  <pre className="max-h-52 overflow-auto text-[11px] leading-5 whitespace-pre-wrap break-words text-white/80">
-                    {JSON.stringify(apiResponse, null, 2)}
-                  </pre>
-                </div>
-              )}
             </section>
 
             {/* Inspector */}
@@ -551,30 +517,25 @@ export default function DashboardStudio() {
                   <div className="mt-4">
                     <div className="text-xs text-white/60 mb-2">Final Preview</div>
                     <div style={frameStyle} className="relative">
-                      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg grid place-items-center">
+                      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg">
                         {resultUrl ? (
-                          <img src={resultUrl} alt="final" className="max-w-full max-h-full object-contain" />
+                          <img src={resultUrl} alt="final" className="absolute inset-0 w-full h-full object-contain" />
                         ) : (
-                          <div className="grid place-items-center h-full text-xs text-white/50">
-                            — أزل الخلفية أولًا —
-                          </div>
+                          <div className="grid place-items-center h-full text-xs text-white/50">— أزل الخلفية أولًا —</div>
                         )}
                       </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                // للأدوات الأخرى: عرض معاينة نهائية بسيطة
                 <div className="space-y-3">
                   <div className="text-xs text-white/60">Final Preview</div>
-                  <div className="rounded-xl border border-white/10 bg-white/10 p-2">
-                    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-md grid place-items-center">
+                  <div className="rounded-xl border border-white/10 bg-white/10">
+                    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-md">
                       {resultUrl ? (
-                        <img src={resultUrl} alt="final" className="max-w-full max-h-full object-contain" />
+                        <img src={resultUrl} alt="final" className="absolute inset-0 w-full h-full object-contain" />
                       ) : (
-                        <div className="grid place-items-center h-full text-xs text-white/50">
-                          — شغّل الأداة أولًا —
-                        </div>
+                        <div className="grid place-items-center h-full text-xs text-white/50">— شغّل الأداة أولًا —</div>
                       )}
                     </div>
                   </div>
@@ -629,6 +590,36 @@ export default function DashboardStudio() {
               </div>
             </motion.div>
           )}
+
+          {/* Response Modal (مناسب للموبايل) */}
+          {showResponse && apiResponse && (
+            <motion.div className="fixed inset-0 z-[120] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <div className="absolute inset-0 bg-black/60" onClick={()=>setShowResponse(false)} />
+              <div className="relative w-[92vw] max-w-2xl rounded-2xl border border-white/15 bg-[#0c0c12] p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-semibold text-white/90">Response</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => navigator.clipboard?.writeText(JSON.stringify(apiResponse, null, 2))}
+                      className="text-[11px] rounded-md border border-white/20 bg-white/10 px-2 py-1 hover:bg-white/15"
+                    >
+                      Copy
+                    </button>
+                    <button
+                      onClick={()=>setShowResponse(false)}
+                      className="rounded-md border border-white/20 bg-white/10 p-1 hover:bg-white/15"
+                      aria-label="Close"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <pre className="max-h-[60vh] overflow-auto text-[11px] leading-5 whitespace-pre-wrap break-words text-white/80">
+                  {JSON.stringify(apiResponse, null, 2)}
+                </pre>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* toast */}
@@ -636,7 +627,7 @@ export default function DashboardStudio() {
           {err && (
             <motion.div
               initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm backdrop-blur"
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[130] rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm backdrop-blur"
             >
               {err}
             </motion.div>
@@ -673,7 +664,6 @@ function TopBar({ userName, plan, credits, initials }) {
     </div>
   );
 }
-
 function Logo() {
   return (
     <div className="inline-flex items-center gap-2">
@@ -686,7 +676,6 @@ function Logo() {
     </div>
   );
 }
-
 function BGFX() {
   return (
     <>
@@ -702,18 +691,11 @@ function BGFX() {
     </>
   );
 }
-
 function StepBadge({ phase }) {
   const map = { idle:{label:'Ready',color:'bg-white/10'}, processing:{label:'Processing',color:'bg-indigo-400/20'}, ready:{label:'Done',color:'bg-emerald-400/20'}, error:{label:'Error',color:'bg-rose-400/20'} };
   const it = map[phase] || map.idle;
-  return (
-    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${it.color} border border-white/10`}>
-      <span className={`inline-block size-2 rounded-full ${phase==='processing'?'bg-white animate-pulse':'bg-white/70'}`} />
-      {it.label}
-    </span>
-  );
+  return <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${it.color} border border-white/10`}><span className={`inline-block size-2 rounded-full ${phase==='processing'?'bg-white animate-pulse':'bg-white/70'}`} />{it.label}</span>;
 }
-
 function ModeTabs({ mode, setMode }) {
   return (
     <div className="mb-1 flex flex-wrap gap-2">
