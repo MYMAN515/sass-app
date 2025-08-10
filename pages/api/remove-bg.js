@@ -1,11 +1,11 @@
-// pages/api/remove-bg.js
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = { api: { bodyParser: true } };
 
-const REPLICATE_VERSION_851 =
+// إصدارات الموديلات
+const VERSION_851 =
   '851-labs/background-remover:a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc';
-const REPLICATE_VERSION_LUCATACO =
+const VERSION_LUCATACO =
   'lucataco/remove-bg:95fcc2a26d3899cd6c2691c900465aaeff466285a65c14638cc5f36f34befaf1';
 
 export default async function handler(req, res) {
@@ -16,20 +16,19 @@ export default async function handler(req, res) {
     const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 
     if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing Replicate token' });
-    if (!imageUrl || !user_email) {
-      return res.status(400).json({ error: 'Missing required fields (imageUrl, user_email)' });
-    }
+    if (!imageUrl) return res.status(400).json({ error: 'Missing imageUrl' });
 
-    // Auth
+    // Supabase session
     const supabase = createPagesServerClient({ req, res });
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (!session || sessionError) return res.status(401).json({ error: 'Unauthorized' });
+    if (sessionError || !session?.user) return res.status(401).json({ error: 'Unauthorized' });
 
-    // User credits
+    // جلب المستخدم من جدول Data
+    const email = user_email || session.user.email;
     const { data: userData, error: userError } = await supabase
       .from('Data')
       .select('credits, plan')
-      .eq('email', user_email)
+      .eq('email', email)
       .single();
 
     if (userError || !userData) return res.status(404).json({ error: 'User not found' });
@@ -39,25 +38,31 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'No credits left' });
     }
 
-    // Model + input
+    // إعدادات الموديل
     const use851 = String(engine).toLowerCase() !== 'fast';
-    const version = use851 ? REPLICATE_VERSION_851 : REPLICATE_VERSION_LUCATACO;
-    const input = use851 ? { image: imageUrl, background_type: 'rgba', format: 'png', threshold: 0 } : { image: imageUrl };
+    const version = use851 ? VERSION_851 : VERSION_LUCATACO;
+    const input = use851
+      ? { image: imageUrl, background_type: 'rgba', format: 'png', threshold: 0 }
+      : { image: imageUrl };
 
-    // Start prediction
+    // بدء التنبؤ
     const startRes = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
-      headers: { Authorization: `Token ${REPLICATE_TOKEN}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Token ${REPLICATE_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ version, input }),
     });
     const startData = await startRes.json();
+
     if (!startRes.ok || !startData?.urls?.get) {
       return res.status(502).json({ error: startData?.error || 'Failed to start prediction' });
     }
 
-    // Polling with timeout
+    // Polling للحالة
     const statusUrl = startData.urls.get;
-    const startedAt = Date.now();
+    const started = Date.now();
     let outputUrl = null;
 
     while (true) {
@@ -71,18 +76,20 @@ export default async function handler(req, res) {
       }
       if (j.status === 'failed') return res.status(500).json({ error: 'Background removal failed' });
 
-      if (Date.now() - startedAt > 60_000) {
+      if (Date.now() - started > 60_000) {
         return res.status(504).json({ error: 'Prediction timed out' });
       }
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 1200));
     }
 
-    // Deduct credit only if not Pro
-    if (!isPro) await supabase.rpc('decrement_credit', { user_email });
+    // خصم كريدت بعد النجاح فقط
+    if (!isPro) {
+      await supabase.rpc('decrement_credit', { user_email: email });
+    }
 
     return res.status(200).json({ success: true, image: outputUrl });
   } catch (e) {
-    console.error('remove-bg error:', e);
+    console.error('remove-bg api error:', e);
     return res.status(500).json({ error: 'Server error' });
   }
 }
