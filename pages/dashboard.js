@@ -46,8 +46,6 @@ const TOOLS = [
 
 export default function DashboardStudio() {
   const router = useRouter();
-
-  // ✅ عميل واحد فقط عبر createBrowserSupabaseClient
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const [loading, setLoading]   = useState(true);
@@ -64,10 +62,10 @@ export default function DashboardStudio() {
   // images
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState('');
+  const [imageData, setImageData] = useState('');   // for removeBg
   const [resultUrl, setResultUrl] = useState('');
 
-  // designer
+  // inspector
   const [bgMode, setBgMode] = useState('color');
   const [color, setColor] = useState('#0b0b14');
   const [color2, setColor2] = useState('#221a42');
@@ -76,6 +74,10 @@ export default function DashboardStudio() {
   const [padding, setPadding] = useState(22);
   const [shadow, setShadow] = useState(true);
   const [patternOpacity, setPatternOpacity] = useState(0.08);
+
+  // simple prompts for Enhance/Try-On
+  const [enhancePrompt, setEnhancePrompt] = useState('clean e-commerce enhancement, sharp, realistic, soft studio light');
+  const [tryonPrompt, setTryonPrompt] = useState('photo-realistic model try-on, neutral studio background, true colors');
 
   const [history, setHistory] = useState([]);
   const [compare, setCompare] = useState(55);
@@ -87,12 +89,7 @@ export default function DashboardStudio() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
-
-      if (!session?.user) {
-        router.replace('/login');
-        return;
-      }
-
+      if (!session?.user) { router.replace('/login'); return; }
       setUser(session.user);
 
       try {
@@ -101,16 +98,12 @@ export default function DashboardStudio() {
           .select('plan, credits')
           .eq('email', session.user.email)
           .single();
-
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
       } catch {
         setErr('Failed to load workspace.');
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     })();
-
     return () => { mounted = false; };
   }, [supabase, router]);
 
@@ -138,7 +131,8 @@ export default function DashboardStudio() {
   const onPick = async (f) => {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
-    setResultUrl(''); setPhase('idle');
+    setResultUrl(''); setPhase('idle'); setErr('');
+    // نحتاج dataURL فقط لـ removeBg
     setImageData(await fileToOptimizedDataURL(f, 1600, 0.9));
   };
 
@@ -163,26 +157,104 @@ export default function DashboardStudio() {
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
+  // helper: upload to supabase storage and return public URL
+  const uploadToStorage = useCallback(async () => {
+    if (!file) throw new Error('no file');
+    const ext = (file.name?.split('.').pop() || 'png').toLowerCase();
+    const path = `${user.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('uploads').upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || 'image/*',
+    });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage.from('uploads').getPublicUrl(path);
+    if (!data?.publicUrl) throw new Error('no public url');
+    return data.publicUrl;
+  }, [file, supabase, user]);
+
+  // helper: normalize various API shapes
+  const extractUrl = (obj) => {
+    if (!obj) return '';
+    if (typeof obj === 'string') return obj;
+    const keys = ['image', 'image_url', 'output', 'result', 'url'];
+    for (const k of keys) {
+      if (obj[k]) {
+        const v = obj[k];
+        return Array.isArray(v) ? v[0] : v;
+      }
+    }
+    return '';
+  };
+
   const handleRun = useCallback(async () => {
     if (!file) { setErr('اختر صورة أولاً'); return; }
-    if (active !== 'removeBg') { setErr('القسم قادم قريبًا — جرّب Remove BG الآن'); return; }
+
     try {
       setBusy(true); setErr(''); setPhase('processing');
-      const r = await fetch('/api/remove-bg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData }),
-      });
-      if (!r.ok) throw new Error(await r.text());
-      const j = await r.json();
-      const out = Array.isArray(j.image) ? j.image[0] : j.image;
-      setResultUrl(out); setPhase('ready');
+
+      if (active === 'removeBg') {
+        const r = await fetch('/api/remove-bg', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageData }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const j = await r.json();
+        const out = extractUrl(j);
+        if (!out) throw new Error('No output from remove-bg');
+        setResultUrl(out);
+      }
+
+      if (active === 'enhance') {
+        const imageUrl = await uploadToStorage();
+        const r = await fetch('/api/enhance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl,
+            prompt: enhancePrompt,
+            plan,
+            user_email: user.email,
+          }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const j = await r.json();
+        const out = extractUrl(j);
+        if (!out) throw new Error('No output from enhance');
+        setResultUrl(out);
+      }
+
+      if (active === 'tryon') {
+        const imageUrl = await uploadToStorage();
+        const r = await fetch('/api/tryon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl,
+            prompt: tryonPrompt,
+            plan,
+            user_email: user.email,
+          }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const j = await r.json();
+        const out = extractUrl(j);
+        if (!out) throw new Error('No output from try-on');
+        setResultUrl(out);
+      }
+
+      setPhase('ready');
       window.dispatchEvent(new Event('credits:refresh'));
-      setHistory(h => [{ tool: active, inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 8));
-    } catch {
-      setPhase('error'); setErr('تعذر تنفيذ العملية.');
-    } finally { setBusy(false); }
-  }, [active, file, imageData, localUrl]);
+      setHistory((h) => [{ tool: active, inputThumb: localUrl, outputUrl: resultUrl, ts: Date.now() }, ...h].slice(0, 8));
+    } catch (e) {
+      console.error(e);
+      setPhase('error');
+      setErr('تعذر تنفيذ العملية.');
+    } finally {
+      setBusy(false);
+    }
+  }, [active, file, imageData, uploadToStorage, enhancePrompt, tryonPrompt, plan, user, localUrl, resultUrl]);
 
   const composeAndDownload = async () => {
     if (!resultUrl) return;
@@ -248,16 +320,14 @@ export default function DashboardStudio() {
               <div className="px-2 py-1 text-xs text-white/60">Tools</div>
               <div className="mt-2 space-y-1">
                 {TOOLS.map(t => (
-                  <button key={t.id} onClick={() => setActive(t.id)} disabled={!t.ready}
+                  <button key={t.id} onClick={() => { setActive(t.id); setErr(''); setPhase('idle'); }}
                     className={[
                       'w-full text-left rounded-xl px-3 py-2 text-sm flex items-center gap-2 transition',
                       active === t.id ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15',
-                      !t.ready ? 'opacity-60 cursor-not-allowed' : '',
                     ].join(' ')}
-                    title={!t.ready ? 'Coming soon' : t.label}
+                    title={t.label}
                   >
                     <span className="text-base">{t.emoji}</span>{t.label}
-                    {!t.ready && <span className="ml-auto text-[10px] rounded-full bg-white/10 px-2 py-0.5">soon</span>}
                   </button>
                 ))}
               </div>
@@ -352,9 +422,31 @@ export default function DashboardStudio() {
                 </div>
               )}
 
-              {active !== 'removeBg' && (
-                <div className="space-y-3 opacity-60 pointer-events-none">
-                  <div className="text-xs text-white/70">Settings (coming soon)</div>
+              {active === 'enhance' && (
+                <div className="space-y-3">
+                  <div className="text-xs text-white/70">Prompt</div>
+                  <textarea
+                    className="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-2 text-sm"
+                    rows={4}
+                    value={enhancePrompt}
+                    onChange={(e)=>setEnhancePrompt(e.target.value)}
+                    placeholder="Describe the enhancement look…"
+                  />
+                  <div className="text-xs text-white/50">Will be sent to /api/enhance</div>
+                </div>
+              )}
+
+              {active === 'tryon' && (
+                <div className="space-y-3">
+                  <div className="text-xs text-white/70">Prompt</div>
+                  <textarea
+                    className="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-2 text-sm"
+                    rows={4}
+                    value={tryonPrompt}
+                    onChange={(e)=>setTryonPrompt(e.target.value)}
+                    placeholder="Describe the try-on style…"
+                  />
+                  <div className="text-xs text-white/50">Will be sent to /api/tryon</div>
                 </div>
               )}
             </aside>
