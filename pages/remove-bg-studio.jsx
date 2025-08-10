@@ -1,10 +1,10 @@
-// app/remove-bg-studio/page.jsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/* ---------- helpers ---------- */
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
@@ -12,19 +12,37 @@ const hexToRGBA = (hex, a = 1) => {
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
-const fileToDataURL = (file) =>
-  new Promise((res, rej) => {
+
+// تصغير + ضغط قبل الإرسال لتجنب 413
+const fileToOptimizedDataURL = (file, maxSide = 1600, quality = 0.9) =>
+  new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => res(reader.result);
-    reader.onerror = rej;
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const { width, height } = img;
+        const scale = Math.min(1, maxSide / Math.max(width, height));
+        const w = Math.round(width * scale);
+        const h = Math.round(height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 
 export default function RemoveBgStudioPage() {
-  // ملف + معاينة محلية + ناتج
+  // ملف + معاينة + Base64
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState(''); // base64 dataURL
+  const [imageData, setImageData] = useState(''); // base64 (jpeg)
   const [cutoutUrl, setCutoutUrl] = useState('');
 
   // حالات واجهة
@@ -32,8 +50,8 @@ export default function RemoveBgStudioPage() {
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
   const [msg, setMsg] = useState('');
 
-  // مصمّم الخلفية
-  const [mode, setMode] = useState('color'); // color | gradient | pattern
+  // مصمم الخلفية
+  const [mode, setMode] = useState('color');
   const [color, setColor] = useState('#0b0b14');
   const [color2, setColor2] = useState('#221a42');
   const [angle, setAngle] = useState(45);
@@ -44,7 +62,7 @@ export default function RemoveBgStudioPage() {
 
   const dropRef = useRef(null);
 
-  // CSS للخلفية
+  /* ---------- background CSS ---------- */
   const bgStyle = useMemo(() => {
     if (mode === 'color') return { background: color };
     if (mode === 'gradient') return { background: `linear-gradient(${angle}deg, ${color}, ${color2})` };
@@ -68,7 +86,7 @@ export default function RemoveBgStudioPage() {
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
-  // Drag & drop
+  /* ---------- drag & drop ---------- */
   useEffect(() => {
     const el = dropRef.current;
     if (!el) return;
@@ -81,12 +99,12 @@ export default function RemoveBgStudioPage() {
     return () => { el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop); };
   }, []);
 
+  /* ---------- handlers ---------- */
   const onPick = async (f) => {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
     setCutoutUrl(''); setMsg(''); setPhase('idle');
-    // اقرأ DataURL (base64) — بدون تخزين
-    const dataUrl = await fileToDataURL(f);
+    const dataUrl = await fileToOptimizedDataURL(f, 1600, 0.9);
     setImageData(dataUrl);
   };
 
@@ -97,14 +115,19 @@ export default function RemoveBgStudioPage() {
       const r = await fetch('/api/remove-bg', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData }) // << نرسل base64
+        body: JSON.stringify({ imageData }), // base64 مصغّر
       });
+
+      if (!r.ok) {
+        const text = await r.text(); // قد يكون HTML عند 413
+        throw new Error(text || `HTTP ${r.status}`);
+      }
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'failed');
+
       const out = Array.isArray(j.image) ? j.image[0] : j.image;
       setCutoutUrl(out);
       setPhase('ready');
-      // بلّغ النافبار يحدّث الرصيد (لو مفعّل)
+      // تحديت الرصيد في النافبار (إن وجد)
       window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
       console.error(e);
@@ -124,7 +147,6 @@ export default function RemoveBgStudioPage() {
     canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext('2d');
 
-    // خلفية
     if (mode === 'color') {
       ctx.fillStyle = color; ctx.fillRect(0, 0, size, size);
     } else if (mode === 'gradient') {
@@ -141,7 +163,6 @@ export default function RemoveBgStudioPage() {
       }
     }
 
-    // رسم المنتج
     const pad = Math.round(size * (padding / 300));
     const boxW = size - pad * 2, boxH = size - pad * 2;
     const ratio = Math.min(boxW / bmp.width, boxH / bmp.height);
@@ -153,8 +174,10 @@ export default function RemoveBgStudioPage() {
     const a = document.createElement('a'); a.href = url; a.download = 'product.png'; a.click();
   };
 
+  /* ---------- UI ---------- */
   return (
     <main className="min-h-[100svh] bg-[radial-gradient(90%_80%_at_50%_-10%,#221a42_0%,#0b0b14_55%,#05060a_100%)] text-white">
+      {/* Header */}
       <div className="mx-auto max-w-6xl px-6 pt-24 pb-8">
         <motion.h1 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .5 }}
           className="text-3xl md:text-4xl font-extrabold tracking-tight">
@@ -162,13 +185,14 @@ export default function RemoveBgStudioPage() {
         </motion.h1>
         <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }}
           className="mt-2 text-sm text-white/70 max-w-2xl">
-          ارفع صورة، أزل الخلفية فورًا (بدون تخزين)، ثم اختر خلفية (لون/جراديانت/نمط) ونزّل النتيجة.
+          ارفع صورة، أزل الخلفية فورًا (بدون تخزين)، واختر خلفية (لون/جراديانت/نمط) ثم نزّل النتيجة.
         </motion.p>
       </div>
 
+      {/* Body */}
       <div className="mx-auto max-w-6xl px-6 pb-20">
         <div className="grid gap-6 md:grid-cols-2">
-          {/* اليسار: رفع ومعالجة */}
+          {/* Left */}
           <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .4 }}>
             <div className="relative rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-lg">
               <div className="mb-3 flex items-center justify-between">
@@ -228,7 +252,7 @@ export default function RemoveBgStudioPage() {
             </div>
           </motion.div>
 
-          {/* اليمين: مصمّم الخلفية + تنزيل */}
+          {/* Right */}
           <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .4 }}>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-lg">
               <label className="block text-sm mb-2 font-medium">Background & Layout</label>
@@ -286,6 +310,7 @@ export default function RemoveBgStudioPage() {
         </div>
       </div>
 
+      {/* subtle grid */}
       <div className="pointer-events-none fixed inset-0 opacity-[.04] hidden dark:block"
         style={{
           backgroundImage:
@@ -297,7 +322,7 @@ export default function RemoveBgStudioPage() {
   );
 }
 
-/* ====== UI Atoms ====== */
+/* ---------- tiny UI ---------- */
 function StepBadge({ phase }) {
   const map = {
     idle: { label: 'Ready', color: 'bg-white/10' },
