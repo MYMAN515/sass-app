@@ -2,94 +2,63 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = { api: { bodyParser: true } };
 
-// إصدارات الموديلات
 const VERSION_851 =
   '851-labs/background-remover:a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc';
-const VERSION_LUCATACO =
-  'lucataco/remove-bg:95fcc2a26d3899cd6c2691c900465aaeff466285a65c14638cc5f36f34befaf1';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Only POST allowed' });
 
   try {
-    const { imageUrl, user_email, engine = 'best' } = req.body || {};
+    const { imageUrl } = req.body || {};
     const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 
-    if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing Replicate token' });
-    if (!imageUrl) return res.status(400).json({ error: 'Missing imageUrl' });
+    if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing REPLICATE_API_TOKEN' });
+    if (!imageUrl) return res.status(400).json({ error: 'Missing imageUrl (must be public URL)' });
 
-    // Supabase session
+    // session check (مثل أسلوبك)
     const supabase = createPagesServerClient({ req, res });
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session?.user) return res.status(401).json({ error: 'Unauthorized' });
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return res.status(401).json({ error: 'Unauthorized' });
 
-    // جلب المستخدم من جدول Data
-    const email = user_email || session.user.email;
-    const { data: userData, error: userError } = await supabase
-      .from('Data')
-      .select('credits, plan')
-      .eq('email', email)
-      .single();
-
-    if (userError || !userData) return res.status(404).json({ error: 'User not found' });
-
-    const isPro = userData.plan === 'Pro';
-    if (!isPro && userData.credits <= 0) {
-      return res.status(403).json({ error: 'No credits left' });
-    }
-
-    // إعدادات الموديل
-    const use851 = String(engine).toLowerCase() !== 'fast';
-    const version = use851 ? VERSION_851 : VERSION_LUCATACO;
-    const input = use851
-      ? { image: imageUrl, background_type: 'rgba', format: 'png', threshold: 0 }
-      : { image: imageUrl };
-
-    // بدء التنبؤ
-    const startRes = await fetch('https://api.replicate.com/v1/predictions', {
+    // اطلب من Replicate
+    const start = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
         Authorization: `Token ${REPLICATE_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ version, input }),
+      body: JSON.stringify({
+        version: VERSION_851,
+        input: {
+          image: imageUrl,
+          background_type: 'rgba', // ناتج شفاف
+          format: 'png',
+          threshold: 0,
+        },
+      }),
     });
-    const startData = await startRes.json();
 
-    if (!startRes.ok || !startData?.urls?.get) {
-      return res.status(502).json({ error: startData?.error || 'Failed to start prediction' });
+    const sJson = await start.json();
+    if (!start.ok || !sJson?.urls?.get) {
+      return res.status(502).json({ error: sJson?.error || 'Failed to start prediction', detail: sJson });
     }
 
-    // Polling للحالة
-    const statusUrl = startData.urls.get;
-    const started = Date.now();
-    let outputUrl = null;
-
+    // poll
+    const statusUrl = sJson.urls.get;
+    const t0 = Date.now();
+    let out = null;
     while (true) {
-      const s = await fetch(statusUrl, { headers: { Authorization: `Token ${REPLICATE_TOKEN}` } });
-      const j = await s.json();
-
-      if (j.status === 'succeeded') {
-        const out = j.output;
-        outputUrl = Array.isArray(out) ? out[0] : out;
-        break;
-      }
+      const r = await fetch(statusUrl, { headers: { Authorization: `Token ${REPLICATE_TOKEN}` } });
+      const j = await r.json();
+      if (j.status === 'succeeded') { out = Array.isArray(j.output) ? j.output[0] : j.output; break; }
       if (j.status === 'failed') return res.status(500).json({ error: 'Background removal failed' });
-
-      if (Date.now() - started > 60_000) {
-        return res.status(504).json({ error: 'Prediction timed out' });
-      }
-      await new Promise((r) => setTimeout(r, 1200));
+      if (Date.now() - t0 > 60_000) return res.status(504).json({ error: 'Prediction timed out' });
+      await new Promise(r => setTimeout(r, 1200));
     }
 
-    // خصم كريدت بعد النجاح فقط
-    if (!isPro) {
-      await supabase.rpc('decrement_credit', { user_email: email });
-    }
-
-    return res.status(200).json({ success: true, image: outputUrl });
+    return res.status(200).json({ success: true, image: out });
   } catch (e) {
-    console.error('remove-bg api error:', e);
+    console.error('remove-bg debug error:', e);
     return res.status(500).json({ error: 'Server error' });
   }
 }
