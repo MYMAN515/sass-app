@@ -162,13 +162,13 @@ export default function DashboardStudio() {
     if (!file) throw new Error('no file');
     const ext = (file.name?.split('.').pop() || 'png').toLowerCase();
     const path = `${user.id}/${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('uploads').upload(path, file, {
+    const { error: upErr } = await supabase.storage.from('img').upload(path, file, {
       cacheControl: '3600',
       upsert: false,
       contentType: file.type || 'image/*',
     });
     if (upErr) throw upErr;
-    const { data } = supabase.storage.from('uploads').getPublicUrl(path);
+    const { data } = supabase.storage.from('img').getPublicUrl(path);
     if (!data?.publicUrl) throw new Error('no public url');
     return data.publicUrl;
   }, [file, supabase, user]);
