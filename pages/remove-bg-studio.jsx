@@ -3,10 +3,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
-/* ---------------- Helpers ---------------- */
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
@@ -14,68 +12,42 @@ const hexToRGBA = (hex, a = 1) => {
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
+const fileToDataURL = (file) =>
+  new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result);
+    reader.onerror = rej;
+    reader.readAsDataURL(file);
+  });
 
-/* ====================================================== */
-/* =============== Remove BG Studio (Page) ============== */
-/* ====================================================== */
 export default function RemoveBgStudioPage() {
-  const [supabase] = useState(()=>createBrowserSupabaseClient());
-
-  // Auth
-  const [sessionEmail, setSessionEmail] = useState('');
-  const [authChecked, setAuthChecked] = useState(false);
-
-  // File & URLs
+  // ملف + معاينة محلية + ناتج
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [publicUrl, setPublicUrl] = useState('');
+  const [imageData, setImageData] = useState(''); // base64 dataURL
   const [cutoutUrl, setCutoutUrl] = useState('');
 
-  // UI state
+  // حالات واجهة
   const [busy, setBusy] = useState(false);
-  const [phase, setPhase] = useState('idle'); // idle | upload | processing | ready | error
+  const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
   const [msg, setMsg] = useState('');
 
-  // BG Designer
+  // مصمّم الخلفية
   const [mode, setMode] = useState('color'); // color | gradient | pattern
   const [color, setColor] = useState('#0b0b14');
-  const [color2, setColor2] = useState('#221a42'); // gradient second
+  const [color2, setColor2] = useState('#221a42');
   const [angle, setAngle] = useState(45);
   const [radius, setRadius] = useState(28);
   const [padding, setPadding] = useState(24);
   const [shadow, setShadow] = useState(true);
   const [patternOpacity, setPatternOpacity] = useState(0.08);
 
-  // DnD
   const dropRef = useRef(null);
 
-  /* ---------- Session ---------- */
-  useEffect(() => {
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) setSessionEmail(session.user.email);
-      setAuthChecked(true);
-    })();
-  }, [supabase]);
-
-  /* ---------- Drag & Drop ---------- */
-  useEffect(() => {
-    const el = dropRef.current;
-    if (!el) return;
-    const over = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-fuchsia-500/60'); };
-    const leave = () => el.classList.remove('ring-2','ring-fuchsia-500/60');
-    const drop = (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) onPick(f); };
-    el.addEventListener('dragover', over);
-    el.addEventListener('dragleave', leave);
-    el.addEventListener('drop', drop);
-    return () => { el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop); };
-  }, []);
-
-  /* ---------- Background CSS ---------- */
+  // CSS للخلفية
   const bgStyle = useMemo(() => {
     if (mode === 'color') return { background: color };
     if (mode === 'gradient') return { background: `linear-gradient(${angle}deg, ${color}, ${color2})` };
-    // pattern SVG
     const svg = encodeURIComponent(
       `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'>
         <defs><pattern id='p' width='24' height='24' patternUnits='userSpaceOnUse'>
@@ -93,64 +65,51 @@ export default function RemoveBgStudioPage() {
     borderRadius: `${radius}px`,
     padding: `${padding}px`,
     boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.08)' : 'none',
-    transition: 'all .25s ease'
+    transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
-  /* ---------- Handlers ---------- */
-  const onPick = (f) => {
+  // Drag & drop
+  useEffect(() => {
+    const el = dropRef.current;
+    if (!el) return;
+    const over = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-fuchsia-500/60'); };
+    const leave = () => el.classList.remove('ring-2','ring-fuchsia-500/60');
+    const drop = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
+    el.addEventListener('dragover', over);
+    el.addEventListener('dragleave', leave);
+    el.addEventListener('drop', drop);
+    return () => { el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop); };
+  }, []);
+
+  const onPick = async (f) => {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
-    setPublicUrl('');
-    setCutoutUrl('');
-    setPhase('idle');
-    setMsg('');
-  };
-
-  const uploadToSupabase = async () => {
-    setPhase('upload');
-    try {
-      const fileName = `${Date.now()}-${file.name}`;
-      // NOTE: bucket "img" يجب أن يكون موجود + Public
-      const { data, error } = await supabase.storage.from('img').upload(fileName, file, { upsert: true, cacheControl: '3600' });
-      if (error) throw error;
-      const { data: pub } = supabase.storage.from('img').getPublicUrl(data.path);
-      setPublicUrl(pub.publicUrl);
-      return pub.publicUrl;
-    } catch (e) {
-      console.error(e);
-      setMsg('فشل رفع الملف إلى Supabase Storage. تأكد أن الباكت "img" موجود ومتاح للعامة.');
-      throw e;
-    }
-  };
-
-  const callRemoveBg = async (imageUrl) => {
-    setPhase('processing');
-    const r = await fetch('/api/remove-bg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // الـ API سيستخرج الإيميل من الجلسة ويخصم الكريدت عند النجاح
-      body: JSON.stringify({ imageUrl })
-    });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || 'failed');
-    return Array.isArray(j.image) ? j.image[0] : j.image;
+    setCutoutUrl(''); setMsg(''); setPhase('idle');
+    // اقرأ DataURL (base64) — بدون تخزين
+    const dataUrl = await fileToDataURL(f);
+    setImageData(dataUrl);
   };
 
   const run = async () => {
-    if (!file) { setMsg('اختر صورة أولًا'); return; }
-    if (!sessionEmail && authChecked) { setMsg('سجّل دخولك أولًا.'); return; }
-    setBusy(true); setMsg('');
+    if (!file || !imageData) { setMsg('اختر صورة أولًا'); return; }
+    setBusy(true); setMsg(''); setPhase('processing');
     try {
-      const url = publicUrl || await uploadToSupabase(); // ارفع إذا ما عندنا URL عام
-      const cut = await callRemoveBg(url);               // إزالة الخلفية
-      setCutoutUrl(cut);
+      const r = await fetch('/api/remove-bg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData }) // << نرسل base64
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'failed');
+      const out = Array.isArray(j.image) ? j.image[0] : j.image;
+      setCutoutUrl(out);
       setPhase('ready');
-      // بلّغ النافبار يحدّث الرصيد (لو مركّب الـ listener)
+      // بلّغ النافبار يحدّث الرصيد (لو مفعّل)
       window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
       console.error(e);
       setPhase('error');
-      setMsg('تعذر إكمال العملية. جرّب صورة أخرى لاحقًا.');
+      setMsg('تعذّر إكمال العملية. جرّب لاحقًا أو بصورة أخرى.');
     } finally {
       setBusy(false);
     }
@@ -158,7 +117,6 @@ export default function RemoveBgStudioPage() {
 
   const composeAndDownload = async () => {
     if (!cutoutUrl) return;
-    // دمج الخلفية المخصصة مع صورة المنتج (شفافة) وتصدير PNG
     const blob = await fetch(cutoutUrl, { cache: 'no-store' }).then(r => r.blob());
     const bmp = await createImageBitmap(blob);
     const size = Math.max(bmp.width, bmp.height);
@@ -170,8 +128,7 @@ export default function RemoveBgStudioPage() {
     if (mode === 'color') {
       ctx.fillStyle = color; ctx.fillRect(0, 0, size, size);
     } else if (mode === 'gradient') {
-      const rad = (angle * Math.PI) / 180;
-      const x = Math.cos(rad), y = Math.sin(rad);
+      const rad = (angle * Math.PI) / 180, x = Math.cos(rad), y = Math.sin(rad);
       const g = ctx.createLinearGradient(size*(1-x)/2, size*(1-y)/2, size*(1+x)/2, size*(1+y)/2);
       g.addColorStop(0, color); g.addColorStop(1, color2);
       ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
@@ -184,7 +141,7 @@ export default function RemoveBgStudioPage() {
       }
     }
 
-    // رسم المنتج داخل مساحة padded مع الحفاظ على التناسب
+    // رسم المنتج
     const pad = Math.round(size * (padding / 300));
     const boxW = size - pad * 2, boxH = size - pad * 2;
     const ratio = Math.min(boxW / bmp.width, boxH / bmp.height);
@@ -196,10 +153,8 @@ export default function RemoveBgStudioPage() {
     const a = document.createElement('a'); a.href = url; a.download = 'product.png'; a.click();
   };
 
-  /* ---------- UI ---------- */
   return (
     <main className="min-h-[100svh] bg-[radial-gradient(90%_80%_at_50%_-10%,#221a42_0%,#0b0b14_55%,#05060a_100%)] text-white">
-      {/* Header */}
       <div className="mx-auto max-w-6xl px-6 pt-24 pb-8">
         <motion.h1 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .5 }}
           className="text-3xl md:text-4xl font-extrabold tracking-tight">
@@ -207,14 +162,13 @@ export default function RemoveBgStudioPage() {
         </motion.h1>
         <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }}
           className="mt-2 text-sm text-white/70 max-w-2xl">
-          ارفع صورة، أزل الخلفية خلال ثوانٍ، واختر خلفية (لون/جراديانت/نمط) ثم نزّل النتيجة — تجربة سريعة وحديثة.
+          ارفع صورة، أزل الخلفية فورًا (بدون تخزين)، ثم اختر خلفية (لون/جراديانت/نمط) ونزّل النتيجة.
         </motion.p>
       </div>
 
-      {/* Body */}
       <div className="mx-auto max-w-6xl px-6 pb-20">
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Left: Upload & Result */}
+          {/* اليسار: رفع ومعالجة */}
           <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .4 }}>
             <div className="relative rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-lg">
               <div className="mb-3 flex items-center justify-between">
@@ -222,7 +176,6 @@ export default function RemoveBgStudioPage() {
                 <StepBadge phase={phase} />
               </div>
 
-              {/* Dropzone */}
               <div
                 ref={dropRef}
                 className="group relative grid place-items-center aspect-video rounded-xl border-2 border-dashed border-white/15 bg-white/5 hover:bg-white/[.08] transition cursor-pointer"
@@ -230,7 +183,7 @@ export default function RemoveBgStudioPage() {
                 onClick={() => document.getElementById('file-input')?.click()}
               >
                 <input id="file-input" type="file" accept="image/*" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }} />
+                  onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }} />
                 {!localUrl ? (
                   <div className="text-center text-white/70">
                     <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white/10">⬆</div>
@@ -241,7 +194,6 @@ export default function RemoveBgStudioPage() {
                 )}
               </div>
 
-              {/* Controls */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1 text-xs">
                   Model: <strong className="font-semibold">851-labs / background-remover</strong>
@@ -263,7 +215,6 @@ export default function RemoveBgStudioPage() {
 
               {msg && <div className="mt-2 text-xs text-rose-300">{msg}</div>}
 
-              {/* Result (transparent) */}
               <div className="mt-4">
                 <label className="block text-sm mb-2 font-medium">Result (Transparent)</label>
                 <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -277,19 +228,17 @@ export default function RemoveBgStudioPage() {
             </div>
           </motion.div>
 
-          {/* Right: Designer & Download */}
+          {/* اليمين: مصمّم الخلفية + تنزيل */}
           <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .4 }}>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-lg">
               <label className="block text-sm mb-2 font-medium">Background & Layout</label>
 
-              {/* Modes */}
               <div className="mb-3 flex flex-wrap gap-2">
                 <Tab active={mode==='color'} onClick={()=>setMode('color')}>Color</Tab>
                 <Tab active={mode==='gradient'} onClick={()=>setMode('gradient')}>Gradient</Tab>
                 <Tab active={mode==='pattern'} onClick={()=>setMode('pattern')}>Pattern</Tab>
               </div>
 
-              {/* Controls */}
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
                 {mode === 'gradient' && (
@@ -311,7 +260,6 @@ export default function RemoveBgStudioPage() {
                 </label>
               </div>
 
-              {/* Final preview with BG */}
               <div className="mt-4">
                 <label className="block text-sm mb-2 font-medium">Final Preview</label>
                 <div style={containerStyle} className="relative">
@@ -338,9 +286,7 @@ export default function RemoveBgStudioPage() {
         </div>
       </div>
 
-      {/* background grid */}
-      <div
-        className="pointer-events-none fixed inset-0 opacity-[.04] hidden dark:block"
+      <div className="pointer-events-none fixed inset-0 opacity-[.04] hidden dark:block"
         style={{
           backgroundImage:
             'linear-gradient(to right, rgba(255,255,255,.7) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.7) 1px, transparent 1px)',
@@ -351,38 +297,31 @@ export default function RemoveBgStudioPage() {
   );
 }
 
-/* ---------------- Tiny UI atoms ---------------- */
+/* ====== UI Atoms ====== */
 function StepBadge({ phase }) {
   const map = {
     idle: { label: 'Ready', color: 'bg-white/10' },
-    upload: { label: 'Uploading', color: 'bg-amber-400/20' },
     processing: { label: 'Processing', color: 'bg-indigo-400/20' },
     ready: { label: 'Done', color: 'bg-emerald-400/20' },
     error: { label: 'Error', color: 'bg-rose-400/20' },
   };
-  const item = map[phase] || map.idle;
+  const it = map[phase] || map.idle;
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${item.color} border border-white/10`}>
-      <Dot phase={phase} />
-      {item.label}
+    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${it.color} border border-white/10`}>
+      <span className={`inline-block size-2 rounded-full ${phase==='processing' ? 'bg-white animate-pulse' : 'bg-white/70'}`} />
+      {it.label}
     </span>
-  );
-}
-function Dot({ phase }) {
-  const pulse = phase === 'processing' || phase === 'upload';
-  return (
-    <span className={`inline-block size-2 rounded-full ${pulse ? 'bg-white animate-pulse' : 'bg-white/70'}`} />
   );
 }
 function Tab({ active, children, onClick }) {
   return (
     <button
       onClick={onClick}
-      type="button"
       className={[
         'rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-        active ? 'bg-white text-black' : 'border border-white/15 bg-white/10 hover:bg-white/15'
+        active ? 'bg-white text-black' : 'border border-white/15 bg-white/10 hover:bg-white/15',
       ].join(' ')}
+      type="button"
     >
       {children}
     </button>
@@ -400,10 +339,8 @@ function Color({ value, onChange }) {
   return (
     <div className="flex items-center gap-2">
       <input type="color" value={value} onChange={(e)=>onChange(e.target.value)} />
-      <input
-        className="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-1"
-        value={value} onChange={(e)=>onChange(e.target.value)}
-      />
+      <input className="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-1"
+             value={value} onChange={(e)=>onChange(e.target.value)} />
     </div>
   );
 }
@@ -411,7 +348,7 @@ function Range({ value, onChange, min, max, step=1 }) {
   return (
     <div className="flex items-center gap-2">
       <input type="range" value={value} min={min} max={max} step={step}
-        onChange={(e)=>onChange(Number(e.target.value))} className="w-full" />
+             onChange={(e)=>onChange(Number(e.target.value))} className="w-full" />
       <span className="w-10 text-right">{typeof value === 'number' ? value : ''}</span>
     </div>
   );
