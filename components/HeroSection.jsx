@@ -7,44 +7,22 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * Landing Body (no Nav, no Footer) — Startup-serious with playful wit
- * - Clear value prop above the fold (understand instantly)
- * - Early email capture + strong CTAs
- * - Rich animations (prefers-reduced-motion respected)
- * - SVG aurora + floating shapes + marquee + count-up KPIs
- * - Humor lines without hurting credibility
+ * Landing Body (no Nav/No Footer) — Startup-serious with playful wit
+ * Clear value prop • Early email capture • Rich animations • SVG aurora • Marquee • KPIs
  */
 
 export default function HeroSection() {
   return (
     <section className="relative w-full overflow-hidden font-sans text-black dark:text-white">
       <BackgroundFX />
-
-      {/* ===== TOP HERO ===== */}
       <TopHero />
-
-      {/* ===== LOGOS / SOCIAL PROOF ===== */}
       <LogoMarquee />
-
-      {/* ===== METRICS (PSYCHOLOGY: AUTHORITY + MOMENTUM) ===== */}
       <ProofMetrics />
-
-      {/* ===== VALUE PROPS ===== */}
       <ValueProps />
-
-      {/* ===== HOW IT WORKS ===== */}
       <HowItWorks />
-
-      {/* ===== HUMOR BREAK (LIGHT TOUCH) ===== */}
       <HumorBreak />
-
-      {/* ===== TESTIMONIALS TICKER ===== */}
       <TestimonialsTicker />
-
-      {/* ===== BOTTOM CTA (STRONG NUDGE) ===== */}
       <BottomCTA />
-
-      {/* ===== MOBILE FLOATING CTA ===== */}
       <StickyMobileCTA />
     </section>
   );
@@ -87,7 +65,7 @@ function TopHero() {
               <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">Cancel anytime</span>
             </div>
 
-            {/* CTAs + Email capture (prime action above the fold) */}
+            {/* CTAs + Email capture */}
             <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center">
               <MagneticCTA href="/dashboard" ariaLabel="Get started for free">
                 Get started free
@@ -101,8 +79,6 @@ function TopHero() {
             </div>
 
             <EarlyEmailCapture />
-
-            {/* Trust bar */}
             <TrustBar />
           </div>
 
@@ -156,7 +132,6 @@ function BackgroundFX() {
 <rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' opacity=\'0.4\'/></svg>")',
         }}
       />
-      {/* Aurora + Shapes */}
       <AuroraBlobs />
       <FloatingShapes />
     </div>
@@ -290,7 +265,8 @@ function EarlyEmailCapture() {
           className="w-full rounded-xl border border-black/10 bg-white/70 px-4 py-3 text-sm outline-none backdrop-blur placeholder:text-zinc-500 focus:ring-2 focus:ring-fuchsia-400 dark:border-white/15 dark:bg-white/10"
           aria-label="Work email"
         />
-        <SVGMail className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-70" />
+        {/* FIX: renamed SVGMail -> MailIcon to avoid duplicate identifier */}
+        <MailIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-70" />
       </div>
       <button
         type="submit"
@@ -304,7 +280,8 @@ function EarlyEmailCapture() {
   );
 }
 
-function SVGMail(props) {
+/* ------------- FIXED: unique name to avoid redeclare collisions ------------- */
+function MailIcon(props) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" {...props} aria-hidden>
       <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -442,17 +419,8 @@ function LogoMarquee() {
         </div>
       </div>
       <style jsx>{`
-        .animate-marquee {
-          animation: marquee 26s linear infinite;
-        }
-        @keyframes marquee {
-          from {
-            transform: translateX(0);
-          }
-          to {
-            transform: translateX(-50%);
-          }
-        }
+        .animate-marquee { animation: marquee 26s linear infinite; }
+        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       `}</style>
     </div>
   );
@@ -488,7 +456,7 @@ function KPI({ label, to, suffix = '', reverse = false }) {
     let start = null;
     const duration = 1000;
     const startVal = reverse ? to : 0;
-    const endVal = reverse ? (to <= 15 ? to : 0) : to;
+    const endVal = reverse ? (to <= 15 ? to : 0) : to; // gag for honesty on "15s"
     const step = (t) => {
       if (!start) start = t;
       const p = Math.min((t - start) / duration, 1);
@@ -501,18 +469,12 @@ function KPI({ label, to, suffix = '', reverse = false }) {
       { threshold: 0.5 }
     );
     io.observe(el);
-    return () => {
-      cancelAnimationFrame(frame);
-      io.disconnect();
-    };
+    return () => { cancelAnimationFrame(frame); io.disconnect(); };
   }, [to, reverse]);
 
   return (
     <div ref={ref} className="rounded-xl border border-black/10 bg-white p-4 text-center dark:border-white/10 dark:bg-zinc-800">
-      <div className="text-2xl font-extrabold">
-        {val}
-        {suffix}
-      </div>
+      <div className="text-2xl font-extrabold">{val}{suffix}</div>
       <div className="text-xs text-zinc-600 dark:text-zinc-300">{label}</div>
     </div>
   );
@@ -544,9 +506,7 @@ function ValueProps() {
             whileHover={{ y: -4 }}
             className="rounded-2xl border border-black/10 bg-gradient-to-br from-white to-zinc-50 p-6 shadow-md transition dark:border-white/10 dark:from-zinc-800 dark:to-zinc-800"
           >
-            <div className="mb-3 text-3xl" aria-hidden>
-              {icon}
-            </div>
+            <div className="mb-3 text-3xl" aria-hidden>{icon}</div>
             <h3 className="text-lg font-semibold">{title}</h3>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{desc}</p>
           </motion.div>
@@ -564,7 +524,6 @@ function HowItWorks() {
     { title: 'Enhance', desc: 'AI-powered quality', icon: '⚙️' },
     { title: 'Publish', desc: 'Export to your store', icon: '🚀' },
   ];
-
   return (
     <div id="how" className="relative z-10 bg-gradient-to-b from-[#0f0320] to-black px-6 py-20 text-white md:px-12 lg:px-20">
       <h2 className="mb-12 text-center text-3xl font-bold md:text-4xl">How it works</h2>
@@ -574,8 +533,6 @@ function HowItWorks() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-fuchsia-600 text-2xl">{step.icon}</div>
             <h3 className="text-xl font-semibold">{step.title}</h3>
             <p className="mt-1 text-sm text-zinc-300">{step.desc}</p>
-
-            {/* Connector line (SVG) */}
             {idx < steps.length - 1 && (
               <svg className="pointer-events-none absolute right-[-18px] top-1/2 hidden -translate-y-1/2 md:block" width="36" height="2" viewBox="0 0 36 2" fill="none" aria-hidden>
                 <path d="M0 1h36" stroke="white" strokeOpacity="0.25" strokeDasharray="4 3" />
@@ -629,17 +586,8 @@ function TestimonialsTicker() {
         </div>
       </div>
       <style jsx>{`
-        .animate-marquee2 {
-          animation: marquee2 30s linear infinite;
-        }
-        @keyframes marquee2 {
-          from {
-            transform: translateX(0);
-          }
-          to {
-            transform: translateX(-50%);
-          }
-        }
+        .animate-marquee2 { animation: marquee2 30s linear infinite; }
+        @keyframes marquee2 { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       `}</style>
     </div>
   );
@@ -688,36 +636,5 @@ function StickyMobileCTA() {
         Try now <span aria-hidden>→</span>
       </Link>
     </div>
-  );
-}
-
-/* --------------------------------- SVG Utils -------------------------------- */
-
-function SVGMail(props) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" {...props} aria-hidden>
-      <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-/* --------------------------------- BG Bits ---------------------------------- */
-
-function Logo() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden>
-      <defs>
-        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stopColor="#6366f1" />
-          <stop offset="50%" stopColor="#ec4899" />
-          <stop offset="100%" stopColor="#f43f5e" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="28" height="28" rx="8" stroke="url(#g)" strokeWidth="2" />
-      <path d="M10 22c3-6 9-6 12 0" stroke="url(#g)" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="12" cy="12" r="2" fill="url(#g)" />
-      <circle cx="20" cy="12" r="2" fill="url(#g)" />
-    </svg>
   );
 }
