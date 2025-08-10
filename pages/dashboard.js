@@ -8,6 +8,7 @@ import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import Layout from '@/components/Layout';
 import EnhanceCustomizer from '@/components/EnhanceCustomizer';
 import TryOnCustomizer from '@/components/TryOnCustomizer';
+import { buildTryOnPromptBundle } from '@/lib/generateDynamicPrompt';
 
 /* ---------- utils ---------- */
 const hexToRGBA = (hex, a = 1) => {
@@ -80,13 +81,12 @@ export default function DashboardStudio() {
   const [shadow, setShadow] = useState(true);
   const [patternOpacity, setPatternOpacity] = useState(0.08);
 
-  // history + compare
   const [history, setHistory] = useState([]);
-  const [compare, setCompare] = useState(55);
   const dropRef = useRef(null);
 
-  // modals (pop-ups)
+  // modals
   const [showEnhance, setShowEnhance] = useState(false);
+  the
   const [showTryon, setShowTryon] = useState(false);
 
   /* ---------- auth + workspace ---------- */
@@ -110,7 +110,7 @@ export default function DashboardStudio() {
     return () => { mounted = false; };
   }, [supabase, router]);
 
-  // listen credits refresh
+  // listen credit refresh
   useEffect(() => {
     const h = async () => {
       if (!user?.email) return;
@@ -180,7 +180,7 @@ export default function DashboardStudio() {
   const pickFirstUrl = (obj) => {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
-    const keys = ['image', 'image_url', 'output', 'result', 'url'];
+    const keys = ['image', 'image_url', 'output', 'result,', 'url'];
     for (const k of keys) {
       if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
     }
@@ -191,6 +191,16 @@ export default function DashboardStudio() {
   const buildEnhancePrompt = (f) =>
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
+
+  const downloadResult = () => {
+    if (!resultUrl) return;
+    const a = document.createElement('a');
+    a.href = resultUrl;
+    a.download = 'studio-output.jpg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
 
   /* ---------- actions ---------- */
 
@@ -240,15 +250,25 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl]);
 
-  // Try-On (from modal selections)
+  // Try-On (from modal selections) — مع البرومبت
   const runTryOn = useCallback(async (selections) => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
       const imageUrl = await uploadToStorage();
+
+      // ✅ ابنِ البرومبت من اختيارات Try-On وأرسله
+      const { prompt, negativePrompt } = buildTryOnPromptBundle(selections);
+
       const r = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, selections, plan, user_email: user.email }),
+        body: JSON.stringify({
+          imageUrl,
+          prompt,
+          negative_prompt: negativePrompt, // اختياري؛ API ممكن يتجاهله
+          plan,
+          user_email: user.email,
+        }),
       });
       if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
@@ -263,7 +283,7 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl]);
 
-  // زر Run يفتح المودالات للأدوات الجديدة
+  // زر Run يفتح المودالات أو يشغّل RemoveBG
   const handleRun = useCallback(() => {
     if (!file) { setErr('اختر صورة أولاً'); return; }
     if (active === 'removeBg') { runRemoveBg(); return; }
@@ -293,7 +313,7 @@ export default function DashboardStudio() {
     <Layout title="Studio">
       <main className="min-h-screen relative overflow-hidden bg-[radial-gradient(90%_80%_at_50%_-10%,#221a42_0%,#0b0b14_55%,#05060a_100%)] text-white">
         <BGFX />
-        <TopBar userName={user.user_metadata?.name || user.email} plan={plan} credits={credits} initials={initials} onExport={async()=>{}} />
+        <TopBar userName={user.user_metadata?.name || user.email} plan={plan} credits={credits} initials={initials} />
 
         <section className="max-w-7xl mx-auto px-4 md:px-8 pb-16">
           <div className="grid gap-6 md:grid-cols-[220px_1fr_320px]">
@@ -317,7 +337,7 @@ export default function DashboardStudio() {
               </div>
             </aside>
 
-            {/* Canvas */}
+            {/* Canvas — بدون سلايدر */}
             <section className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3">
               <div className="flex items-center justify-between px-1 pb-2">
                 <div className="text-sm font-semibold">{TOOLS.find(t => t.id === active)?.label}</div>
@@ -330,15 +350,25 @@ export default function DashboardStudio() {
                 onClick={() => document.getElementById('file-input')?.click()}
                 title="Drag & drop or click to upload"
               >
-                <input id="file-input" type="file" accept="image/*" className="hidden"
-                       onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }} />
-                {!localUrl ? (
+                <input
+                  id="file-input"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
+                />
+                {!localUrl && !resultUrl ? (
                   <div className="text-center text-white/70">
                     <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white/10">⬆</div>
                     اسحب ملفًا هنا أو اضغط للاختيار
                   </div>
                 ) : (
-                  <Compare before={localUrl} after={resultUrl} percent={compare} setPercent={setCompare} />
+                  <img
+                    src={resultUrl || localUrl}
+                    alt="preview"
+                    className="w-full h-full object-contain"
+                    draggable={false}
+                  />
                 )}
               </div>
 
@@ -350,54 +380,63 @@ export default function DashboardStudio() {
                 >
                   {busy ? 'Processing…' : `Run ${TOOLS.find(t => t.id === active)?.label}`}
                 </button>
+                {resultUrl && (
+                  <button
+                    onClick={downloadResult}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
+                  >
+                    Download
+                  </button>
+                )}
                 {err && <div className="text-xs text-rose-300">{err}</div>}
               </div>
             </section>
 
-            {/* Inspector */}
+            {/* Inspector — Final Preview موحد */}
             <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3">
               <div className="px-1 pb-2 text-sm font-semibold">Inspector</div>
 
+              {/* إعدادات Remove BG فقط */}
               {active === 'removeBg' && (
-                <div className="space-y-3">
-                  <ModeTabs mode={bgMode} setMode={setBgMode} />
-                  <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
-                  {bgMode === 'gradient' && (
-                    <>
-                      <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
-                      <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
-                    </>
-                  )}
-                  {bgMode === 'pattern' && (
-                    <Field label="Pattern opacity"><Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} /></Field>
-                  )}
-                  <Field label="Radius"><Range value={radius} onChange={setRadius} min={0} max={48} /></Field>
-                  <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
-                  <label className="mt-1 inline-flex items-center gap-2 text-xs">
-                    <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
-                    Shadow
-                  </label>
+                <>
+                  <div className="space-y-3">
+                    <ModeTabs mode={bgMode} setMode={setBgMode} />
+                    <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
+                    {bgMode === 'gradient' && (
+                      <>
+                        <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
+                        <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
+                      </>
+                    )}
+                    {bgMode === 'pattern' && (
+                      <Field label="Pattern opacity"><Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} /></Field>
+                    )}
+                    <Field label="Radius"><Range value={radius} onChange={setRadius} min={0} max={48} /></Field>
+                    <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
+                    <label className="mt-1 inline-flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
+                      Shadow
+                    </label>
+                  </div>
+                  <div className="h-3" />
+                </>
+              )}
 
-                  <div className="mt-4">
-                    <div className="text-xs text-white/60 mb-2">Final Preview</div>
-                    <div style={frameStyle} className="relative">
-                      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg">
-                        {resultUrl ? (
-                          <img src={resultUrl} alt="final" className="w-full h-full object-contain" />
-                        ) : (
-                          <div className="grid place-items-center h-full text-xs text-white/50">— أزل الخلفية أولًا —</div>
-                        )}
+              {/* Final Preview للجميع */}
+              <div className="mt-2">
+                <div className="text-xs text-white/60 mb-2">Final Preview</div>
+                <div style={active === 'removeBg' ? frameStyle : undefined} className="relative">
+                  <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border border-white/10 bg-black/30">
+                    {resultUrl ? (
+                      <img src={resultUrl} alt="final" className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="grid place-items-center h-full text-xs text-white/50">
+                        {localUrl ? '— شغِّل الأداة لإظهار النتيجة —' : '— ارفع صورة أولًا —'}
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
-              )}
-
-              {active !== 'removeBg' && (
-                <div className="space-y-2 text-xs text-white/70">
-                  <div>اضغط Run لفتح نافذة الإعدادات (Pop-Up) واختيار التفاصيل.</div>
-                </div>
-              )}
+              </div>
             </aside>
           </div>
 
@@ -425,10 +464,7 @@ export default function DashboardStudio() {
         {/* ===== Modals (Pop-Ups) ===== */}
         <AnimatePresence>
           {showEnhance && (
-            <motion.div
-              className="fixed inset-0 z-[100] grid place-items-center"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            >
+            <motion.div className="fixed inset-0 z-[100] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="absolute inset-0 bg-black/60" onClick={()=>setShowEnhance(false)} />
               <div className="relative w-full max-w-3xl">
                 <EnhanceCustomizer
@@ -440,10 +476,7 @@ export default function DashboardStudio() {
           )}
 
           {showTryon && (
-            <motion.div
-              className="fixed inset-0 z-[100] grid place-items-center"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            >
+            <motion.div className="fixed inset-0 z-[100] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="absolute inset-0 bg-black/60" onClick={()=>setShowTryon(false)} />
               <div className="relative w-full max-w-3xl">
                 <TryOnCustomizer
@@ -458,8 +491,12 @@ export default function DashboardStudio() {
         {/* toast */}
         <AnimatePresence>
           {err && (
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm backdrop-blur">
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm backdrop-blur"
+            >
               {err}
             </motion.div>
           )}
@@ -542,20 +579,3 @@ function Tab({ active, children, onClick }) {
 function Field({ label, children }) { return <label className="flex items-center justify-between gap-3 text-xs"><span className="min-w-28 text-white/70">{label}</span><div className="flex-1">{children}</div></label>; }
 function Color({ value, onChange }) { return (<div className="flex items-center gap-2"><input type="color" value={value} onChange={(e)=>onChange(e.target.value)} /><input className="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-1" value={value} onChange={(e)=>onChange(e.target.value)} /></div>); }
 function Range({ value, onChange, min, max, step=1 }) { return (<div className="flex items-center gap-2"><input type="range" value={value} min={min} max={max} step={step} onChange={(e)=>onChange(Number(e.target.value))} className="w-full" /><span className="w-10 text-right">{typeof value==='number'?value:''}</span></div>); }
-function Compare({ before, after, percent, setPercent }) {
-  const ref = useRef(null);
-  const clamp = (v) => Math.max(0, Math.min(100, v));
-  const move = (x) => { const r = ref.current.getBoundingClientRect(); setPercent(clamp(((x - r.left) / r.width) * 100)); };
-  return (
-    <div ref={ref} className="relative w-full h-full overflow-hidden" onPointerDown={(e)=>move(e.clientX)} onPointerMove={(e)=>{ if (e.buttons & 1) move(e.clientX); }}>
-      <img src={after || before} alt="after" className="w-full h-full object-contain select-none" />
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ width: `${percent}%` }}>
-        <img src={before} alt="before" className="w-full h-full object-contain" />
-      </div>
-      <div className="absolute top-0 cursor-ew-resize" style={{ left:`calc(${percent}% - 1px)`, height:'100%' }}>
-        <div className="h-full w-0.5 bg-white/90 mix-blend-difference shadow-[0_0_0_1px_rgba(0,0,0,.2)]" />
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">Drag</div>
-      </div>
-    </div>
-  );
-}
