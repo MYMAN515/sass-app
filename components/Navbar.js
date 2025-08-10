@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,6 +29,7 @@ export default function Navbar() {
   const [plan, setPlan] = useState('Free');
   const [credits, setCredits] = useState(0);
   const [loading, setLoading] = useState(true);
+  const creditPulseRef = useRef(0); // لتوليد key مختلف عند التغيير للأنيميشن
 
   // لماذا: تمييز الرابط الحالي بصريًا
   const isActive = useCallback((href) => {
@@ -60,31 +61,106 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Session & user data
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
+  // --- util: جلب بيانات المستخدم من جدول Data
+  const syncUserData = useCallback(
+    async (uid, fallbackEmail) => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) return;
-        if (!mounted) return;
-
-        setUser({ id: session.user.id, email: session.user.email, name: session.user.user_metadata?.name });
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('Data')
-          .select('name, credits, plan')
-          .eq('user_id', session.user.id)
+          .select('name, credits, plan, email')
+          .eq('user_id', uid)
           .single();
 
-        setPlan(data?.plan || 'Free');
-        setCredits(data?.credits ?? 0);
-        setUser((u) => ({ ...u, name: data?.name || u?.name || session.user.email }));
+        if (!error && data) {
+          setPlan(data?.plan || 'Free');
+          setCredits((prev) => {
+            if (typeof data?.credits === 'number' && data.credits !== prev) {
+              creditPulseRef.current += 1; // لتحديث key للأنيميشن
+            }
+            return data?.credits ?? 0;
+          });
+          setUser((u) => ({
+            ...(u || {}),
+            name: data?.name || u?.name || fallbackEmail,
+            email: data?.email || fallbackEmail,
+            id: uid,
+          }));
+        }
+      } catch (_e) {
+        // no-op
       } finally {
-        if (mounted) setLoading(false);
+        setLoading(false);
       }
+    },
+    [supabase]
+  );
+
+  // Session & initial fetch + realtime
+  useEffect(() => {
+    let mounted = true;
+    let channel;
+
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (!session?.user) {
+        setLoading(false);
+        return;
+      }
+
+      setUser({
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.user_metadata?.name || session.user.email,
+      });
+
+      // جلب أولي
+      await syncUserData(session.user.id, session.user.email);
+
+      // ✅ Realtime: استمع لتحديثات صف المستخدم في Data
+      channel = supabase
+        .channel('public:Data:credits')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'Data',
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          (payload) => {
+            const newCredits = payload.new?.credits;
+            const newPlan = payload.new?.plan;
+            if (typeof newCredits === 'number') {
+              setCredits((prev) => {
+                if (newCredits !== prev) creditPulseRef.current += 1;
+                return newCredits;
+              });
+            }
+            if (newPlan) setPlan(newPlan);
+          }
+        )
+        .subscribe(status => {
+          // console.log('Realtime status', status);
+        });
+
+      // Fallback: لو أي صفحة بثّت الحدث "credits:refresh" نعيد الجلب
+      const onRefresh = () => syncUserData(session.user.id, session.user.email);
+      window.addEventListener('credits:refresh', onRefresh);
+
+      // Cleanup
+      return () => {
+        mounted = false;
+        window.removeEventListener('credits:refresh', onRefresh);
+        if (channel) supabase.removeChannel(channel);
+      };
     })();
-    return () => { mounted = false; };
-  }, [supabase]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [supabase, syncUserData]);
 
   const initials = useMemo(() => {
     const n = user?.name || user?.email || '';
@@ -107,6 +183,9 @@ export default function Navbar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [menuOpen]);
 
+  // لون تنبيهي لو الكريدت قليل
+  const lowCredits = !loading && user && credits <= 3 && plan !== 'Pro';
+
   return (
     <header
       className={[
@@ -122,9 +201,7 @@ export default function Navbar() {
           'backdrop-blur-xl',
           'bg-white/5 dark:bg-zinc-900/50',
         ].join(' ')}
-        style={{
-          boxShadow: scrolled ? 'inset 0 -1px 0 rgba(255,255,255,.06)' : 'none',
-        }}
+        style={{ boxShadow: scrolled ? 'inset 0 -1px 0 rgba(255,255,255,.06)' : 'none' }}
       >
         <nav className="h-16 flex items-center justify-between text-white">
           {/* Logo */}
@@ -172,22 +249,46 @@ export default function Navbar() {
 
             {/* User/CTA */}
             {loading ? (
-              <div className="ml-2 h-9 w-44 rounded-full bg-white/10 animate-pulse" />
+              <div className="ml-2 h-9 w-52 rounded-full bg-white/10 animate-pulse" />
             ) : user ? (
               <div className="ml-2 flex items-center gap-2">
                 <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
                   <span className="inline-block size-2 rounded-full bg-emerald-400" />
                   Plan: <strong className="font-semibold">{plan}</strong>
                 </span>
-                <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
-                  Credits: <strong className="font-semibold">{credits}</strong>
-                </span>
+
+                {/* Credits pill مع أنيميشن عند التغيير */}
+                <Link
+                  href={lowCredits ? '/pricing' : '#'}
+                  className={[
+                    'hidden lg:inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition',
+                    lowCredits
+                      ? 'border-rose-400/40 bg-rose-400/15 hover:bg-rose-400/25'
+                      : 'border-white/15 bg-white/10 hover:bg-white/15',
+                  ].join(' ')}
+                  title={lowCredits ? 'Recharge credits' : 'Credits'}
+                >
+                  Credits:{' '}
+                  <motion.strong
+                    key={creditPulseRef.current}
+                    initial={{ scale: 1.2, color: lowCredits ? '#fecaca' : '#fff' }}
+                    animate={{ scale: 1, color: '#fff' }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                    className="font-semibold"
+                    aria-live="polite"
+                  >
+                    {credits}
+                  </motion.strong>
+                  {lowCredits && <span className="ml-1 hidden md:inline">— Low</span>}
+                </Link>
+
                 <Link
                   href="/enhance"
                   className="hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
                 >
                   🚀 Launch Studio
                 </Link>
+
                 <div
                   title={user.email}
                   className="ml-1 grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold"
@@ -296,8 +397,20 @@ export default function Navbar() {
                           <span className="inline-block size-2 rounded-full bg-emerald-400" />
                           Plan: <strong className="font-semibold">{plan}</strong>
                         </span>
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1">
-                          Credits: <strong className="font-semibold">{credits}</strong>
+                        <span className={[
+                          'inline-flex items-center gap-2 rounded-full px-2.5 py-1 border',
+                          lowCredits ? 'border-rose-400/40 bg-rose-400/15' : 'border-white/15 bg-white/10'
+                        ].join(' ')}>
+                          Credits:{' '}
+                          <motion.strong
+                            key={`m-${creditPulseRef.current}`}
+                            initial={{ scale: 1.15 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+                            className="font-semibold"
+                          >
+                            {credits}
+                          </motion.strong>
                         </span>
                       </div>
                       <div className="flex items-center gap-2 pt-2">
@@ -308,12 +421,22 @@ export default function Navbar() {
                         >
                           🚀 Launch Studio
                         </Link>
-                        <button
-                          onClick={() => { setMenuOpen(false); handleLogout(); }}
-                          className="text-xs underline text-white/80 hover:text-white"
-                        >
-                          Logout
-                        </button>
+                        {lowCredits ? (
+                          <Link
+                            href="/pricing"
+                            onClick={() => setMenuOpen(false)}
+                            className="text-xs underline text-rose-300 hover:text-rose-200"
+                          >
+                            Recharge
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => { setMenuOpen(false); handleLogout(); }}
+                            className="text-xs underline text-white/80 hover:text-white"
+                          >
+                            Logout
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
