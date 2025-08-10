@@ -8,12 +8,13 @@ import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Layout from '@/components/Layout';
 import EnhanceCustomizer from '@/components/EnhanceCustomizer';
 import TryOnCustomizer from '@/components/TryOnCustomizer';
-import { buildTryOnPromptBundle } from '@/lib/generateDynamicPrompt';
+import { Download } from 'lucide-react';
 
 /* ---------- utils ---------- */
 const hexToRGBA = (hex, a = 1) => {
-  const c = hex.replace('#', '');
+  const c = hex?.replace?.('#', '') || '';
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
+  if (!v) return `rgba(0,0,0,${a})`;
   const n = parseInt(v, 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
@@ -41,7 +42,7 @@ const fileToOptimizedDataURL = (file, maxSide = 1600, quality = 0.9) =>
   });
 
 /* ---------- constants ---------- */
-const STORAGE_BUCKET = 'img';
+const STORAGE_BUCKET = 'img'; // تأكد أنه Public
 
 /* ---------- studio ---------- */
 const TOOLS = [
@@ -60,6 +61,7 @@ export default function DashboardStudio() {
   const [credits, setCredits] = useState(0);
   const [err, setErr] = useState('');
 
+  // tools
   const [active, setActive] = useState('removeBg');
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
@@ -70,22 +72,25 @@ export default function DashboardStudio() {
   const [imageData, setImageData] = useState(''); // removeBg فقط
   const [resultUrl, setResultUrl] = useState('');
 
-  // removeBg designer
-  const [bgMode, setBgMode] = useState('color');
+  // designer (removeBg فقط)
+  const [bgMode, setBgMode] = useState('color'); // color|gradient|pattern
   const [color, setColor] = useState('#0b0b14');
   const [color2, setColor2] = useState('#221a42');
   const [angle, setAngle] = useState(45);
   const [radius, setRadius] = useState(22);
-  const [padding, setPadding] = useState(22);
+  const [padding, setPadding] = useState(22); // px نسبة للكانفس
   const [shadow, setShadow] = useState(true);
   const [patternOpacity, setPatternOpacity] = useState(0.08);
 
+  // history
   const [history, setHistory] = useState([]);
-  const dropRef = useRef(null);
 
   // modals
   const [showEnhance, setShowEnhance] = useState(false);
   const [showTryon, setShowTryon] = useState(false);
+
+  // API response (للعرض/النسخ)
+  const [apiResponse, setApiResponse] = useState(null);
 
   /* ---------- auth + workspace ---------- */
   useEffect(() => {
@@ -103,19 +108,16 @@ export default function DashboardStudio() {
           .select('plan, credits')
           .eq('email', session.user.email)
           .single();
-
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
       } catch {
         setErr('Failed to load workspace.');
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     })();
     return () => { mounted = false; };
   }, [supabase, router]);
 
-  // listen credits refresh
+  // credits refresh
   useEffect(() => {
     const h = async () => {
       if (!user?.email) return;
@@ -127,6 +129,7 @@ export default function DashboardStudio() {
   }, [supabase, user]);
 
   // drag & drop
+  const dropRef = useRef(null);
   useEffect(() => {
     const el = dropRef.current; if (!el) return;
     const over = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-fuchsia-500/60'); };
@@ -136,10 +139,22 @@ export default function DashboardStudio() {
     return () => { el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop); };
   }, []);
 
+  // تغيير الأداة = رفع مستقل (نفضّي كل شي)
+  const resetUploadState = useCallback(() => {
+    setFile(null);
+    setLocalUrl('');
+    setImageData('');
+    setResultUrl('');
+    setPhase('idle');
+    setErr('');
+    setApiResponse(null);
+  }, []);
+  useEffect(() => { resetUploadState(); }, [active, resetUploadState]);
+
   const onPick = async (f) => {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
-    setResultUrl(''); setPhase('idle'); setErr('');
+    setResultUrl(''); setPhase('idle'); setErr(''); setApiResponse(null);
     setImageData(await fileToOptimizedDataURL(f, 1600, 0.9));
   };
 
@@ -159,13 +174,14 @@ export default function DashboardStudio() {
   }, [bgMode, color, color2, angle, patternOpacity]);
 
   const frameStyle = useMemo(() => ({
-    ...bgStyle, borderRadius: `${radius}px`, padding: `${padding}px`,
+    ...bgStyle,
+    borderRadius: `${radius}px`,
+    padding: `${padding}px`,
     boxShadow: shadow ? '0 20px 55px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.08)' : 'none',
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
   /* ---------- helpers ---------- */
-
   const uploadToStorage = useCallback(async () => {
     if (!file) throw new Error('no file');
     const ext = (file.name?.split('.').pop() || 'png').toLowerCase();
@@ -195,18 +211,7 @@ export default function DashboardStudio() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
-  const downloadResult = () => {
-    if (!resultUrl) return;
-    const a = document.createElement('a');
-    a.href = resultUrl;
-    a.download = 'studio-output.jpg';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
-
   /* ---------- actions ---------- */
-
   const runRemoveBg = useCallback(async () => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
@@ -215,8 +220,9 @@ export default function DashboardStudio() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageData }),
       });
-      if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
+      setApiResponse(j);
+      if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
       const out = pickFirstUrl(j);
       if (!out) throw new Error('No output from remove-bg');
       setResultUrl(out);
@@ -238,8 +244,9 @@ export default function DashboardStudio() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email }),
       });
-      if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
+      setApiResponse(j);
+      if (!r.ok) throw new Error(j?.error || 'enhance failed');
       const out = pickFirstUrl(j);
       if (!out) throw new Error('No output from enhance');
       setResultUrl(out);
@@ -255,21 +262,14 @@ export default function DashboardStudio() {
     setBusy(true); setErr(''); setPhase('processing');
     try {
       const imageUrl = await uploadToStorage();
-      const { prompt, negativePrompt } = buildTryOnPromptBundle(selections);
-
       const r = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrl,
-          prompt,
-          negative_prompt: negativePrompt,
-          plan,
-          user_email: user.email,
-        }),
+        body: JSON.stringify({ imageUrl, selections, plan, user_email: user.email }),
       });
-      if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
+      setApiResponse(j);
+      if (!r.ok) throw new Error(j?.error || 'tryon failed');
       const out = pickFirstUrl(j);
       if (!out) throw new Error('No output from try-on');
       setResultUrl(out);
@@ -287,6 +287,114 @@ export default function DashboardStudio() {
     if (active === 'enhance')  { setShowEnhance(true); return; }
     if (active === 'tryon')    { setShowTryon(true); return; }
   }, [active, file, runRemoveBg]);
+
+  /* ---------- download composer (PNG مع تطبيق الإعدادات) ---------- */
+  const composeAndDownload = useCallback(async () => {
+    if (!resultUrl) return;
+
+    // حمّل الصورة كـ Blob لتفادي مشاكل CORS في toDataURL
+    const blob = await fetch(resultUrl, { cache: 'no-store' }).then(r => r.blob());
+
+    // ImageBitmap إن توفر، وإلا HTMLImage من object URL
+    let bmp, imgEl, w, h;
+    if ('createImageBitmap' in window) {
+      bmp = await createImageBitmap(blob);
+      w = bmp.width; h = bmp.height;
+    } else {
+      imgEl = new Image();
+      imgEl.src = URL.createObjectURL(blob);
+      await new Promise((res, rej) => { imgEl.onload = res; imgEl.onerror = rej; });
+      w = imgEl.naturalWidth; h = imgEl.naturalHeight;
+    }
+
+    // حجم ناتج منطقي (نحدّه 2048 عشان الأداء/الحجم)
+    const maxSide = Math.min(2048, Math.max(w, h));
+    const canvas = document.createElement('canvas');
+    canvas.width = maxSide; canvas.height = maxSide;
+    const ctx = canvas.getContext('2d');
+
+    // خلفية/تصميم (نطبّقه فقط لو الأداة removeBg)
+    if (active === 'removeBg') {
+      if (bgMode === 'color') {
+        ctx.fillStyle = color; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else if (bgMode === 'gradient') {
+        const rad = (angle * Math.PI) / 180, x = Math.cos(rad), y = Math.sin(rad);
+        const g = ctx.createLinearGradient(
+          canvas.width * (1 - x) / 2, canvas.height * (1 - y) / 2,
+          canvas.width * (1 + x) / 2, canvas.height * (1 + y) / 2
+        );
+        g.addColorStop(0, color); g.addColorStop(1, color2);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else {
+        // pattern grid
+        ctx.fillStyle = color; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = hexToRGBA(color, patternOpacity); ctx.lineWidth = 1;
+        for (let i = 0; i <= canvas.width; i += 24) {
+          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+        }
+      }
+    } else {
+      // للأدوات الأخرى: خلفية شفافة PNG (لا نملأ شيء)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // إعدادات الإطار/القص
+    const pad = Math.round(canvas.width * (padding / 300)); // نفس منطق المعاينة
+    const boxW = canvas.width - pad * 2;
+    const boxH = canvas.height - pad * 2;
+    const ratio = Math.min(boxW / w, boxH / h);
+    const dw = Math.round(w * ratio);
+    const dh = Math.round(h * ratio);
+    const dx = Math.round((canvas.width - dw) / 2);
+    const dy = Math.round((canvas.height - dh) / 2);
+
+    // قص بزوايا دائرية للإطار بالكامل (يشمل الصورة)
+    const r = Math.max(0, Math.min(radius, 64));
+    const roundedRect = (x, y, w, h, rad) => {
+      const rr = Math.min(rad, w/2, h/2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.arcTo(x + w, y, x + w, y + h, rr);
+      ctx.arcTo(x + w, y + h, x, y + h, rr);
+      ctx.arcTo(x, y + h, x, y, rr);
+      ctx.arcTo(x, y, x + w, y, rr);
+      ctx.closePath();
+    };
+
+    ctx.save();
+    roundedRect(0, 0, canvas.width, canvas.height, r);
+    ctx.clip();
+
+    // ظل للصورة فقط (اختياري)
+    if (active === 'removeBg' && shadow) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.25)';
+      ctx.shadowBlur = Math.round(canvas.width * 0.02);
+      ctx.shadowOffsetX = Math.round(canvas.width * 0.005);
+      ctx.shadowOffsetY = Math.round(canvas.width * 0.01);
+      if (bmp) ctx.drawImage(bmp, dx, dy, dw, dh);
+      else ctx.drawImage(imgEl, dx, dy, dw, dh);
+      ctx.restore();
+    } else {
+      if (bmp) ctx.drawImage(bmp, dx, dy, dw, dh);
+      else ctx.drawImage(imgEl, dx, dy, dw, dh);
+    }
+
+    ctx.restore();
+
+    // نزّل كـ PNG
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `studio-output.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    // تنظيف
+    if (imgEl?.src?.startsWith('blob:')) URL.revokeObjectURL(imgEl.src);
+  }, [resultUrl, active, bgMode, color, color2, angle, patternOpacity, padding, radius, shadow]);
 
   /* ---------- UI ---------- */
 
@@ -313,9 +421,10 @@ export default function DashboardStudio() {
         <TopBar userName={user.user_metadata?.name || user.email} plan={plan} credits={credits} initials={initials} />
 
         <section className="max-w-7xl mx-auto px-4 md:px-8 pb-16">
-          <div className="grid gap-6 md:grid-cols-[220px_1fr_320px]">
+          {/* على الموبايل: الشبكة تتحول لعمود */}
+          <div className="grid gap-6 md:grid-cols-[220px_1fr_340px]">
             {/* Tools */}
-            <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3">
+            <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3 h-fit">
               <div className="px-2 py-1 text-xs text-white/60">Tools</div>
               <div className="mt-2 space-y-1">
                 {TOOLS.map(t => (
@@ -334,13 +443,14 @@ export default function DashboardStudio() {
               </div>
             </aside>
 
-            {/* Canvas — صورة واحدة فقط */}
+            {/* Canvas */}
             <section className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3">
               <div className="flex items-center justify-between px-1 pb-2">
                 <div className="text-sm font-semibold">{TOOLS.find(t => t.id === active)?.label}</div>
                 <StepBadge phase={phase} />
               </div>
 
+              {/* منطقة الرفع/المعاينة */}
               <div
                 ref={dropRef}
                 className="group relative grid place-items-center aspect-[16/10] rounded-xl border-2 border-dashed border-white/15 bg-white/5 hover:bg-white/[.08] transition cursor-pointer overflow-hidden"
@@ -360,12 +470,14 @@ export default function DashboardStudio() {
                     اسحب ملفًا هنا أو اضغط للاختيار
                   </div>
                 ) : (
-                  <img
-                    src={resultUrl || localUrl}
-                    alt="preview"
-                    className="w-full h-full object-contain"
-                    draggable={false}
-                  />
+                  <div className="w-full h-full grid place-items-center p-2">
+                    {/* عرض الصورة بالكامل بدون قص */}
+                    <img
+                      src={resultUrl || localUrl}
+                      alt="preview"
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  </div>
                 )}
               </div>
 
@@ -377,61 +489,100 @@ export default function DashboardStudio() {
                 >
                   {busy ? 'Processing…' : `Run ${TOOLS.find(t => t.id === active)?.label}`}
                 </button>
-                {resultUrl && (
-                  <button
-                    onClick={downloadResult}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
-                  >
-                    Download
-                  </button>
-                )}
+
+                <button
+                  onClick={composeAndDownload}
+                  disabled={!resultUrl}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15 disabled:opacity-50"
+                  title="Download PNG"
+                >
+                  <Download className="w-4 h-4" /> Download PNG
+                </button>
+
                 {err && <div className="text-xs text-rose-300">{err}</div>}
               </div>
+
+              {/* Response (يتكيف مع الموبايل) */}
+              {apiResponse && (
+                <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-semibold text-white/80">Response</div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(JSON.stringify(apiResponse, null, 2));
+                      }}
+                      className="text-[11px] rounded-md border border-white/20 bg-white/10 px-2 py-1 hover:bg-white/15"
+                    >
+                      Copy JSON
+                    </button>
+                  </div>
+                  <pre className="max-h-52 overflow-auto text-[11px] leading-5 whitespace-pre-wrap break-words text-white/80">
+                    {JSON.stringify(apiResponse, null, 2)}
+                  </pre>
+                </div>
+              )}
             </section>
 
-            {/* Inspector — Final Preview موحد */}
-            <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3">
+            {/* Inspector */}
+            <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3 h-fit">
               <div className="px-1 pb-2 text-sm font-semibold">Inspector</div>
 
-              {active === 'removeBg' && (
-                <>
-                  <div className="space-y-3">
-                    <ModeTabs mode={bgMode} setMode={setBgMode} />
-                    <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
-                    {bgMode === 'gradient' && (
-                      <>
-                        <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
-                        <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
-                      </>
-                    )}
-                    {bgMode === 'pattern' && (
-                      <Field label="Pattern opacity"><Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} /></Field>
-                    )}
-                    <Field label="Radius"><Range value={radius} onChange={setRadius} min={0} max={48} /></Field>
-                    <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
-                    <label className="mt-1 inline-flex items-center gap-2 text-xs">
-                      <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
-                      Shadow
-                    </label>
-                  </div>
-                  <div className="h-3" />
-                </>
-              )}
+              {active === 'removeBg' ? (
+                <div className="space-y-3">
+                  <ModeTabs mode={bgMode} setMode={setBgMode} />
+                  <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
+                  {bgMode === 'gradient' && (
+                    <>
+                      <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
+                      <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
+                    </>
+                  )}
+                  {bgMode === 'pattern' && (
+                    <Field label="Pattern opacity"><Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} /></Field>
+                  )}
+                  <Field label="Radius"><Range value={radius} onChange={setRadius} min={0} max={64} /></Field>
+                  <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
+                  <label className="mt-1 inline-flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
+                    Shadow
+                  </label>
 
-              <div className="mt-2">
-                <div className="text-xs text-white/60 mb-2">Final Preview</div>
-                <div style={active === 'removeBg' ? frameStyle : undefined} className="relative">
-                  <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border border-white/10 bg-black/30">
-                    {resultUrl ? (
-                      <img src={resultUrl} alt="final" className="w-full h-full object-contain" />
-                    ) : (
-                      <div className="grid place-items-center h-full text-xs text-white/50">
-                        {localUrl ? '— شغِّل الأداة لإظهار النتيجة —' : '— ارفع صورة أولًا —'}
+                  {/* Final Preview */}
+                  <div className="mt-4">
+                    <div className="text-xs text-white/60 mb-2">Final Preview</div>
+                    <div style={frameStyle} className="relative">
+                      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg grid place-items-center">
+                        {resultUrl ? (
+                          <img src={resultUrl} alt="final" className="max-w-full max-h-full object-contain" />
+                        ) : (
+                          <div className="grid place-items-center h-full text-xs text-white/50">
+                            — أزل الخلفية أولًا —
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                // للأدوات الأخرى: عرض معاينة نهائية بسيطة
+                <div className="space-y-3">
+                  <div className="text-xs text-white/60">Final Preview</div>
+                  <div className="rounded-xl border border-white/10 bg-white/10 p-2">
+                    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-md grid place-items-center">
+                      {resultUrl ? (
+                        <img src={resultUrl} alt="final" className="max-w-full max-h-full object-contain" />
+                      ) : (
+                        <div className="grid place-items-center h-full text-xs text-white/50">
+                          — شغّل الأداة أولًا —
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-white/60">
+                    * إعدادات الخلفية/الإطار تنطبق على Remove BG فقط. التنزيل دائمًا PNG.
+                  </div>
+                </div>
+              )}
             </aside>
           </div>
 
@@ -443,8 +594,11 @@ export default function DashboardStudio() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
                 {history.map((h, i) => (
-                  <button key={i} onClick={() => setResultUrl(h.outputUrl)}
-                          className="group relative rounded-xl overflow-hidden border border-white/10 hover:border-white/20 transition">
+                  <button
+                    key={i}
+                    onClick={() => setResultUrl(h.outputUrl)}
+                    className="group relative rounded-xl overflow-hidden border border-white/10 hover:border-white/20 transition"
+                  >
                     <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
                     <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/40 backdrop-blur">
                       {h.tool} • {new Date(h.ts).toLocaleTimeString()}
@@ -456,16 +610,13 @@ export default function DashboardStudio() {
           </div>
         </section>
 
-        {/* Modals */}
+        {/* ===== Modals ===== */}
         <AnimatePresence>
           {showEnhance && (
             <motion.div className="fixed inset-0 z-[100] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="absolute inset-0 bg-black/60" onClick={()=>setShowEnhance(false)} />
               <div className="relative w-full max-w-3xl">
-                <EnhanceCustomizer
-                  onChange={()=>{}}
-                  onComplete={(form) => { setShowEnhance(false); runEnhance(form); }}
-                />
+                <EnhanceCustomizer onChange={()=>{}} onComplete={(form) => { setShowEnhance(false); runEnhance(form); }} />
               </div>
             </motion.div>
           )}
@@ -474,10 +625,7 @@ export default function DashboardStudio() {
             <motion.div className="fixed inset-0 z-[100] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="absolute inset-0 bg-black/60" onClick={()=>setShowTryon(false)} />
               <div className="relative w-full max-w-3xl">
-                <TryOnCustomizer
-                  onChange={()=>{}}
-                  onComplete={(form) => { setShowTryon(false); runTryOn(form); }}
-                />
+                <TryOnCustomizer onChange={()=>{}} onComplete={(form) => { setShowTryon(false); runTryOn(form); }} />
               </div>
             </motion.div>
           )}
@@ -487,9 +635,7 @@ export default function DashboardStudio() {
         <AnimatePresence>
           {err && (
             <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
+              initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
               className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm backdrop-blur"
             >
               {err}
@@ -527,6 +673,7 @@ function TopBar({ userName, plan, credits, initials }) {
     </div>
   );
 }
+
 function Logo() {
   return (
     <div className="inline-flex items-center gap-2">
@@ -539,6 +686,7 @@ function Logo() {
     </div>
   );
 }
+
 function BGFX() {
   return (
     <>
@@ -554,11 +702,18 @@ function BGFX() {
     </>
   );
 }
+
 function StepBadge({ phase }) {
   const map = { idle:{label:'Ready',color:'bg-white/10'}, processing:{label:'Processing',color:'bg-indigo-400/20'}, ready:{label:'Done',color:'bg-emerald-400/20'}, error:{label:'Error',color:'bg-rose-400/20'} };
   const it = map[phase] || map.idle;
-  return <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${it.color} border border-white/10`}><span className={`inline-block size-2 rounded-full ${phase==='processing'?'bg-white animate-pulse':'bg-white/70'}`} />{it.label}</span>;
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${it.color} border border-white/10`}>
+      <span className={`inline-block size-2 rounded-full ${phase==='processing'?'bg-white animate-pulse':'bg-white/70'}`} />
+      {it.label}
+    </span>
+  );
 }
+
 function ModeTabs({ mode, setMode }) {
   return (
     <div className="mb-1 flex flex-wrap gap-2">
