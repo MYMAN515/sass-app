@@ -1,16 +1,18 @@
 // pages/blog/new.js
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase } from '@/lib/supabaseClient';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Layout from '@/components/Layout';
 
-const BUCKET = 'blog'; // أنشئ Bucket بهذا الاسم واجعله Public
+const BUCKET = 'blog'; // تأكد إنك عامل Bucket بهذا الاسم ومخليه Public
 
 export default function NewPostPage() {
   const router = useRouter();
+  const supabase = useMemo(() => createPagesBrowserClient(), []);
+
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -23,19 +25,41 @@ export default function NewPostPage() {
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
 
+  // ✅ اقرأ الجلسة من نفس الكوكيز + عالج الرجوع للوجهة المطلوبة
   useEffect(() => {
+    let mounted = true;
+
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted) return;
       setSession(session);
       setLoading(false);
-      if (!session?.user) router.replace('/login');
+
+      if (!session?.user) {
+        const next = encodeURIComponent('/blog/new');
+        router.replace(`/login?next=${next}`);
+      }
     })();
-  }, [router]);
+
+    // تابع تغيّر حالة المصادقة (يساعد بعد تحقق الإيميل/تبدّل الجلسة)
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [supabase, router]);
 
   async function uploadCoverIfNeeded() {
     if (!coverFile) return coverUrl || null;
     const filePath = `covers/${Date.now()}-${coverFile.name}`;
-    const { error } = await supabase.storage.from(BUCKET).upload(filePath, coverFile, { upsert: true });
+    const { error } = await supabase
+      .storage
+      .from(BUCKET)
+      .upload(filePath, coverFile, { upsert: true });
+
     if (error) throw new Error(error.message);
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
     return data.publicUrl;
@@ -46,6 +70,7 @@ export default function NewPostPage() {
     try {
       setSubmitting(true);
       const uploaded = await uploadCoverIfNeeded();
+
       const res = await fetch('/api/blog/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -57,8 +82,10 @@ export default function NewPostPage() {
           cover_url: uploaded
         }),
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
+      if (!res.ok) throw new Error(data.error || 'Failed to create post');
+
       setMsg('تم إرسال المقال للمراجعة ✅');
       setTimeout(() => router.push(`/blog/${data.slug}`), 900);
     } catch (err) {
@@ -68,11 +95,19 @@ export default function NewPostPage() {
     }
   }
 
-  if (loading) return <Layout><div className="max-w-3xl mx-auto p-6">Loading…</div></Layout>;
+  if (loading) {
+    return (
+      <Layout>
+        <div className="max-w-3xl mx-auto p-6">Loading…</div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <Head><title>New Post — AIStore Blog</title></Head>
+      <Head>
+        <title>New Post — AIStore Blog</title>
+      </Head>
 
       <div className="max-w-3xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-bold mb-6">Create a new post</h1>
@@ -80,41 +115,60 @@ export default function NewPostPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm mb-1">Title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required
-              className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60" />
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+            />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm mb-1">Language</label>
-              <select value={language} onChange={(e) => setLanguage(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10"
+              >
                 <option value="en">English</option>
                 <option value="ar">Arabic</option>
               </select>
             </div>
             <div>
               <label className="block text-sm mb-1">Cover Image</label>
-              <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+              />
             </div>
           </div>
 
           <div>
             <label className="block text-sm mb-1">Excerpt (optional)</label>
-            <textarea value={excerpt} onChange={(e) => setExcerpt(e.target.value)}
-              className="w-full h-24 p-3 rounded-2xl bg-white/5 border border-white/10" />
+            <textarea
+              value={excerpt}
+              onChange={(e) => setExcerpt(e.target.value)}
+              className="w-full h-24 p-3 rounded-2xl bg-white/5 border border-white/10"
+            />
           </div>
 
           <div>
             <label className="block text-sm mb-2">Content (Markdown)</label>
-            <textarea value={content} onChange={(e) => setContent(e.target.value)}
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
               placeholder="Write your post in Markdown…"
-              className="w-full h-80 p-4 rounded-2xl bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60" />
+              className="w-full h-80 p-4 rounded-2xl bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+            />
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <button disabled={submitting}
-              className="px-5 py-2 rounded-2xl bg-fuchsia-600 text-white disabled:opacity-60">
+            <button
+              disabled={submitting}
+              className="px-5 py-2 rounded-2xl bg-fuchsia-600 text-white disabled:opacity-60"
+            >
               {submitting ? 'Submitting…' : 'Submit for Review'}
             </button>
             {msg && <span className="text-sm text-gray-300">{msg}</span>}
