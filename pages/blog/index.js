@@ -1,12 +1,14 @@
 // pages/blog/index.js
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import Layout from '@/components/Layout';
+
+const PAGE_SIZE = 9;
 
 function formatDate(iso) {
   try {
@@ -16,6 +18,20 @@ function formatDate(iso) {
   } catch {
     return iso;
   }
+}
+
+function Avatar({ src, name }) {
+  return (
+    <div className="flex items-center gap-2">
+      <img
+        src={src || '/avatar-fallback.png'}
+        alt=""
+        className="w-7 h-7 rounded-full object-cover border border-white/10"
+        onError={(e) => { e.currentTarget.src = '/avatar-fallback.png'; }}
+      />
+      <span className="text-xs text-gray-300">{name || 'AIStore Author'}</span>
+    </div>
+  );
 }
 
 function SkeletonCard() {
@@ -31,7 +47,7 @@ function SkeletonCard() {
   );
 }
 
-function ArticleCard({ p }) {
+function ArticleCard({ p, author }) {
   return (
     <motion.div whileHover={{ y: -4 }} className="group border border-white/10 rounded-2xl overflow-hidden bg-white/5 backdrop-blur">
       <Link href={`/blog/${p.slug}`} className="block">
@@ -56,6 +72,10 @@ function ArticleCard({ p }) {
             {p.title}
           </h2>
           <p className="text-sm text-gray-300 mt-2 line-clamp-3">{p.excerpt}</p>
+
+          <div className="mt-4">
+            <Avatar src={author?.avatar_url} name={author?.full_name} />
+          </div>
         </div>
       </Link>
     </motion.div>
@@ -64,21 +84,68 @@ function ArticleCard({ p }) {
 
 export default function BlogIndex() {
   const [posts, setPosts] = useState([]);
+  const [authors, setAuthors] = useState({}); // { [user_id]: { full_name, avatar_url } }
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const fetchedAuthorIds = useRef(new Set());
+
+  // fetch authors in batches (from profiles table if exists)
+  async function fetchAuthorsFor(postsBatch) {
+    const ids = Array.from(
+      new Set(postsBatch.map(p => p.author_id).filter(Boolean))
+    ).filter(id => !fetchedAuthorIds.current.has(id));
+
+    if (!ids.length) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, avatar_url')
+        .in('user_id', ids);
+
+      if (error) {
+        // profiles table may not exist yet — fail silently
+        return;
+      }
+
+      const map = {};
+      for (const row of data || []) {
+        map[row.user_id] = { full_name: row.full_name, avatar_url: row.avatar_url };
+        fetchedAuthorIds.current.add(row.user_id);
+      }
+      setAuthors(prev => ({ ...prev, ...map }));
+    } catch {
+      // ignore
+    }
+  }
+
+  async function fetchPage(p = 0) {
+    const from = p * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const { data } = await supabase
+      .from('posts')
+      .select('id, author_id, title, slug, excerpt, cover_url, published_at, created_at, language')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .range(from, to);
+
+    const batch = data || [];
+    setPosts(prev => (p === 0 ? batch : [...prev, ...batch]));
+    setHasMore(batch.length === PAGE_SIZE);
+    await fetchAuthorsFor(batch);
+  }
 
   useEffect(() => {
-    const fetchPosts = async () => {
+    (async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from('posts')
-        .select('id, title, slug, excerpt, cover_url, published_at, created_at, language')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false });
-      setPosts(data || []);
+      await fetchPage(0);
+      setPage(0);
       setLoading(false);
-    };
-    fetchPosts();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = useMemo(() => {
@@ -90,6 +157,10 @@ export default function BlogIndex() {
         (p.excerpt || '').toLowerCase().includes(s)
     );
   }, [posts, q]);
+
+  // featured + rest
+  const featured = filtered[0] || null;
+  const rest = featured ? filtered.slice(1) : filtered;
 
   return (
     <Layout>
@@ -106,10 +177,28 @@ export default function BlogIndex() {
         <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-600/10 to-fuchsia-500/10">
           <div className="absolute inset-0 pointer-events-none [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,.12),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(255,255,255,.08),transparent_30%)]" />
           <div className="p-8 sm:p-12">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Blog</h1>
-            <p className="mt-2 text-gray-300 max-w-2xl">
-              Insights, tutorials, and updates to help you craft world-class product visuals.
-            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Blog</h1>
+                <p className="mt-2 text-gray-300 max-w-2xl">
+                  Insights, tutorials, and updates to help you craft world-class product visuals.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Link
+                  href="/blog/new"
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-2xl bg-fuchsia-600 text-white border border-fuchsia-500/40 hover:opacity-90"
+                >
+                  Write a post
+                </Link>
+                <Link
+                  href="/admin/blog"
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10"
+                >
+                  Admin
+                </Link>
+              </div>
+            </div>
 
             <div className="mt-6 max-w-md">
               <input
@@ -120,6 +209,47 @@ export default function BlogIndex() {
               />
             </div>
           </div>
+
+          {/* Featured */}
+          {featured && (
+            <Link href={`/blog/${featured.slug}`} className="block">
+              <div className="px-4 pb-8 sm:px-12">
+                <div className="relative overflow-hidden rounded-2xl border border-white/10">
+                  {featured.cover_url ? (
+                    <img
+                      src={featured.cover_url}
+                      alt=""
+                      className="w-full h-[320px] object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-[320px] bg-gradient-to-br from-fuchsia-600/20 to-violet-600/20" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6">
+                    <div className="flex items-center gap-2 text-xs text-gray-300">
+                      {featured.language && (
+                        <span className="px-2 py-0.5 rounded-full border border-white/10 bg-white/5">
+                          {featured.language}
+                        </span>
+                      )}
+                      {featured.published_at && (
+                        <span>{formatDate(featured.published_at)}</span>
+                      )}
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-semibold mt-2 line-clamp-2">
+                      {featured.title}
+                    </h3>
+                    <div className="mt-3">
+                      <Avatar
+                        src={authors[featured.author_id]?.avatar_url}
+                        name={authors[featured.author_id]?.full_name}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )}
         </div>
       </section>
 
@@ -131,12 +261,36 @@ export default function BlogIndex() {
               <SkeletonCard key={i} />
             ))}
           </div>
-        ) : filtered.length ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((p) => (
-              <ArticleCard key={p.id} p={p} />
-            ))}
-          </div>
+        ) : rest.length ? (
+          <>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {rest.map((p) => (
+                <ArticleCard
+                  key={p.id}
+                  p={p}
+                  author={authors[p.author_id]}
+                />
+              ))}
+            </div>
+
+            {hasMore && (
+              <div className="flex justify-center mt-10">
+                <button
+                  disabled={loadingMore}
+                  onClick={async () => {
+                    setLoadingMore(true);
+                    const next = page + 1;
+                    await fetchPage(next);
+                    setPage(next);
+                    setLoadingMore(false);
+                  }}
+                  className="px-5 py-2 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-60"
+                >
+                  {loadingMore ? 'Loading…' : 'Load more'}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center text-gray-400 py-24">No posts yet.</div>
         )}
