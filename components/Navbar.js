@@ -14,6 +14,7 @@ const LINKS = [
   { href: '/pricing', label: 'Pricing' },
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/history', label: 'History' },
+  { href: '/blog', label: 'Blog' },
 ];
 
 export default function Navbar() {
