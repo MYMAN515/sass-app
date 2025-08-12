@@ -4,11 +4,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import Layout from '@/components/Layout';
 import EnhanceCustomizer from '@/components/EnhanceCustomizer';
 import TryOnCustomizer from '@/components/TryOnCustomizer';
 import generateDynamicPrompt, { generateTryOnNegativePrompt } from '@/lib/generateDynamicPrompt';
+import ExportDrawer from '@/components/ExportDrawer';
 
 /* ---------- utils ---------- */
 const hexToRGBA = (hex, a = 1) => {
@@ -40,10 +41,10 @@ const TOOLS = [
 
 export default function DashboardStudio() {
   const router = useRouter();
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const supabase = useSupabaseClient();
+  const user = useUser(); // null (غير مسجل) | object (مسجل) | undefined (جارِ التحميل)
 
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
   const [plan, setPlan] = useState('Free');
   const [credits, setCredits] = useState(0);
   const [err, setErr] = useState('');
@@ -79,25 +80,26 @@ export default function DashboardStudio() {
   const [showEnhance, setShowEnhance] = useState(false);
   const [showTryon, setShowTryon] = useState(false);
 
+  // Export drawer
+  const [exportOpen, setExportOpen] = useState(false);
+
   /* ---------- auth + workspace ---------- */
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!mounted) return;
-      if (!session?.user) { router.replace('/login'); return; }
-      setUser(session.user);
-
+      if (user === undefined) return; // ما زال يحمّل من الـProvider
+      if (!user) { router.replace('/login'); return; }
       try {
-        const { data } = await supabase.from('Data').select('plan, credits').eq('email', session.user.email).single();
+        const { data } = await supabase.from('Data').select('plan, credits').eq('email', user.email).single();
+        if (!mounted) return;
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
       } catch {
         setErr('Failed to load workspace.');
-      } finally { setLoading(false); }
+      } finally { if (mounted) setLoading(false); }
     })();
     return () => { mounted = false; };
-  }, [supabase, router]);
+  }, [user, router, supabase]);
 
   // refresh credits on demand
   useEffect(() => {
@@ -195,7 +197,6 @@ export default function DashboardStudio() {
     return '';
   };
 
-  // build enhance prompt (إذا احتجته السيرفر)
   const buildEnhancePrompt = (f) =>
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
@@ -287,21 +288,18 @@ export default function DashboardStudio() {
   }, [active, file, runRemoveBg]);
 
   /* ---------- download helpers ---------- */
-  // helper download from dataURL
   const downloadDataUrl = (dataUrl, name = 'studio-output.png') => {
     const a = document.createElement('a');
     a.href = dataUrl; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
   };
 
-  // compose background for removeBg and export as PNG reflecting inspector options
   const downloadRemoveBgPng = async () => {
     if (!resultUrl) return;
 
     const blob = await fetch(resultUrl, { cache: 'no-store' }).then(r => r.blob());
     const bmp  = await createImageBitmap(blob);
 
-    // canvas sized by image while adding padding without upscaling
     const padPx = Math.round(Math.max(bmp.width, bmp.height) * (padding / 300));
     const cw = bmp.width  + padPx * 2;
     const ch = bmp.height + padPx * 2;
@@ -312,7 +310,6 @@ export default function DashboardStudio() {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // background
     if (bgMode === 'color') {
       ctx.fillStyle = color; ctx.fillRect(0, 0, cw, ch);
     } else if (bgMode === 'gradient') {
@@ -329,7 +326,6 @@ export default function DashboardStudio() {
       }
     }
 
-    // rounded frame (radius)
     if (radius > 0) {
       const r = radius;
       ctx.save();
@@ -343,10 +339,8 @@ export default function DashboardStudio() {
       ctx.clip();
     }
 
-    // draw image centered with padding, no upscaling beyond original
     ctx.drawImage(bmp, padPx, padPx);
 
-    // soft shadow (outside)
     if (shadow) {
       ctx.globalCompositeOperation = 'destination-over';
       ctx.shadowColor = 'rgba(0,0,0,.28)';
@@ -357,11 +351,10 @@ export default function DashboardStudio() {
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    const url = canvas.toDataURL('image/png'); // ✅ always PNG
+    const url = canvas.toDataURL('image/png');
     downloadDataUrl(url, 'studio-output.png');
   };
 
-  // generic: just re-encode the result as PNG (no scaling)
   const downloadResultAsPng = async () => {
     if (!resultUrl) return;
     const img = await fetch(resultUrl).then(r => r.blob()).then(createImageBitmap);
@@ -375,7 +368,7 @@ export default function DashboardStudio() {
   };
 
   /* ---------- UI ---------- */
-  if (loading || !user) {
+  if (loading || user === undefined) {
     return (
       <Layout title="Studio">
         <main className="min-h-screen bg-[#0b0519] text-white grid place-items-center">
@@ -384,6 +377,7 @@ export default function DashboardStudio() {
       </Layout>
     );
   }
+  if (!user) return null;
 
   const initials = (() => {
     const n = user?.user_metadata?.name || user?.email || 'U';
@@ -395,7 +389,16 @@ export default function DashboardStudio() {
     <Layout title="Studio">
       <main className="min-h-screen relative overflow-hidden bg-[radial-gradient(90%_80%_at_50%_-10%,#221a42_0%,#0b0b14_55%,#05060a_100%)] text-white">
         <BGFX />
-        <TopBar userName={user.user_metadata?.name || user.email} plan={plan} credits={credits} initials={initials} />
+
+        {/* Top Bar مع زر Export */}
+        <TopBar
+          userName={user.user_metadata?.name || user.email}
+          plan={plan}
+          credits={credits}
+          initials={initials}
+          canExport={!!resultUrl}
+          onExportClick={() => setExportOpen(true)}
+        />
 
         <section className="max-w-7xl mx-auto px-4 md:px-8 pb-20">
           <div className="grid gap-6 md:grid-cols-[220px_1fr_320px]">
@@ -419,9 +422,9 @@ export default function DashboardStudio() {
               </div>
             </aside>
 
-            {/* Canvas - fully responsive, no cropping */}
+            {/* Canvas */}
             <section className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3">
-              <div className="flex items-center justify-between px-1 pb-2">
+              <div className="flex itemscenter justify-between px-1 pb-2">
                 <div className="text-sm font-semibold">{TOOLS.find(t => t.id === active)?.label}</div>
                 <StepBadge phase={phase} />
               </div>
@@ -477,7 +480,7 @@ export default function DashboardStudio() {
                 {err && <div className="text-xs text-rose-300">{err}</div>}
               </div>
 
-              {/* Response (mobile-friendly, collapsible) */}
+              {/* Response (collapsible) */}
               {apiResponse && (
                 <div className="mt-4">
                   <button
@@ -602,6 +605,17 @@ export default function DashboardStudio() {
           )}
         </AnimatePresence>
 
+        {/* NEW — Export Drawer */}
+        <ExportDrawer
+          open={exportOpen}
+          onClose={() => setExportOpen(false)}
+          cutoutUrl={resultUrl}       // الناتج (الأفضل يكون شفاف من Remove BG)
+          defaultName="product"       // بدّلها لـ SKU عندك
+          // استخدم خلفية المصمم الحالية بدل الخلفية الافتراضية للقالب:
+          // useCurrentBg={bgMode === 'color'}
+          // currentBgColor={color}
+        />
+
         {/* toast */}
         <AnimatePresence>
           {err && (
@@ -617,7 +631,7 @@ export default function DashboardStudio() {
 }
 
 /* ---------- small UI ---------- */
-function TopBar({ userName, plan, credits, initials }) {
+function TopBar({ userName, plan, credits, initials, canExport = false, onExportClick }) {
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 pt-6">
       <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md px-4 sm:px-6 py-3">
@@ -635,8 +649,23 @@ function TopBar({ userName, plan, credits, initials }) {
             Credits: <strong className="font-semibold">{credits}</strong>
           </span>
         </div>
-        <div className="inline-flex items-center justify-center size-9 rounded-full bg-white/10 border border-white/15 font-bold">
-          {initials}
+
+        <div className="flex items-center gap-2">
+          {/* زر Export */}
+          <button
+            onClick={onExportClick}
+            disabled={!canExport}
+            title={canExport ? 'Export for marketplaces' : 'Run a tool first to enable export'}
+            className="hidden sm:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 
+                       hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition
+                       disabled:opacity-50"
+          >
+            ⬇ Export
+          </button>
+
+          <div className="inline-flex items-center justify-center size-9 rounded-full bg-white/10 border border-white/15 font-bold">
+            {initials}
+          </div>
         </div>
       </div>
     </div>
