@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
+// 👇 نستوردهم مثل قبل (تأكد الملفات موجودة بمكانها)
 import EnhanceCustomizer from '@/components/EnhanceCustomizer';
 import TryOnCustomizer from '@/components/TryOnCustomizer';
 import ExportDrawer from '@/components/ExportDrawer';
@@ -29,6 +30,110 @@ const fileToDataURLOriginal = (file) =>
 
 const STORAGE_BUCKET = 'img';
 
+/* ---------------- Presets (الصور في مجلد /public مباشرة) ---------------- */
+// ضع هذه الملفات في /public:
+// - /enhance-clean-studio.webp
+// - /enhance-desert-tones.webp
+// - /enhance-editorial-beige.webp
+// - /enhance-slate-contrast.webp
+// - /tryon-streetwear.webp
+// - /tryon-ecom.webp
+// - /tryon-lifestyle.webp
+// - /tryon-outdoor.webp
+const ENHANCE_PRESETS = [
+  {
+    id: 'clean-studio',
+    title: 'Clean Studio',
+    subtitle: 'Soft light • white sweep',
+    config: {
+      photographyStyle: 'studio product photography, 50mm',
+      background: 'white seamless',
+      lighting: 'softbox, gentle reflections',
+      colorStyle: 'neutral whites, subtle grays',
+      realism: 'hyperrealistic details',
+      outputQuality: '4k sharp',
+    },
+    preview: '/enhance-clean-studio.webp',
+    badge: 'Popular',
+  },
+  {
+    id: 'desert-tones',
+    title: 'Desert Tones',
+    subtitle: 'Warm • cinematic',
+    config: {
+      photographyStyle: 'cinematic product shot',
+      background: 'warm beige backdrop',
+      lighting: 'golden hour, soft shadows',
+      colorStyle: 'sand, beige, amber',
+      realism: 'photo-real, crisp textures',
+      outputQuality: '4k',
+    },
+    preview: '/enhance-desert-tones.webp',
+  },
+  {
+    id: 'editorial-beige',
+    title: 'Editorial Beige',
+    subtitle: 'Minimal • magazine look',
+    config: {
+      photographyStyle: 'editorial catalog',
+      background: 'matte beige',
+      lighting: 'directional key + fill',
+      colorStyle: 'beige monochrome',
+      realism: 'realistic',
+      outputQuality: '4k print',
+    },
+    preview: '/enhance-editorial-beige.webp',
+  },
+  {
+    id: 'slate-contrast',
+    title: 'Slate Contrast',
+    subtitle: 'Dark slate • specular',
+    config: {
+      photographyStyle: 'premium product hero',
+      background: 'charcoal slate plate',
+      lighting: 'specular rim + soft key',
+      colorStyle: 'cool neutrals, deep blacks',
+      realism: 'hyperrealistic micro-details',
+      outputQuality: '4k ecom',
+    },
+    preview: '/enhance-slate-contrast.webp',
+    badge: 'High-contrast',
+  },
+];
+
+const TRYON_PRESETS = [
+  {
+    id: 'streetwear',
+    title: 'Streetwear',
+    subtitle: 'Urban • moody',
+    config: { style: 'streetwear fit', setting: 'urban alley', lighting: 'overcast soft', mood: 'cool, editorial' },
+    preview: '/tryon-streetwear.webp',
+    badge: 'Model',
+  },
+  {
+    id: 'ecom-mannequin',
+    title: 'E-Com Mannequin',
+    subtitle: 'Plain white',
+    config: { style: 'ecommerce mannequin front', setting: 'white cyclorama', lighting: 'soft studio', mood: 'catalog clean' },
+    preview: '/tryon-ecom.webp',
+  },
+  {
+    id: 'lifestyle',
+    title: 'Lifestyle',
+    subtitle: 'Sunlit room',
+    config: { style: 'lifestyle casual', setting: 'bright apartment', lighting: 'window soft', mood: 'fresh & bright' },
+    preview: '/tryon-lifestyle.webp',
+    badge: 'Natural',
+  },
+  {
+    id: 'outdoor',
+    title: 'Outdoor',
+    subtitle: 'Park • daylight',
+    config: { style: 'casual outdoor', setting: 'green park path', lighting: 'daylight', mood: 'friendly & open' },
+    preview: '/tryon-outdoor.webp',
+  },
+];
+
 /* ---------------- Tools ---------------- */
 const TOOLS = [
   { id: 'removeBg', label: 'Remove BG', icon: ScissorsIcon },
@@ -45,7 +150,7 @@ export default function DashboardStudio() {
   /* ---------- state ---------- */
   const [loading, setLoading] = useState(true);
 
-  // نقرأهم فقط لاستخدام شرط زر Home — بدون عرضهم في الواجهة
+  // نستخدمهم فقط لزر Home — غير معروضين UI
   const [plan, setPlan] = useState('Free');
   const [credits, setCredits] = useState(0);
 
@@ -60,7 +165,7 @@ export default function DashboardStudio() {
   const [imageData, setImageData] = useState(''); // removeBg only
   const [resultUrl, setResultUrl] = useState('');
 
-  // removeBg inspector
+  // BG inspector
   const [bgMode, setBgMode] = useState('color');   // color | gradient | pattern
   const [color, setColor] = useState('#ffffff');
   const [color2, setColor2] = useState('#f1f5f9');
@@ -76,8 +181,13 @@ export default function DashboardStudio() {
   const [respOpen, setRespOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
-  // presets → ألغيناها بالكامل حسب طلبك، نعتمد فقط على الـ Customizers
-  // backend model (from API, NOT hardcoded here)
+  // Customizers
+  const [showEnhance, setShowEnhance] = useState(false);
+  const [showTryOn, setShowTryOn] = useState(false);
+  const [enhanceInitial, setEnhanceInitial] = useState(null);
+  const [tryonInitial, setTryonInitial] = useState(null);
+
+  // backend model (من API)
   const [models, setModels] = useState([]); // [{id,name,tags,desc,recommendFor}]
   const [backendModel, setBackendModel] = useState('');
 
@@ -95,7 +205,7 @@ export default function DashboardStudio() {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
 
-      // 1) fetch plan/credits/model لهذا المستخدم — بالاعتماد على user_id
+      // 1) fetch plan/credits/model لهذا المستخدم
       try {
         const { data } = await supabase
           .from('Data')
@@ -109,7 +219,7 @@ export default function DashboardStudio() {
         setBackendModel(data?.model_backend || '');
       } catch {/* ignore */}
 
-      // 2) fetch model options من API (لا تعتمد على ثابت)
+      // 2) fetch models من API
       try {
         const res = await fetch('/api/models', { cache: 'no-store' });
         if (res.ok) {
@@ -124,7 +234,7 @@ export default function DashboardStudio() {
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
-  // credits live refresh (optional) — بدون عرض مباشر
+  // live credits refresh (اختياري)
   useEffect(() => {
     const h = async () => {
       if (!user?.id) return;
@@ -161,8 +271,8 @@ export default function DashboardStudio() {
   const handleRun = useCallback(() => {
     if (active !== 'modelSwap' && !file) { setErr('اختر صورة أولاً'); return; }
     if (active === 'removeBg') return runRemoveBg();
-    if (active === 'enhance')  return setShowEnhance(true);
-    if (active === 'tryon')    return setShowTryOn(true);
+    if (active === 'enhance')  { setEnhanceInitial(null); return setShowEnhance(true); }
+    if (active === 'tryon')    { setTryonInitial(null); return setShowTryOn(true); }
   }, [active, file]); // runRemoveBg مستقل
 
   useEffect(() => {
@@ -302,9 +412,14 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl, backendModel]);
 
-  /* ---------- modals ---------- */
-  const [showEnhance, setShowEnhance] = useState(false);
-  const [showTryOn, setShowTryOn] = useState(false);
+  const openEnhancePreset = (presetConfig) => {
+    setEnhanceInitial(presetConfig || null);
+    setShowEnhance(true);
+  };
+  const openTryOnPreset = (presetConfig) => {
+    setTryonInitial(presetConfig || null);
+    setShowTryOn(true);
+  };
 
   /* ---------- download helpers ---------- */
   const downloadDataUrl = (dataUrl, name = 'studio-output.png') => {
@@ -344,8 +459,8 @@ export default function DashboardStudio() {
       const r = radius;
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(r,0); ctx.arcTo(cw,0,cw,ch,r); ctx.arcTo(cw,ch,0,ch,r);
-      ctx.arcTo(0,ch,0,0,r); ctx.arcTo(0,0,cw,0,r); ctx.closePath(); ctx.clip();
+      ctx.moveTo(r,0); ctx.arcTo(cw,0,cw,ch,r); ctx.arcTo(cw,ch,0,0,r);
+      ctx.arcTo(0,0,cw,0,r); ctx.closePath(); ctx.clip();
     }
 
     ctx.drawImage(bmp, padPx, padPx);
@@ -455,7 +570,7 @@ export default function DashboardStudio() {
         </div>
       )}
 
-      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 px-4 md:px-6 py-6">
+      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 px-4 md:px-6 py-6">
         {/* ===== Left Sidebar (بدون Navbar/Footer) ===== */}
         <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-4 self-start h-fit">
           <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
@@ -495,16 +610,9 @@ export default function DashboardStudio() {
 
           <div className="mt-2 px-4 py-3 border-t border-slate-200">
             <div className="flex items-center gap-3">
-              <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">
-                {(() => {
-                  const n = user?.user_metadata?.name || user?.email || 'U';
-                  const p = n.split(' ').filter(Boolean);
-                  return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
-                })()}
-              </div>
+              <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">{initials}</div>
               <div className="text-sm">
-                <div className="font-medium leading-tight truncate max-w-[140px]">{user.user_metadata?.name || user.email}</div>
-                {/* لا نعرض Plan/Credits حسب طلبك */}
+                <div className="font-medium leading-tight truncate max-w-[160px]">{user.user_metadata?.name || user.email}</div>
               </div>
             </div>
           </div>
@@ -512,8 +620,65 @@ export default function DashboardStudio() {
 
         {/* ===== Main Column ===== */}
         <section className="space-y-6">
-          {/* Workbench فقط (بدون Presets) */}
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+          {/* Presets Row (Enhance + Try-On) */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 md:p-7 shadow-sm">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Quick Start</h1>
+                <p className="text-slate-600 text-sm">اختر Preset جاهز أو افتح Customize لضبط الإعدادات يدويًا.</p>
+              </div>
+              <div className="text-[11px] rounded-full border px-3 py-1 bg-slate-50">
+                Current Model: <span className="font-semibold">{models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
+              </div>
+            </div>
+
+            {/* Enhance presets */}
+            <div className="mt-4">
+              <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
+              <div className="flex gap-3 overflow-x-auto pb-1 snap-x">
+                {ENHANCE_PRESETS.map(p => (
+                  <PresetCard
+                    key={p.id}
+                    title={p.title}
+                    subtitle={p.subtitle}
+                    preview={p.preview}
+                    badge={p.badge}
+                    onClick={() => { setActive('enhance'); openEnhancePreset(p.config); }}
+                  />
+                ))}
+                <CustomizeCard
+                  label="Customize"
+                  hint="Open Enhance settings"
+                  onClick={() => { setActive('enhance'); setEnhanceInitial(null); setShowEnhance(true); }}
+                />
+              </div>
+            </div>
+
+            {/* Try-On presets */}
+            <div className="mt-6">
+              <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
+              <div className="flex gap-3 overflow-x-auto pb-1 snap-x">
+                {TRYON_PRESETS.map(p => (
+                  <PresetCard
+                    key={p.id}
+                    title={p.title}
+                    subtitle={p.subtitle}
+                    preview={p.preview}
+                    badge={p.badge}
+                    onClick={() => { setActive('tryon'); openTryOnPreset(p.config); }}
+                  />
+                ))}
+                <CustomizeCard
+                  label="Customize"
+                  hint="Open Try-On settings"
+                  onClick={() => { setActive('tryon'); setTryonInitial(null); setShowTryOn(true); }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Workbench */}
+          <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
             {/* Canvas Panel */}
             <section className="rounded-3xl border border-slate-200 bg-white shadow-sm relative">
               {/* header */}
@@ -713,7 +878,7 @@ export default function DashboardStudio() {
 
               {active === 'enhance' && (
                 <div className="space-y-2 text-xs text-slate-600">
-                  <div>اضغط <span className="font-semibold">Run</span> لفتح نافذة الإعدادات.</div>
+                  <div>اختر Preset من الأعلى أو اضغط <span className="font-semibold">Run</span>/<span className="font-semibold">Customize</span> لفتح الإعدادات.</div>
                   <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
                   {resultUrl && (
                     <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
@@ -727,7 +892,7 @@ export default function DashboardStudio() {
 
               {active === 'tryon' && (
                 <div className="space-y-2 text-xs text-slate-600">
-                  <div>اضغط <span className="font-semibold">Run</span> لفتح إعدادات الـ Try-On.</div>
+                  <div>اختر Preset أو افتح <span className="font-semibold">Customize</span> لضبط تفاصيل الـ Try-On.</div>
                   <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
                   {resultUrl && (
                     <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
@@ -784,8 +949,9 @@ export default function DashboardStudio() {
             <div className="absolute inset-0 bg-black/55" onClick={()=>setShowEnhance(false)} />
             <div className="relative w-full max-w-3xl mx-4">
               <EnhanceCustomizer
+                initial={enhanceInitial || undefined}
                 onChange={()=>{}}
-                onComplete={(form) => { setShowEnhance(false); runEnhance(form || {}); }}
+                onComplete={(form) => { setShowEnhance(false); setEnhanceInitial(null); runEnhance(form || {}); }}
               />
             </div>
           </motion.div>
@@ -796,8 +962,9 @@ export default function DashboardStudio() {
             <div className="absolute inset-0 bg-black/55" onClick={()=>setShowTryOn(false)} />
             <div className="relative w-full max-w-3xl mx-4">
               <TryOnCustomizer
+                initial={tryonInitial || undefined}
                 onChange={()=>{}}
-                onComplete={(form) => { setShowTryOn(false); runTryOn(form || {}); }}
+                onComplete={(form) => { setShowTryOn(false); setTryonInitial(null); runTryOn(form || {}); }}
               />
             </div>
           </motion.div>
@@ -884,6 +1051,46 @@ function Segmented({ items, value, onChange }) {
         );
       })}
     </div>
+  );
+}
+
+function PresetCard({ title, subtitle, preview, onClick, badge }) {
+  return (
+    <button
+      onClick={onClick}
+      className="snap-start min-w-[240px] sm:min-w-[260px] group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left"
+    >
+      <div className="relative">
+        <img src={preview} alt={title} className="h-36 w-full object-cover" loading="lazy" />
+        {badge && (
+          <div className="absolute top-2 left-2 rounded-full bg-black/50 text-white text-[10px] px-2 py-0.5 backdrop-blur">
+            {badge}
+          </div>
+        )}
+        <div className="absolute top-2 right-2 rounded-full bg-white/80 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
+          Use preset
+        </div>
+      </div>
+      <div className="p-3">
+        <div className="font-semibold">{title}</div>
+        <div className="text-xs text-slate-500">{subtitle}</div>
+      </div>
+    </button>
+  );
+}
+
+function CustomizeCard({ label='Customize', hint='Open settings', onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="snap-start min-w-[240px] sm:min-w-[260px] rounded-2xl border-2 border-dashed border-slate-300 text-left bg-slate-50 hover:bg-slate-100 transition grid place-items-center"
+    >
+      <div className="p-5 text-center">
+        <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white border border-slate-200">⚙️</div>
+        <div className="font-semibold">{label}</div>
+        <div className="text-[11px] text-slate-500">{hint}</div>
+      </div>
+    </button>
   );
 }
 
