@@ -30,38 +30,6 @@ const fileToDataURLOriginal = (file) =>
 
 const STORAGE_BUCKET = 'img';
 
-/* ---------------- Models (backend choices) ---------------- */
-const BACKENDS = [
-  {
-    id: 'flux-pro',
-    name: 'FLUX Pro',
-    tags: ['Quality', 'Ads'],
-    desc: 'جودة إعلان عالية (أبطأ/أغلى)',
-    recommendFor: ['enhance'],
-  },
-  {
-    id: 'flux-dev',
-    name: 'FLUX Dev',
-    tags: ['Fast', 'Cheap'],
-    desc: 'سريع وعملي للدفعات',
-    recommendFor: ['enhance', 'tryon'],
-  },
-  {
-    id: 'sdxl-turbo',
-    name: 'SDXL Turbo',
-    tags: ['Realtime'],
-    desc: 'فوريّ تقريبًا، أفضل للمعاينات',
-    recommendFor: ['enhance'],
-  },
-  {
-    id: 'instant-id',
-    name: 'Instant-ID',
-    tags: ['Face', 'Consistency'],
-    desc: 'ثبات الوجه/الهوية لجلسات Try-On',
-    recommendFor: ['tryon'],
-  },
-];
-
 /* ---------------- Presets ---------------- */
 const ENHANCE_PRESETS = [
   {
@@ -156,9 +124,9 @@ const TOOLS = [
 ];
 
 export default function DashboardStudio() {
-  const router = useRouter();
   const supabase = useSupabaseClient();
   const user = useUser();
+  const router = useRouter();
 
   /* ---------- state ---------- */
   const [loading, setLoading] = useState(true);
@@ -166,7 +134,7 @@ export default function DashboardStudio() {
   const [credits, setCredits] = useState(0);
   const [err, setErr] = useState('');
 
-  const [active, setActive] = useState('enhance'); // default to Enhance
+  const [active, setActive] = useState('enhance'); // default
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
 
@@ -196,10 +164,16 @@ export default function DashboardStudio() {
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [pendingTryOnPreset, setPendingTryOnPreset] = useState(null);
 
-  // backend model (Model Swap)
-  const [backendModel, setBackendModel] = useState('flux-pro');
+  // backend model (from API, NOT hardcoded here)
+  const [models, setModels] = useState([]); // [{id,name,tags,desc,recommendFor}]
+  const [backendModel, setBackendModel] = useState('');
+
+  // compare overlay
+  const [compare, setCompare] = useState(false);
+  const [compareOpacity, setCompareOpacity] = useState(50);
 
   const dropRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   /* ---------- auth & workspace ---------- */
   useEffect(() => {
@@ -207,6 +181,8 @@ export default function DashboardStudio() {
     (async () => {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
+
+      // 1) fetch plan/credits/model from Supabase once (single client via hook)
       try {
         const { data } = await supabase
           .from('Data')
@@ -218,58 +194,87 @@ export default function DashboardStudio() {
 
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
-
-        // pull saved backend model if exists
-        if (data?.model_backend) setBackendModel(data.model_backend);
+        setBackendModel(data?.model_backend || '');
       } catch {
-        // ignore
-      } finally {
-        if (mounted) setLoading(false);
+        // ignore – keep defaults
       }
+
+      // 2) fetch model options from your API (no constants here)
+      try {
+        const res = await fetch('/api/models', { cache: 'no-store' });
+        if (res.ok) {
+          const arr = await res.json();
+          if (Array.isArray(arr)) setModels(arr);
+          if (!backendModel && Array.isArray(arr) && arr[0]?.id) setBackendModel(arr[0].id);
+        }
+      } catch {/* ignore */}
+
+      if (mounted) setLoading(false);
     })();
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
+  // credits live refresh (optional)
   useEffect(() => {
     const h = async () => {
       if (!user?.email) return;
       const { data } = await supabase.from('Data').select('credits').eq('email', user.email).single();
       if (typeof data?.credits === 'number') setCredits(data.credits);
     };
-    window.addEventListener('credits:refresh', h);
-    return () => window.removeEventListener('credits:refresh', h);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('credits:refresh', h);
+      return () => window.removeEventListener('credits:refresh', h);
+    }
   }, [supabase, user]);
 
-  /* ---------- drag & drop ---------- */
+  /* ---------- drag & drop + paste ---------- */
   useEffect(() => {
     const el = dropRef.current; if (!el) return;
     const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-indigo-400'); };
     const leave = () => el.classList.remove('ring-2','ring-indigo-400');
     const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
     el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
-    return () => { el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop); };
+
+    const onPaste = async (e) => {
+      const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
+      const f = item?.getAsFile?.(); if (f) await onPick(f);
+    };
+    window.addEventListener('paste', onPaste);
+
+    return () => {
+      el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop);
+      window.removeEventListener('paste', onPaste);
+    };
   }, []);
+
+  /* ---------- keyboard shortcuts ---------- */
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleRun(); }
+      if (e.key >= '1' && e.key <= '4') {
+        const index = Number(e.key) - 1;
+        setActive(TOOLS[index]?.id || 'enhance');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleRun]);
 
   /* ---------- reset on tool switch ---------- */
   useEffect(() => {
-    setFile(null);
-    setLocalUrl('');
+    setPhase('idle'); setErr(''); setApiResponse(null);
+    // لا نمسح الملف عند التنقل بين الأدوات باستثناء modelSwap
+    if (active === 'modelSwap') return;
     setResultUrl('');
     setImageData('');
-    setPhase('idle');
-    setErr('');
-    setApiResponse(null);
   }, [active]);
 
   const onPick = async (f) => {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
     setResultUrl(''); setPhase('idle'); setErr(''); setApiResponse(null);
-    if (active === 'removeBg') {
-      setImageData(await fileToDataURLOriginal(f));
-    } else {
-      setImageData('');
-    }
+    if (active === 'removeBg') setImageData(await fileToDataURLOriginal(f));
   };
 
   /* ---------- styles ---------- */
@@ -322,40 +327,25 @@ export default function DashboardStudio() {
     return data.publicUrl;
   }, [file, supabase, user]);
 
-  /* ---------- history save (optional) ---------- */
-  const saveHistoryRow = useCallback(async (tool, inputThumb, outputUrl) => {
-    try {
-      if (!user) return;
-      await supabase.from('History').insert({
-        user_id: user.id,
-        tool,
-        input_url: inputThumb,
-        output_url: outputUrl,
-        ts: new Date().toISOString(),
-      });
-    } catch { /* ignore */ }
-  }, [supabase, user]);
-
   /* ---------- actions ---------- */
   const runRemoveBg = useCallback(async () => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
       const r = await fetch('/api/remove-bg', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData, backendModel }), // pass backend for parity
+        body: JSON.stringify({ imageData, backendModel }),
       });
       const j = await r.json(); setApiResponse(j);
       if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from remove-bg');
       setResultUrl(out);
       setHistory(h => [{ tool:'removeBg', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
-      saveHistoryRow('removeBg', localUrl, out);
       setPhase('ready');
       window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
       console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
     } finally { setBusy(false); }
-  }, [imageData, localUrl, backendModel, saveHistoryRow]);
+  }, [imageData, localUrl, backendModel]);
 
   const runEnhance = useCallback(async (selections) => {
     setBusy(true); setErr(''); setPhase('processing');
@@ -371,12 +361,11 @@ export default function DashboardStudio() {
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from enhance');
       setResultUrl(out);
       setHistory(h => [{ tool:'enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
-      saveHistoryRow('enhance', localUrl, out);
       setPhase('ready'); window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
       console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
     } finally { setBusy(false); }
-  }, [uploadToStorage, plan, user, localUrl, backendModel, saveHistoryRow]);
+  }, [uploadToStorage, plan, user, localUrl, backendModel]);
 
   const runTryOn = useCallback(async (selections) => {
     setBusy(true); setErr(''); setPhase('processing');
@@ -393,19 +382,17 @@ export default function DashboardStudio() {
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
       setResultUrl(out);
       setHistory(h => [{ tool:'tryon', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
-      saveHistoryRow('tryon', localUrl, out);
       setPhase('ready'); window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
       console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
     } finally { setBusy(false); }
-  }, [uploadToStorage, plan, user, localUrl, backendModel, saveHistoryRow]);
+  }, [uploadToStorage, plan, user, localUrl, backendModel]);
 
   const handleRun = useCallback(() => {
-    if (!file && active !== 'modelSwap') { setErr('اختر صورة أولاً'); return; }
+    if (active !== 'modelSwap' && !file) { setErr('اختر صورة أولاً'); return; }
     if (active === 'removeBg') return runRemoveBg();
     if (active === 'enhance')  return setShowEnhance(true);
     if (active === 'tryon')    return setShowTryOn(true);
-    if (active === 'modelSwap') return; // nothing to run here
   }, [active, file, runRemoveBg]);
 
   /* ---------- modals ---------- */
@@ -475,6 +462,15 @@ export default function DashboardStudio() {
     downloadDataUrl(canvas.toDataURL('image/png'), 'studio-output.png');
   };
 
+  const copyUrl = async () => {
+    if (!resultUrl) return;
+    try { await navigator.clipboard.writeText(resultUrl); setErr('✔ تم نسخ الرابط'); setTimeout(()=>setErr(''),1500); } catch {}
+  };
+
+  const resetAll = () => {
+    setFile(null); setLocalUrl(''); setResultUrl(''); setImageData(''); setErr(''); setPhase('idle'); setApiResponse(null); setCompare(false);
+  };
+
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
     return (
@@ -493,10 +489,10 @@ export default function DashboardStudio() {
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
 
-  /* ---------- Model Swap (panel) ---------- */
+  /* ---------- Model Swap (panel from API) ---------- */
   const ModelSwapPanel = () => (
     <div className="grid gap-3 sm:grid-cols-2">
-      {BACKENDS.map(b => {
+      {models?.length ? models.map((b) => {
         const selected = backendModel === b.id;
         return (
           <button
@@ -515,24 +511,31 @@ export default function DashboardStudio() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="font-semibold">{b.name}</div>
-                <div className="text-xs text-slate-600">{b.desc}</div>
+                {b.desc && <div className="text-xs text-slate-600">{b.desc}</div>}
               </div>
               {selected && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600 text-white">Active</span>}
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              {b.tags.map(t => (
-                <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">{t}</span>
-              ))}
-            </div>
-            <div className="mt-2 text-[11px] text-slate-500">
-              Recommended for: {b.recommendFor.join(', ')}
-            </div>
+            {Array.isArray(b.tags) && b.tags.length > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                {b.tags.map(t => (
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">{t}</span>
+                ))}
+              </div>
+            )}
+            {Array.isArray(b.recommendFor) && (
+              <div className="mt-2 text-[11px] text-slate-500">
+                Recommended: {b.recommendFor.join(', ')}
+              </div>
+            )}
           </button>
         );
-      })}
+      }) : (
+        <div className="text-xs text-slate-500">No models from API.</div>
+      )}
     </div>
   );
 
+  /* ---------- View ---------- */
   return (
     <Layout title="Studio">
       <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -599,7 +602,7 @@ export default function DashboardStudio() {
                   <p className="text-slate-600 text-sm">اختر إعداد جاهز — يفتح لك النافذة مع القيم المعبأة.</p>
                 </div>
                 <div className="text-xs rounded-full border px-3 py-1 bg-slate-50">
-                  Current Model: <span className="font-semibold">{BACKENDS.find(b=>b.id===backendModel)?.name || backendModel}</span>
+                  Current Model: <span className="font-semibold">{models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
                 </div>
               </div>
 
@@ -612,7 +615,7 @@ export default function DashboardStudio() {
                       title={p.title}
                       subtitle={p.subtitle}
                       gradient={p.gradient}
-                      onClick={() => { setPendingEnhancePreset(p.config); setActive('enhance'); setShowEnhance(true); }}
+                      onClick={() => { setActive('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
                     />
                   ))}
                 </div>
@@ -627,7 +630,7 @@ export default function DashboardStudio() {
                       title={p.title}
                       subtitle={p.subtitle}
                       gradient={p.gradient}
-                      onClick={() => { setPendingTryOnPreset(p.config); setActive('tryon'); setShowTryOn(true); }}
+                      onClick={() => { setActive('tryon'); setPendingTryOnPreset(p.config); setShowTryOn(true); }}
                     />
                   ))}
                 </div>
@@ -637,11 +640,14 @@ export default function DashboardStudio() {
             {/* Workbench */}
             <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
               {/* Canvas Panel */}
-              <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <section className="rounded-3xl border border-slate-200 bg-white shadow-sm relative">
                 {/* header */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-4">
                   <Segmented items={TOOLS} value={active} onChange={setActive} />
-                  <StepBadge phase={phase} />
+                  <div className="flex items-center gap-2">
+                    <StepBadge phase={phase} />
+                    <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50">Reset</button>
+                  </div>
                 </div>
 
                 {/* dropzone / model swap content */}
@@ -649,26 +655,36 @@ export default function DashboardStudio() {
                   <div
                     ref={dropRef}
                     className="m-4 md:m-5 min-h-[280px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                    onClick={() => document.getElementById('file-input')?.click()}
-                    title="Drag & drop or click to upload"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Drag & drop / Click / Paste (Ctrl+V)"
                   >
                     <input
-                      id="file-input" type="file" accept="image/*" className="hidden"
+                      ref={fileInputRef}
+                      type="file" accept="image/*" className="hidden"
                       onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
                     />
                     {!localUrl && !resultUrl ? (
                       <div className="text-center text-slate-500 text-sm">
                         <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white border border-slate-200">⬆</div>
-                        Drag & drop an image here, or click to choose
+                        Drag & drop an image here, click to choose, or paste (Ctrl+V)
                       </div>
                     ) : (
                       <div className="relative w-full h-full grid place-items-center p-3">
-                        <img
-                          src={resultUrl || localUrl}
-                          alt="preview"
-                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
-                          draggable={false}
-                        />
+                        {/* compare overlay */}
+                        {compare && localUrl && resultUrl ? (
+                          <div className="relative max-w-full max-h-[70vh]">
+                            <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+                            <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
+                              className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
+                          </div>
+                        ) : (
+                          <img
+                            src={resultUrl || localUrl}
+                            alt="preview"
+                            className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                            draggable={false}
+                          />
+                        )}
                       </div>
                     )}
                   </div>
@@ -687,12 +703,7 @@ export default function DashboardStudio() {
                       disabled={!file || busy}
                       className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                     >
-                      {busy ? 'Processing…' : (
-                        <>
-                          <PlayIcon className="size-4" />
-                          Run {TOOLS.find(t => t.id === active)?.label}
-                        </>
-                      )}
+                      {busy ? 'Processing…' : (<><PlayIcon className="size-4" />Run {TOOLS.find(t => t.id === active)?.label}</>)}
                     </button>
                   )}
 
@@ -710,11 +721,50 @@ export default function DashboardStudio() {
                       >
                         🧰 Export
                       </button>
+                      <button
+                        onClick={copyUrl}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+                      >
+                        🔗 Copy URL
+                      </button>
+                      <a
+                        href={resultUrl} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+                      >
+                        ↗ Open
+                      </a>
+                      {localUrl && (
+                        <>
+                          <label className="inline-flex items-center gap-2 text-xs ml-2">
+                            <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
+                            Compare
+                          </label>
+                          {compare && (
+                            <div className="flex items-center gap-2">
+                              <input type="range" min={0} max={100} value={compareOpacity}
+                                onChange={(e)=>setCompareOpacity(Number(e.target.value))} />
+                              <span className="text-xs w-8 text-right">{compareOpacity}%</span>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </>
                   )}
 
-                  {err && <div className="text-xs text-rose-600">{err}</div>}
+                  {!!err && <div className="text-xs text-rose-600">{err}</div>}
                 </div>
+
+                {/* busy overlay */}
+                <AnimatePresence>
+                  {busy && (
+                    <motion.div
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="pointer-events-none absolute inset-0 rounded-3xl grid place-items-center bg-white/60"
+                    >
+                      <div className="text-xs px-3 py-2 rounded-lg bg-white border shadow">Working…</div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* API response (collapsible) */}
                 {apiResponse && (
@@ -788,8 +838,8 @@ export default function DashboardStudio() {
 
                 {active === 'enhance' && (
                   <div className="space-y-2 text-xs text-slate-600">
-                    <div>اضغط <span className="font-semibold">Run</span> لفتح نافذة الإعدادات (Pop-Up) — أو اختر Preset من فوق.</div>
-                    <div className="mt-3 text-[11px] text-slate-500">Model: {BACKENDS.find(b=>b.id===backendModel)?.name}</div>
+                    <div>اضغط <span className="font-semibold">Run</span> لفتح نافذة الإعدادات — أو اختر Preset من الأعلى.</div>
+                    <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
                     {resultUrl && (
                       <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                         <div className="relative w-full min-h-[160px] grid place-items-center">
@@ -802,8 +852,8 @@ export default function DashboardStudio() {
 
                 {active === 'tryon' && (
                   <div className="space-y-2 text-xs text-slate-600">
-                    <div>جرّب Preset من قسم Try-On أو اضغط <span className="font-semibold">Run</span>.</div>
-                    <div className="mt-3 text-[11px] text-slate-500">Model: {BACKENDS.find(b=>b.id===backendModel)?.name}</div>
+                    <div>اختر Preset من قسم Try-On أو اضغط <span className="font-semibold">Run</span>.</div>
+                    <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
                     {resultUrl && (
                       <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                         <div className="relative w-full min-h-[160px] grid place-items-center">
@@ -816,7 +866,7 @@ export default function DashboardStudio() {
 
                 {active === 'modelSwap' && (
                   <div className="text-xs text-slate-600">
-                    اختر باك-إند مناسب لاستخدامك (يحفظ تلقائيًا).
+                    اختر الـ Backend المناسب — يتم الحفظ تلقائيًا على حسابك.
                   </div>
                 )}
               </aside>
@@ -828,17 +878,24 @@ export default function DashboardStudio() {
               {history.length === 0 ? (
                 <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                  {history.map((h, i) => (
-                    <button key={i} onClick={() => setResultUrl(h.outputUrl)}
-                      className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-50">
-                      <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
-                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
-                        {h.tool} • {new Date(h.ts).toLocaleTimeString()}
-                      </div>
+                <>
+                  <div className="mb-2">
+                    <button onClick={()=>setHistory([])} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50">
+                      Clear history
                     </button>
-                  ))}
-                </div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                    {history.map((h, i) => (
+                      <button key={i} onClick={() => setResultUrl(h.outputUrl)}
+                        className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-50">
+                        <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
+                        <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
+                          {h.tool} • {new Date(h.ts).toLocaleTimeString()}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </section>
@@ -851,7 +908,6 @@ export default function DashboardStudio() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="absolute inset-0 bg-black/55" onClick={()=>setShowEnhance(false)} />
               <div className="relative w-full max-w-3xl">
-                {/* نمرر initial لو كان الكومبوننت يدعمها، وإلا يتجاهلها */}
                 <EnhanceCustomizer
                   initial={pendingEnhancePreset || undefined}
                   onChange={()=>{}}
@@ -1062,3 +1118,4 @@ function CodeIcon(props){return(<svg viewBox="0 0 24 24" className={props.classN
 function ListIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" fill="currentColor"/></svg>);}
 function StarIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 18l-6.2 3 1.2-6.9-5-4.8 6.9-1L12 2z" fill="currentColor"/></svg>);}
 function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
+function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M2 20l10-10 2 2L4 22H2zM14 2l2 2-2 2-2-2 2-2z" fill="currentColor"/></svg>);}
