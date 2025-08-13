@@ -43,7 +43,7 @@ const TOOLS = [
 export default function DashboardStudio() {
   const router = useRouter();
   const supabase = useSupabaseClient();
-  const user = useUser(); // null (غير مسجل) | object (مسجل) | undefined (جارِ التحميل)
+  const user = useUser();
 
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState('Free');
@@ -89,7 +89,7 @@ export default function DashboardStudio() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (user === undefined) return; // ما زال يحمّل من الـProvider
+      if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
       try {
         const { data } = await supabase.from('Data').select('plan, credits').eq('email', user.email).single();
@@ -140,7 +140,6 @@ export default function DashboardStudio() {
     setLocalUrl(URL.createObjectURL(f));
     setResultUrl(''); setPhase('idle'); setErr(''); setApiResponse(null);
 
-    // للـ Remove BG نرسل الدقّة الأصلية (بدون ضغط/تصغير)
     if (active === 'removeBg') {
       const dataUrl = await fileToDataURLOriginal(f);
       setImageData(dataUrl);
@@ -203,21 +202,49 @@ export default function DashboardStudio() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
-  /* ---------- MYA prompt ---------- */
+  /* ---------- MYA: ad presets ---------- */
   const AD_STYLE_PACKS = {
     luxury: "marble or onyx surface, subtle reflections, soft cool key light, minimal props",
-    tech:   "geometric backdrop, sleek subtle reflections, rim light, modern scene",
+    tech:   "geometric backdrop, sleek rim light, neon accents, modern scene",
     beauty: "pastel gradient background, soft rim light, gentle glow, clean composition",
     sport:  "high-contrast lighting, dynamic angle hints, subtle motion feel",
-    gulf:   "warm tones, elegant fabric textures, tasteful gold accents, clean studio look",
+    gulf:   "warm tones, elegant fabric textures, tasteful gold glints, premium studio look",
+  };
+
+  const AD_THEMES = {
+    aqua: "dynamic water splash and droplets, cool blues, backlit translucency",
+    nature_green: "fresh green leaves swirling, dew, eco vibe, soft sunlight",
+    citrus: "vibrant citrus slices with juicy droplets, bright yellow-orange energy",
+    chocolate_break: "chocolate shards and almonds flying, melted drips, appetizing",
+    luxury_gold: "soft golden bokeh sparkles, black marble accents, premium",
+    tech_neon: "neon glow particles, light streaks, geometric highlights",
   };
 
   const AD_NEGATIVE =
-    "blurry, low-res, watermark, heavy text, distorted edges, messy background, over/underexposed";
+    "boring plain backdrop, low-res, watermark, extra text, distorted label, messy composition, over/underexposed, heavy noise, extra fingers, extra bottles";
 
-  const buildAdPrompt = ({ productType = 'product', stylePack = 'luxury' } = {}) => {
+  const buildAdPrompt = ({
+    productType = 'product',
+    stylePack = 'luxury',
+    adTheme = 'aqua',
+    intensity = 'medium', // subtle | medium | rich
+  } = {}) => {
     const cues = AD_STYLE_PACKS[stylePack] || AD_STYLE_PACKS.luxury;
-    return `Commercial product ad photo for ${productType}. Clean studio-grade scene, ${cues}. Emphasize clarity and realistic materials. Soft key light, balanced shadows. No text, no watermarks.`;
+    const theme = AD_THEMES[adTheme] || AD_THEMES.aqua;
+    const propIntensity = intensity === 'subtle' ? "few accent particles"
+      : intensity === 'rich' ? "abundant dynamic particles"
+      : "balanced floating particles";
+
+    // Core ad prompt (packshot / hero shot)
+    return [
+      `Commercial advertising hero packshot of ${productType}`,
+      `Clean studio-grade scene, ${cues}`,
+      `${theme}, ${propIntensity}`,
+      `center composition, depth of field, glossy surface reflection`,
+      `clear readable label, product fully visible`,
+      `soft key light, balanced shadows, cinematic DOF`,
+      `no typography, no extra logos, no watermarks`,
+    ].join('. ') + '.';
   };
 
   /* ---------- actions ---------- */
@@ -299,18 +326,32 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl]);
 
-  // NEW: MYA uses the same /api/enhance with a different prompt + flag
+  // MYA — uses the same /api/enhance with ad-only prompt + flags
   const runMya = useCallback(async (form) => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
       const imageUrl = await uploadToStorage();
-      const prompt = buildAdPrompt({ productType: form?.productType, stylePack: form?.stylePack });
-      const selections = {
-        __mode: 'mya',                // لتمييزه في الباك-إند إن أردت
-        stylePack: form?.stylePack,
+
+      const prompt = buildAdPrompt({
         productType: form?.productType,
-        aspect_ratio: '1:1',
+        stylePack: form?.stylePack,
+        adTheme: form?.adTheme,
+        intensity: form?.intensity,
+      });
+
+      // نحدد نسبة العرض/الارتفاع حسب الاختيار
+      const ratioMap = { square:'1:1', story:'9:16', wide:'16:9' };
+      const aspect_ratio = ratioMap[form?.ratio || 'square'];
+
+      // selections تُستعمل فقط لإخبار الباك-إند إن هذا وضع MYA
+      const selections = {
+        __mode: 'mya',
+        stylePack: form?.stylePack,
+        adTheme: form?.adTheme,
+        aspect_ratio,
         negativePrompt: AD_NEGATIVE,
+        // ممكن ترسل seed من هنا إن أردت:
+        // seed: Math.floor(Math.random()*1e9),
       };
 
       const r = await fetch('/api/enhance', {
@@ -318,6 +359,7 @@ export default function DashboardStudio() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email }),
       });
+
       const j = await r.json();
       setApiResponse(j);
       if (!r.ok) throw new Error(j?.error || 'mya failed');
@@ -339,7 +381,7 @@ export default function DashboardStudio() {
     if (active === 'removeBg') return runRemoveBg();
     if (active === 'enhance')  return setShowEnhance(true);
     if (active === 'tryon')    return setShowTryon(true);
-    if (active === 'mya')      return setShowMya(true); // NEW
+    if (active === 'mya')      return setShowMya(true);
   }, [active, file, runRemoveBg]);
 
   /* ---------- download helpers ---------- */
@@ -672,14 +714,12 @@ export default function DashboardStudio() {
           )}
         </AnimatePresence>
 
-        {/* NEW — Export Drawer */}
+        {/* Export Drawer */}
         <ExportDrawer
           open={exportOpen}
           onClose={() => setExportOpen(false)}
-          cutoutUrl={resultUrl}       // الناتج (الأفضل يكون شفاف من Remove BG)
-          defaultName="product"       // بدّلها لـ SKU عندك
-          // useCurrentBg={bgMode === 'color'}
-          // currentBgColor={color}
+          cutoutUrl={resultUrl}
+          defaultName="product"
         />
 
         {/* toast */}
@@ -717,7 +757,6 @@ function TopBar({ userName, plan, credits, initials, canExport = false, onExport
         </div>
 
         <div className="flex items-center gap-2">
-          {/* زر Export */}
           <button
             onClick={onExportClick}
             disabled={!canExport}
@@ -789,9 +828,20 @@ function Range({ value, onChange, min, max, step=1 }) { return (<div className="
 function MyaMiniCustomizer({ onCancel, onComplete }) {
   const [productType, setProductType] = useState('perfume bottle');
   const [stylePack, setStylePack] = useState('luxury');
-  const STYLES = Object.keys({
-    luxury:1, tech:1, beauty:1, sport:1, gulf:1
-  });
+  const [adTheme, setAdTheme] = useState('aqua');
+  const [intensity, setIntensity] = useState('medium'); // subtle|medium|rich
+  const [ratio, setRatio] = useState('square'); // square|story|wide
+
+  const STYLES = ['luxury','tech','beauty','sport','gulf'];
+  const THEMES = [
+    {id:'aqua',label:'Aqua splash'},
+    {id:'nature_green',label:'Nature green'},
+    {id:'citrus',label:'Citrus'},
+    {id:'chocolate_break',label:'Chocolate'},
+    {id:'luxury_gold',label:'Luxury gold'},
+    {id:'tech_neon',label:'Tech neon'},
+  ];
+
   return (
     <div className="text-sm text-white">
       <div className="text-base font-semibold mb-3">Make Your Ad — Settings</div>
@@ -806,7 +856,7 @@ function MyaMiniCustomizer({ onCancel, onComplete }) {
         />
       </label>
 
-      <div className="mb-4">
+      <div className="mb-3">
         <div className="mb-1 text-white/70 text-xs">Style pack</div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {STYLES.map(s => (
@@ -821,10 +871,48 @@ function MyaMiniCustomizer({ onCancel, onComplete }) {
         </div>
       </div>
 
+      <div className="mb-3">
+        <div className="mb-1 text-white/70 text-xs">Ad theme</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {THEMES.map(t => (
+            <button key={t.id}
+              onClick={()=>setAdTheme(t.id)}
+              className={['rounded-lg px-3 py-2 text-xs',
+                adTheme===t.id ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15'
+              ].join(' ')}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <div className="mb-1 text-white/70 text-xs">Props intensity</div>
+        <div className="flex gap-2">
+          {['subtle','medium','rich'].map(v => (
+            <button key={v} onClick={()=>setIntensity(v)}
+              className={['rounded-lg px-3 py-2 capitalize text-xs',
+                intensity===v ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15'
+              ].join(' ')}>
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <div className="mb-1 text-white/70 text-xs">Aspect ratio</div>
+        <div className="flex gap-2">
+          <button onClick={()=>setRatio('square')} className={['rounded-lg px-3 py-2 text-xs', ratio==='square' ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15'].join(' ')}>Square 1:1</button>
+          <button onClick={()=>setRatio('story')}  className={['rounded-lg px-3 py-2 text-xs', ratio==='story'  ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15'].join(' ')}>Story 9:16</button>
+          <button onClick={()=>setRatio('wide')}   className={['rounded-lg px-3 py-2 text-xs', ratio==='wide'   ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15'].join(' ')}>Wide 16:9</button>
+        </div>
+      </div>
+
       <div className="flex items-center justify-end gap-2">
         <button onClick={onCancel} className="rounded-lg border border-white/15 bg-white/10 px-3 py-1.5">Cancel</button>
         <button
-          onClick={()=>onComplete({ productType, stylePack })}
+          onClick={()=>onComplete({ productType, stylePack, adTheme, intensity, ratio })}
           className="rounded-lg bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-1.5 font-semibold">
           Generate
         </button>
