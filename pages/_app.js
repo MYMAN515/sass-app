@@ -4,7 +4,8 @@ import { Montserrat, Open_Sans } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 
 import { useState } from 'react';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+// ✅ الصحيح مع Pages Router
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
 
 const montserrat = Montserrat({
@@ -20,26 +21,23 @@ const openSans = Open_Sans({
 });
 
 export default function App({ Component, pageProps }) {
-  const [supabaseClient] = useState(() => createBrowserSupabaseClient());
+  // أنشئ عميل واحد فقط طوال عمر التطبيق
+  const [supabaseClient] = useState(() => createPagesBrowserClient());
 
   return (
-    <SessionContextProvider supabaseClient={supabaseClient} initialSession={pageProps.initialSession}>
-      {/* Vercel Analytics */}
+    <SessionContextProvider
+      supabaseClient={supabaseClient}
+      initialSession={pageProps.initialSession}
+    >
       <Analytics />
-
-      {/* Main wrapper applies fonts and dark bg */}
-      <main
+      <div
         className={`
-          ${montserrat.variable}
-          ${openSans.variable}
-          font-sans
-          bg-[#0f0c29]
-          min-h-screen
-          text-white
+          ${montserrat.variable} ${openSans.variable}
+          font-sans bg-[#0f0c29] min-h-screen text-white
         `}
       >
         <Component {...pageProps} />
-      </main>
+      </div>
     </SessionContextProvider>
   );
 }
