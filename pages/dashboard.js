@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+
 import Layout from '@/components/Layout';
 import EnhanceCustomizer from '@/components/EnhanceCustomizer';
 import TryOnCustomizer from '@/components/TryOnCustomizer';
@@ -76,17 +77,27 @@ export default function DashboardStudio() {
 
   const dropRef = useRef(null);
 
-  /* ---------- auth ---------- */
+  /* ---------- auth & workspace ---------- */
   useEffect(() => {
     let mounted = true;
     (async () => {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
       try {
-        const { data } = await supabase.from('Data').select('plan, credits').eq('email', user.email).single();
+        const { data, error } = await supabase
+          .from('Data')
+          .select('plan, credits')
+          .eq('email', user.email)
+          .single();
+
         if (!mounted) return;
-        setPlan(data?.plan || 'Free');
-        setCredits(typeof data?.credits === 'number' ? data.credits : 0);
+        if (error) {
+          setPlan('Free');
+          setCredits(0);
+        } else {
+          setPlan(data?.plan || 'Free');
+          setCredits(typeof data?.credits === 'number' ? data.credits : 0);
+        }
       } catch {
         setErr('Failed to load workspace.');
       } finally {
@@ -162,7 +173,7 @@ export default function DashboardStudio() {
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
-  /* ---------- build prompts ---------- */
+  /* ---------- prompts ---------- */
   const pickFirstUrl = (obj) => {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
@@ -344,9 +355,9 @@ export default function DashboardStudio() {
   return (
     <Layout title="Studio">
       <main className="min-h-screen bg-slate-50 text-slate-900">
-        <div className="mx-auto max-w-7xl grid grid-cols-[260px_1fr] gap-6 px-4 md:px-6 py-6">
-          {/* ===== Left Sidebar (FASHN-like) ===== */}
-          <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 px-4 md:px-6 py-6">
+          {/* ===== Left Sidebar (FSHN-like) ===== */}
+          <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-4 self-start h-fit">
             <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
               <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
                 <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/></svg>
@@ -400,33 +411,24 @@ export default function DashboardStudio() {
                 Pick a mood, upload your product or outfit, then run a tool. Simple.
               </p>
 
-              {/* Mood Cards (click to prefill Enhance and open pop-up) */}
+              {/* Mood Cards */}
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <MoodCard
                   title="Desert Tones"
                   subtitle="Warm, cinematic"
-                  onClick={() => {
-                    setActive('enhance');
-                    setShowEnhance(true);
-                  }}
+                  onClick={() => { setActive('enhance'); setShowEnhance(true); }}
                   gradient="from-amber-200 via-orange-100 to-rose-100"
                 />
                 <MoodCard
                   title="Clean Studio"
                   subtitle="Soft shadows"
-                  onClick={() => {
-                    setActive('enhance');
-                    setShowEnhance(true);
-                  }}
+                  onClick={() => { setActive('enhance'); setShowEnhance(true); }}
                   gradient="from-slate-100 via-white to-slate-100"
                 />
                 <MoodCard
                   title="Neutral Beige"
                   subtitle="Editorial look"
-                  onClick={() => {
-                    setActive('enhance');
-                    setShowEnhance(true);
-                  }}
+                  onClick={() => { setActive('enhance'); setShowEnhance(true); }}
                   gradient="from-amber-50 via-rose-50 to-amber-50"
                 />
               </div>
@@ -438,11 +440,7 @@ export default function DashboardStudio() {
               <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
                 {/* tool tabs (segmented) */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-4">
-                  <Segmented
-                    items={TOOLS}
-                    value={active}
-                    onChange={setActive}
-                  />
+                  <Segmented items={TOOLS} value={active} onChange={setActive} />
                   <StepBadge phase={phase} />
                 </div>
 
@@ -490,18 +488,26 @@ export default function DashboardStudio() {
                   </button>
 
                   {resultUrl && (
-                    <button
-                      onClick={active === 'removeBg' ? downloadRemoveBgPng : downloadResultAsPng}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
-                    >
-                      ⬇ Download PNG
-                    </button>
+                    <>
+                      <button
+                        onClick={active === 'removeBg' ? downloadRemoveBgPng : downloadResultAsPng}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                      >
+                        ⬇ Download PNG
+                      </button>
+                      <button
+                        onClick={() => setExportOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                      >
+                        🧰 Export
+                      </button>
+                    </>
                   )}
 
                   {err && <div className="text-xs text-rose-600">{err}</div>}
                 </div>
 
-                {/* API response */}
+                {/* API response (collapsible) */}
                 {apiResponse && (
                   <div className="px-4 md:px-5 pb-5">
                     <button
@@ -738,14 +744,46 @@ function Color({ value, onChange }) {
 function Range({ value, onChange, min, max, step=1 }) {
   return (
     <div className="flex items-center gap-2">
-      <input type="range" value={value} min={min} max={max} step={step}
-        onChange={(e)=>onChange(Number(e.target.value))} className="w-full accent-indigo-600" />
+      <input
+        type="range"
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(e)=>onChange(Number(e.target.value))}
+        className="w-full accent-indigo-600"
+      />
       <span className="w-10 text-right">{typeof value==='number'?value:''}</span>
     </div>
   );
 }
 
-/* ---------- icons (tiny inline) ---------- */
+/* ---------- removeBG mode tabs ---------- */
+function ModeTabs({ mode, setMode }) {
+  const tabs = [
+    { id: 'color', label: 'Color' },
+    { id: 'gradient', label: 'Gradient' },
+    { id: 'pattern', label: 'Pattern' },
+  ];
+  return (
+    <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+      {tabs.map(t => (
+        <button
+          key={t.id}
+          onClick={() => setMode(t.id)}
+          className={[
+            'px-3 py-1.5 text-xs rounded-lg transition',
+            mode === t.id ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:bg-white'
+          ].join(' ')}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- icons ---------- */
 function ScissorsIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor"/></svg>);}
 function RocketIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor"/><circle cx="15" cy="9" r="1.5" fill="#fff"/></svg>);}
 function PersonIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/></svg>);}
@@ -754,7 +792,7 @@ function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.classN
 function CubeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2.18L6 6.09v.1l6 3 6-3v-.1l-6-1.91zM6 8.4V18l6 3V11.4L6 8.4zm12 0l-6 3V21l6-3V8.4z" fill="currentColor"/></svg>);}
 function ImageIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14h18zM5 5h14v10l-4-4-3 3-4-4-3 3V5z" fill="currentColor"/></svg>);}
 function GalleryIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M3 5h7v7H3zM14 5h7v7h-7zM3 16h7v7H3zM14 16h7v7h-7z" transform="scale(.9) translate(1, -2)" fill="currentColor"/></svg>);}
-function CodeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 17l-5-5 5-5 1.5 1.5L6 12l3.5 3.5L8 17zm8-10l5 5-5 5-1.5-1.5L18 12l-3.5-3.5L16 7z" fill="currentColor"/></svg>);}
+function CodeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 17l-5-5 5-5 1.5 1.5L6 12l-3.5 3.5L8 17zm8-10l5 5-5 5-1.5-1.5L18 12l-3.5-3.5L16 7z" fill="currentColor"/></svg>);}
 function ListIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" fill="currentColor"/></svg>);}
 function StarIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 18l-6.2 3 1.2-6.9-5-4.8 6.9-1L12 2z" fill="currentColor"/></svg>);}
 function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
