@@ -6,12 +6,6 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
-import Layout from '@/components/Layout';
-import EnhanceCustomizer from '@/components/EnhanceCustomizer';
-import TryOnCustomizer from '@/components/TryOnCustomizer';
-import generateDynamicPrompt, { generateTryOnNegativePrompt } from '@/lib/generateDynamicPrompt';
-import ExportDrawer from '@/components/ExportDrawer';
-
 /* ---------------- helpers ---------------- */
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
@@ -30,7 +24,7 @@ const fileToDataURLOriginal = (file) =>
 
 const STORAGE_BUCKET = 'img';
 
-/* ---------------- Presets ---------------- */
+/* ---------------- Presets (مع صور معاينة) ---------------- */
 const ENHANCE_PRESETS = [
   {
     id: 'clean-studio',
@@ -45,6 +39,7 @@ const ENHANCE_PRESETS = [
       outputQuality: '4k sharp',
     },
     gradient: 'from-slate-100 via-white to-slate-100',
+    preview: '/presets/enhance/clean-studio.webp',
   },
   {
     id: 'desert-tones',
@@ -59,6 +54,7 @@ const ENHANCE_PRESETS = [
       outputQuality: '4k',
     },
     gradient: 'from-amber-200 via-orange-100 to-rose-100',
+    preview: '/presets/enhance/desert-tones.webp',
   },
   {
     id: 'editorial-beige',
@@ -73,6 +69,7 @@ const ENHANCE_PRESETS = [
       outputQuality: '4k print',
     },
     gradient: 'from-amber-50 via-rose-50 to-amber-50',
+    preview: '/presets/enhance/editorial-beige.webp',
   },
 ];
 
@@ -81,37 +78,25 @@ const TRYON_PRESETS = [
     id: 'streetwear',
     title: 'Streetwear',
     subtitle: 'Urban, moody',
-    config: {
-      style: 'streetwear fit',
-      setting: 'urban alley',
-      lighting: 'overcast soft',
-      mood: 'cool, editorial',
-    },
+    config: { style: 'streetwear fit', setting: 'urban alley', lighting: 'overcast soft', mood: 'cool, editorial' },
     gradient: 'from-slate-200 via-slate-100 to-slate-200',
+    preview: '/presets/tryon/streetwear.webp',
   },
   {
     id: 'ecom-mannequin',
     title: 'E-Com Mannequin',
     subtitle: 'Plain backdrop',
-    config: {
-      style: 'ecommerce mannequin front',
-      setting: 'white cyclorama',
-      lighting: 'soft studio',
-      mood: 'catalog clean',
-    },
+    config: { style: 'ecommerce mannequin front', setting: 'white cyclorama', lighting: 'soft studio', mood: 'catalog clean' },
     gradient: 'from-white via-slate-50 to-white',
+    preview: '/presets/tryon/ecom-mannequin.webp',
   },
   {
     id: 'lifestyle',
     title: 'Lifestyle',
     subtitle: 'Bright apartment',
-    config: {
-      style: 'lifestyle casual',
-      setting: 'sunlit room',
-      lighting: 'window soft',
-      mood: 'fresh & bright',
-    },
+    config: { style: 'lifestyle casual', setting: 'sunlit room', lighting: 'window soft', mood: 'fresh & bright' },
     gradient: 'from-emerald-50 via-teal-50 to-cyan-50',
+    preview: '/presets/tryon/lifestyle.webp',
   },
 ];
 
@@ -182,23 +167,21 @@ export default function DashboardStudio() {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
 
-      // 1) fetch plan/credits/model from Supabase
+      // 1) fetch plan/credits/model for this user (⚠️ باستخدام user_id)
       try {
         const { data } = await supabase
           .from('Data')
           .select('plan, credits, model_backend')
-          .eq('email', user.email)
+          .eq('user_id', user.id)
           .single();
 
         if (!mounted) return;
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
         setBackendModel(data?.model_backend || '');
-      } catch {
-        // ignore – keep defaults
-      }
+      } catch {/* ignore */}
 
-      // 2) fetch model options from your API
+      // 2) fetch model options from your API (no constants here)
       try {
         const res = await fetch('/api/models', { cache: 'no-store' });
         if (res.ok) {
@@ -213,11 +196,11 @@ export default function DashboardStudio() {
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
-  // credits live refresh
+  // credits live refresh (optional)
   useEffect(() => {
     const h = async () => {
-      if (!user?.email) return;
-      const { data } = await supabase.from('Data').select('credits').eq('email', user.email).single();
+      if (!user?.id) return;
+      const { data } = await supabase.from('Data').select('credits').eq('user_id', user.id).single();
       if (typeof data?.credits === 'number') setCredits(data.credits);
     };
     if (typeof window !== 'undefined') {
@@ -226,19 +209,54 @@ export default function DashboardStudio() {
     }
   }, [supabase, user]);
 
-  /* ---------- helpers (prompts) ---------- */
-  const pickFirstUrl = (obj) => {
-    if (!obj) return '';
-    if (typeof obj === 'string') return obj;
-    const keys = ['image', 'image_url', 'output', 'result', 'url'];
-    for (const k of keys) if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
-    return '';
-  };
-  const buildEnhancePrompt = (f) =>
-    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
-      .filter(Boolean).join(', ');
+  /* ---------- drag & drop + paste ---------- */
+  useEffect(() => {
+    const el = dropRef.current; if (!el) return;
+    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-indigo-400'); };
+    const leave = () => el.classList.remove('ring-2','ring-indigo-400');
+    const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
+    el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
 
-  /* ---------- onPick (قبل أي useEffect يستخدمه) ---------- */
+    const onPaste = async (e) => {
+      const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
+      const f = item?.getAsFile?.(); if (f) await onPick(f);
+    };
+    window.addEventListener('paste', onPaste);
+
+    return () => {
+      el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop);
+      window.removeEventListener('paste', onPaste);
+    };
+  }, []);
+
+  /* ---------- keyboard shortcuts ---------- */
+  const handleRun = useCallback(() => {
+    if (active !== 'modelSwap' && !file) { setErr('اختر صورة أولاً'); return; }
+    if (active === 'removeBg') return runRemoveBg();
+    if (active === 'enhance')  return setShowEnhance(true);
+    if (active === 'tryon')    return setShowTryOn(true);
+  }, [active, file]); // runRemoveBg is stable enough (no deps leak)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleRun(); }
+      if (e.key >= '1' && e.key <= '4') {
+        const index = Number(e.key) - 1;
+        setActive(TOOLS[index]?.id || 'enhance');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleRun]);
+
+  /* ---------- reset on tool switch ---------- */
+  useEffect(() => {
+    setPhase('idle'); setErr(''); setApiResponse(null);
+    if (active === 'modelSwap') return;
+    setResultUrl(''); setImageData('');
+  }, [active]);
+
   const onPick = async (f) => {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
@@ -269,6 +287,18 @@ export default function DashboardStudio() {
     boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.12), 0 6px 18px rgba(0,0,0,.06)' : 'none',
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
+
+  /* ---------- prompts ---------- */
+  const pickFirstUrl = (obj) => {
+    if (!obj) return '';
+    if (typeof obj === 'string') return obj;
+    const keys = ['image', 'image_url', 'output', 'result', 'url'];
+    for (const k of keys) if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
+    return '';
+  };
+  const buildEnhancePrompt = (f) =>
+    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
+      .filter(Boolean).join(', ');
 
   /* ---------- storage ---------- */
   const uploadToStorage = useCallback(async () => {
@@ -349,58 +379,6 @@ export default function DashboardStudio() {
   const [showEnhance, setShowEnhance] = useState(false);
   const [showTryOn, setShowTryOn] = useState(false);
 
-  /* ---------- handleRun (قبل أي useEffect يعتمد عليه) ---------- */
-  const handleRun = useCallback(() => {
-    if (active !== 'modelSwap' && !file) { setErr('اختر صورة أولاً'); return; }
-    if (active === 'removeBg') return runRemoveBg();
-    if (active === 'enhance')  return setShowEnhance(true);
-    if (active === 'tryon')    return setShowTryOn(true);
-  }, [active, file, runRemoveBg]);
-
-  /* ---------- drag & drop + paste ---------- */
-  useEffect(() => {
-    const el = dropRef.current; if (!el) return;
-    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-indigo-400'); };
-    const leave = () => el.classList.remove('ring-2','ring-indigo-400');
-    const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
-    el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
-
-    const onPaste = async (e) => {
-      const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
-      const f = item?.getAsFile?.(); if (f) await onPick(f);
-    };
-    window.addEventListener('paste', onPaste);
-
-    return () => {
-      el.removeEventListener('dragover', over);
-      el.removeEventListener('dragleave', leave);
-      el.removeEventListener('drop', drop);
-      window.removeEventListener('paste', onPaste);
-    };
-  }, [onPick]);
-
-  /* ---------- keyboard shortcuts ---------- */
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
-      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleRun(); }
-      if (e.key >= '1' && e.key <= '4') {
-        const index = Number(e.key) - 1;
-        setActive(TOOLS[index]?.id || 'enhance');
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [handleRun]);
-
-  /* ---------- reset on tool switch ---------- */
-  useEffect(() => {
-    setPhase('idle'); setErr(''); setApiResponse(null);
-    if (active === 'modelSwap') return;
-    setResultUrl('');
-    setImageData('');
-  }, [active]);
-
   /* ---------- download helpers ---------- */
   const downloadDataUrl = (dataUrl, name = 'studio-output.png') => {
     const a = document.createElement('a'); a.href = dataUrl; a.download = name;
@@ -476,11 +454,9 @@ export default function DashboardStudio() {
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
     return (
-      <Layout title="Studio">
-        <main className="min-h-screen grid place-items-center bg-slate-50 text-slate-600">
-          <div className="text-sm">Loading your studio…</div>
-        </main>
-      </Layout>
+      <main className="min-h-screen grid place-items-center bg-slate-50 text-slate-600">
+        <div className="text-sm">Loading your studio…</div>
+      </main>
     );
   }
   if (!user) return null;
@@ -502,7 +478,7 @@ export default function DashboardStudio() {
             onClick={async () => {
               setBackendModel(b.id);
               try {
-                await supabase.from('Data').update({ model_backend: b.id }).eq('email', user.email);
+                await supabase.from('Data').update({ model_backend: b.id }).eq('user_id', user.id);
               } catch {}
             }}
             className={[
@@ -537,411 +513,423 @@ export default function DashboardStudio() {
     </div>
   );
 
-  /* ---------- View ---------- */
   return (
-    <Layout title="Studio">
-      <main className="min-h-screen bg-slate-50 text-slate-900">
-        <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 px-4 md:px-6 py-6">
-          {/* ===== Left Sidebar ===== */}
-          <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-4 self-start h-fit">
-            <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
-              <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
-                <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/></svg>
-              </div>
-              <div className="font-semibold tracking-tight">AI Studio</div>
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      {/* زر Home فقط عند الخطة Free أو الكريدت 0 */}
+      {(plan === 'Free' || credits <= 0) && (
+        <div className="fixed top-4 right-4 z-10">
+          <button
+            onClick={() => router.push('/')}
+            className="rounded-full border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold shadow-sm"
+            title="Back to Home"
+          >
+            ⬅ Home
+          </button>
+        </div>
+      )}
+
+      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 px-4 md:px-6 py-6">
+        {/* ===== Left Sidebar (لا يوجد Navbar/Footer) ===== */}
+        <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-4 self-start h-fit">
+          <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
+            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
+              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/></svg>
             </div>
+            <div className="font-semibold tracking-tight">AI Studio</div>
+          </div>
 
-            {/* Tools group */}
-            <Group title="Tools" defaultOpen>
-              {TOOLS.map(t => (
-                <SideItem
-                  key={t.id}
-                  label={t.label}
-                  icon={t.icon}
-                  active={active === t.id}
-                  onClick={() => setActive(t.id)}
-                />
-              ))}
-            </Group>
-
-            {/* Models group */}
-            <Group title="Models" defaultOpen>
+          {/* Tools group */}
+          <Group title="Tools" defaultOpen>
+            {TOOLS.map(t => (
               <SideItem
-                label="Model Swap"
-                icon={CubeIcon}
-                active={active === 'modelSwap'}
-                onClick={() => setActive('modelSwap')}
+                key={t.id}
+                label={t.label}
+                icon={t.icon}
+                active={active === t.id}
+                onClick={() => setActive(t.id)}
               />
-              <SideItem
-                label="History"
-                icon={ListIcon}
-                onClick={() => document.getElementById('history-anchor')?.scrollIntoView({ behavior:'smooth' })}
-              />
-            </Group>
+            ))}
+          </Group>
 
-            <div className="mt-2 px-4 py-3 border-t border-slate-200">
-              <div className="flex items-center gap-3">
-                <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">{initials}</div>
-                <div className="text-sm">
-                  <div className="font-medium leading-tight">{user.user_metadata?.name || user.email}</div>
-                  <div className="text-xs text-slate-500">Plan: <span className="font-medium">{plan}</span></div>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-100 px-3 py-2 text-xs">
-                <span className="text-slate-600">Credits</span>
-                <span className="font-semibold">{credits}</span>
+          {/* Models group */}
+          <Group title="Models" defaultOpen>
+            <SideItem
+              label="Model Swap"
+              icon={CubeIcon}
+              active={active === 'modelSwap'}
+              onClick={() => setActive('modelSwap')}
+            />
+            <SideItem
+              label="History"
+              icon={ListIcon}
+              onClick={() => document.getElementById('history-anchor')?.scrollIntoView({ behavior:'smooth' })}
+            />
+          </Group>
+
+          <div className="mt-2 px-4 py-3 border-t border-slate-200">
+            <div className="flex items-center gap-3">
+              <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">{initials}</div>
+              <div className="text-sm">
+                <div className="font-medium leading-tight">{user.user_metadata?.name || user.email}</div>
+                <div className="text-xs text-slate-500">Plan: <span className="font-medium">{plan}</span></div>
               </div>
             </div>
-          </aside>
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-100 px-3 py-2 text-xs">
+              <span className="text-slate-600">Credits</span>
+              <span className="font-semibold">{credits}</span>
+            </div>
+          </div>
+        </aside>
 
-          {/* ===== Main Column ===== */}
-          <section className="space-y-6">
-            {/* Presets row */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
-                  <p className="text-slate-600 text-sm">اختر إعداد جاهز — يفتح لك النافذة مع القيم المعبأة.</p>
-                </div>
-                <div className="text-xs rounded-full border px-3 py-1 bg-slate-50">
-                  Current Model: <span className="font-semibold">{models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
-                </div>
+        {/* ===== Main Column ===== */}
+        <section className="space-y-6">
+          {/* Presets row */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
+                <p className="text-slate-600 text-sm">اختر إعداد جاهز — يفتح لك النافذة مع القيم المعبأة.</p>
               </div>
-
-              <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {ENHANCE_PRESETS.map(p => (
-                    <PresetCard
-                      key={p.id}
-                      title={p.title}
-                      subtitle={p.subtitle}
-                      gradient={p.gradient}
-                      onClick={() => { setActive('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {TRYON_PRESETS.map(p => (
-                    <PresetCard
-                      key={p.id}
-                      title={p.title}
-                      subtitle={p.subtitle}
-                      gradient={p.gradient}
-                      onClick={() => { setActive('tryon'); setPendingTryOnPreset(p.config); setShowTryOn(true); }}
-                    />
-                  ))}
-                </div>
+              <div className="text-xs rounded-full border px-3 py-1 bg-slate-50">
+                Current Model: <span className="font-semibold">{models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
               </div>
             </div>
 
-            {/* Workbench */}
-            <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-              {/* Canvas Panel */}
-              <section className="rounded-3xl border border-slate-200 bg-white shadow-sm relative">
-                {/* header */}
-                <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-4">
-                  <Segmented items={TOOLS} value={active} onChange={setActive} />
-                  <div className="flex items-center gap-2">
-                    <StepBadge phase={phase} />
-                    <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50">Reset</button>
-                  </div>
-                </div>
+            <div className="mt-4">
+              <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {ENHANCE_PRESETS.map(p => (
+                  <PresetCard
+                    key={p.id}
+                    title={p.title}
+                    subtitle={p.subtitle}
+                    gradient={p.gradient}
+                    preview={p.preview}
+                    onClick={() => { setActive('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
+                  />
+                ))}
+              </div>
+            </div>
 
-                {/* dropzone / model swap content */}
-                {active !== 'modelSwap' ? (
-                  <div
-                    ref={dropRef}
-                    className="m-4 md:m-5 min-h[280px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                    onClick={() => fileInputRef.current?.click()}
-                    title="Drag & drop / Click / Paste (Ctrl+V)"
+            <div className="mt-6">
+              <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {TRYON_PRESETS.map(p => (
+                  <PresetCard
+                    key={p.id}
+                    title={p.title}
+                    subtitle={p.subtitle}
+                    gradient={p.gradient}
+                    preview={p.preview}
+                    onClick={() => { setActive('tryon'); setPendingTryOnPreset(p.config); setShowTryOn(true); }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Workbench */}
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+            {/* Canvas Panel */}
+            <section className="rounded-3xl border border-slate-200 bg-white shadow-sm relative">
+              {/* header */}
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-4">
+                <Segmented items={TOOLS} value={active} onChange={setActive} />
+                <div className="flex items-center gap-2">
+                  <StepBadge phase={phase} />
+                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50">Reset</button>
+                </div>
+              </div>
+
+              {/* dropzone / model swap content */}
+              {active !== 'modelSwap' ? (
+                <div
+                  ref={dropRef}
+                  className="m-4 md:m-5 min-h-[280px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Drag & drop / Click / Paste (Ctrl+V)"
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file" accept="image/*" className="hidden"
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
+                  />
+                  {!localUrl && !resultUrl ? (
+                    <div className="text-center text-slate-500 text-sm">
+                      <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white border border-slate-200">⬆</div>
+                      Drag & drop an image here, click to choose, or paste (Ctrl+V)
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-full grid place-items-center p-3">
+                      {/* compare overlay */}
+                      {compare && localUrl && resultUrl ? (
+                        <div className="relative max-w-full max-h-[70vh]">
+                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+                          <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
+                            className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
+                        </div>
+                      ) : (
+                        <img
+                          src={resultUrl || localUrl}
+                          alt="preview"
+                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                          draggable={false}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="m-4 md:m-5">
+                  <div className="mb-2 text-sm font-semibold">Swap Backend Model</div>
+                  <ModelSwapPanel />
+                </div>
+              )}
+
+              {/* actions */}
+              <div className="flex flex-wrap items-center gap-2 px-4 md:px-5 pb-5">
+                {active !== 'modelSwap' && (
+                  <button
+                    onClick={handleRun}
+                    disabled={!file || busy}
+                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                   >
-                    <input
-                      ref={fileInputRef}
-                      type="file" accept="image/*" className="hidden"
-                      onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
-                    />
-                    {!localUrl && !resultUrl ? (
-                      <div className="text-center text-slate-500 text-sm">
-                        <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white border border-slate-200">⬆</div>
-                        Drag & drop an image here, click to choose, or paste (Ctrl+V)
-                      </div>
-                    ) : (
-                      <div className="relative w-full h-full grid place-items-center p-3">
-                        {/* compare overlay */}
-                        {compare && localUrl && resultUrl ? (
-                          <div className="relative max-w-full max-h-[70vh]">
-                            <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
-                            <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
-                              className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
-                          </div>
-                        ) : (
-                          <img
-                            src={resultUrl || localUrl}
-                            alt="preview"
-                            className="max-w-full max-h-[70vh] object-contain rounded-xl"
-                            draggable={false}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="m-4 md:m-5">
-                    <div className="mb-2 text-sm font-semibold">Swap Backend Model</div>
-                    <ModelSwapPanel />
-                  </div>
+                    {busy ? 'Processing…' : (<><PlayIcon className="size-4" />Run {TOOLS.find(t => t.id === active)?.label}</>)}
+                  </button>
                 )}
 
-                {/* actions */}
-                <div className="flex flex-wrap items-center gap-2 px-4 md:px-5 pb-5">
-                  {active !== 'modelSwap' && (
+                {resultUrl && active !== 'modelSwap' && (
+                  <>
                     <button
-                      onClick={handleRun}
-                      disabled={!file || busy}
-                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
+                      onClick={active === 'removeBg' ? downloadRemoveBgPng : downloadResultAsPng}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
                     >
-                      {busy ? 'Processing…' : (<><PlayIcon className="size-4" />Run {TOOLS.find(t => t.id === active)?.label}</>)}
+                      ⬇ Download PNG
                     </button>
-                  )}
+                    <button
+                      onClick={() => setExportOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                    >
+                      🧰 Export
+                    </button>
+                    <button
+                      onClick={copyUrl}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+                    >
+                      🔗 Copy URL
+                    </button>
+                    <a
+                      href={resultUrl} target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+                    >
+                      ↗ Open
+                    </a>
+                    {localUrl && (
+                      <>
+                        <label className="inline-flex items-center gap-2 text-xs ml-2">
+                          <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
+                          Compare
+                        </label>
+                        {compare && (
+                          <div className="flex items-center gap-2">
+                            <input type="range" min={0} max={100} value={compareOpacity}
+                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} />
+                            <span className="text-xs w-8 text-right">{compareOpacity}%</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
 
-                  {resultUrl && active !== 'modelSwap' && (
+                {!!err && <div className="text-xs text-rose-600">{err}</div>}
+              </div>
+
+              {/* busy overlay */}
+              <AnimatePresence>
+                {busy && (
+                  <motion.div
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="pointer-events-none absolute inset-0 rounded-3xl grid place-items-center bg-white/60"
+                  >
+                    <div className="text-xs px-3 py-2 rounded-lg bg-white border shadow">Working…</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* API response (collapsible) */}
+              {apiResponse && (
+                <div className="px-4 md:px-5 pb-5">
+                  <button
+                    onClick={() => setRespOpen(v => !v)}
+                    className="w-full text-left rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
+                  >
+                    {respOpen ? 'Hide' : 'Show'} Response
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {respOpen && (
+                      <motion.pre
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="mt-2 max-h-[40vh] overflow-auto text-[11px] leading-5 whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3"
+                      >
+{JSON.stringify(apiResponse, null, 2)}
+                      </motion.pre>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </section>
+
+            {/* Inspector */}
+            <aside className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
+              <div className="text-sm font-semibold text-slate-900 mb-3">Inspector</div>
+
+              {active === 'removeBg' && (
+                <div className="space-y-3">
+                  <ModeTabs mode={bgMode} setMode={setBgMode} />
+                  <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
+
+                  {bgMode === 'gradient' && (
                     <>
-                      <button
-                        onClick={active === 'removeBg' ? downloadRemoveBgPng : downloadResultAsPng}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
-                      >
-                        ⬇ Download PNG
-                      </button>
-                      <button
-                        onClick={() => setExportOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
-                      >
-                        🧰 Export
-                      </button>
-                      <button
-                        onClick={copyUrl}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50"
-                      >
-                        🔗 Copy URL
-                      </button>
-                      <a
-                        href={resultUrl} target="_blank" rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50"
-                      >
-                        ↗ Open
-                      </a>
-                      {localUrl && (
-                        <>
-                          <label className="inline-flex items-center gap-2 text-xs ml-2">
-                            <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
-                            Compare
-                          </label>
-                          {compare && (
-                            <div className="flex items-center gap-2">
-                              <input type="range" min={0} max={100} value={compareOpacity}
-                                onChange={(e)=>setCompareOpacity(Number(e.target.value))} />
-                              <span className="text-xs w-8 text-right">{compareOpacity}%</span>
-                            </div>
-                          )}
-                        </>
-                      )}
+                      <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
+                      <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
                     </>
                   )}
 
-                  {!!err && <div className="text-xs text-rose-600">{err}</div>}
-                </div>
-
-                {/* busy overlay */}
-                <AnimatePresence>
-                  {busy && (
-                    <motion.div
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="pointer-events-none absolute inset-0 rounded-3xl grid place-items-center bg-white/60"
-                    >
-                      <div className="text-xs px-3 py-2 rounded-lg bg-white border shadow">Working…</div>
-                    </motion.div>
+                  {bgMode === 'pattern' && (
+                    <Field label="Pattern opacity">
+                      <Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} />
+                    </Field>
                   )}
-                </AnimatePresence>
 
-                {/* API response (collapsible) */}
-                {apiResponse && (
-                  <div className="px-4 md:px-5 pb-5">
-                    <button
-                      onClick={() => setRespOpen(v => !v)}
-                      className="w-full text-left rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
-                    >
-                      {respOpen ? 'Hide' : 'Show'} Response
-                    </button>
-                    <AnimatePresence initial={false}>
-                      {respOpen && (
-                        <motion.pre
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="mt-2 max-h-[40vh] overflow-auto text-[11px] leading-5 whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3"
-                        >
-{JSON.stringify(apiResponse, null, 2)}
-                        </motion.pre>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </section>
+                  <Field label="Radius"><Range value={radius} onChange={setRadius} min={0} max={48} /></Field>
+                  <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
 
-              {/* Inspector */}
-              <aside className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
-                <div className="text-sm font-semibold text-slate-900 mb-3">Inspector</div>
+                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-700">
+                    <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
+                    Shadow
+                  </label>
 
-                {active === 'removeBg' && (
-                  <div className="space-y-3">
-                    <ModeTabs mode={bgMode} setMode={setBgMode} />
-                    <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
-
-                    {bgMode === 'gradient' && (
-                      <>
-                        <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
-                        <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
-                      </>
-                    )}
-
-                    {bgMode === 'pattern' && (
-                      <Field label="Pattern opacity">
-                        <Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} />
-                      </Field>
-                    )}
-
-                    <Field label="Radius"><Range value={radius} onChange={setRadius} min={0} max={48} /></Field>
-                    <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
-
-                    <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-700">
-                      <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
-                      Shadow
-                    </label>
-
-                    <div className="mt-4">
-                      <div className="text-xs text-slate-500 mb-2">Final Preview</div>
-                      <div style={frameStyle} className="relative rounded-xl overflow-hidden border border-slate-200">
-                        <div className="relative w-full min-h-[160px] grid place-items-center">
-                          {resultUrl ? (
-                            <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
-                          ) : (
-                            <div className="grid place-items-center h-[160px] text-xs text-slate-400">— Run Remove BG first —</div>
-                          )}
-                        </div>
+                  <div className="mt-4">
+                    <div className="text-xs text-slate-500 mb-2">Final Preview</div>
+                    <div style={frameStyle} className="relative rounded-xl overflow-hidden border border-slate-200">
+                      <div className="relative w-full min-h-[160px] grid place-items-center">
+                        {resultUrl ? (
+                          <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
+                        ) : (
+                          <div className="grid place-items-center h-[160px] text-xs text-slate-400">— Run Remove BG first —</div>
+                        )}
                       </div>
                     </div>
                   </div>
-                )}
-
-                {active === 'enhance' && (
-                  <div className="space-y-2 text-xs text-slate-600">
-                    <div>اضغط <span className="font-semibold">Run</span> لفتح نافذة الإعدادات — أو اختر Preset من الأعلى.</div>
-                    <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
-                    {resultUrl && (
-                      <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                        <div className="relative w-full min-h-[160px] grid place-items-center">
-                          <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {active === 'tryon' && (
-                  <div className="space-y-2 text-xs text-slate-600">
-                    <div>اختر Preset من قسم Try-On أو اضغط <span className="font-semibold">Run</span>.</div>
-                    <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
-                    {resultUrl && (
-                      <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                        <div className="relative w-full min-h-[160px] grid place-items-center">
-                          <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {active === 'modelSwap' && (
-                  <div className="text-xs text-slate-600">
-                    اختر الـ Backend المناسب — يتم الحفظ تلقائيًا على حسابك.
-                  </div>
-                )}
-              </aside>
-            </div>
-
-            {/* History */}
-            <div id="history-anchor" className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
-              <div className="text-sm font-semibold text-slate-900 mb-2">History</div>
-              {history.length === 0 ? (
-                <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
-              ) : (
-                <>
-                  <div className="mb-2">
-                    <button onClick={()=>setHistory([])} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50">
-                      Clear history
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                    {history.map((h, i) => (
-                      <button key={i} onClick={() => setResultUrl(h.outputUrl)}
-                        className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-50">
-                        <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
-                        <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
-                          {h.tool} • {new Date(h.ts).toLocaleTimeString()}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </>
+                </div>
               )}
+
+              {active === 'enhance' && (
+                <div className="space-y-2 text-xs text-slate-600">
+                  <div>اضغط <span className="font-semibold">Run</span> لفتح نافذة الإعدادات — أو اختر Preset من الأعلى.</div>
+                  <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
+                  {resultUrl && (
+                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                      <div className="relative w-full min-h-[160px] grid place-items-center">
+                        <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {active === 'tryon' && (
+                <div className="space-y-2 text-xs text-slate-600">
+                  <div>اختر Preset من قسم Try-On أو اضغط <span className="font-semibold">Run</span>.</div>
+                  <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
+                  {resultUrl && (
+                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                      <div className="relative w-full min-h-[160px] grid place-items-center">
+                        <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {active === 'modelSwap' && (
+                <div className="text-xs text-slate-600">
+                  اختر الـ Backend المناسب — يتم الحفظ تلقائيًا على حسابك.
+                </div>
+              )}
+            </aside>
+          </div>
+
+          {/* History */}
+          <div id="history-anchor" className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
+            <div className="text-sm font-semibold text-slate-900 mb-2">History</div>
+            {history.length === 0 ? (
+              <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
+            ) : (
+              <>
+                <div className="mb-2">
+                  <button onClick={()=>setHistory([])} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50">
+                    Clear history
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                  {history.map((h, i) => (
+                    <button key={i} onClick={() => setResultUrl(h.outputUrl)}
+                      className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-50">
+                      <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
+                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
+                        {h.tool} • {new Date(h.ts).toLocaleTimeString()}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* ===== Modals ===== */}
+      <AnimatePresence>
+        {showEnhance && (
+          <motion.div className="fixed inset-0 z-[100] grid place-items-center"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="absolute inset-0 bg-black/55" onClick={()=>setShowEnhance(false)} />
+            <div className="relative w-full max-w-3xl">
+              <EnhanceCustomizer
+                initial={pendingEnhancePreset || undefined}
+                onChange={()=>{}}
+                onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
+              />
             </div>
-          </section>
-        </div>
+          </motion.div>
+        )}
+        {showTryOn && (
+          <motion.div className="fixed inset-0 z-[100] grid place-items-center"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="absolute inset-0 bg-black/55" onClick={()=>setShowTryOn(false)} />
+            <div className="relative w-full max-w-3xl">
+              <TryOnCustomizer
+                initial={pendingTryOnPreset || undefined}
+                onChange={()=>{}}
+                onComplete={(form) => { setShowTryOn(false); setPendingTryOnPreset(null); runTryOn(form); }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* ===== Modals ===== */}
-        <AnimatePresence>
-          {showEnhance && (
-            <motion.div className="fixed inset-0 z-[100] grid place-items-center"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="absolute inset-0 bg-black/55" onClick={()=>setShowEnhance(false)} />
-              <div className="relative w-full max-w-3xl">
-                <EnhanceCustomizer
-                  initial={pendingEnhancePreset || undefined}
-                  onChange={()=>{}}
-                  onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
-                />
-              </div>
-            </motion.div>
-          )}
-          {showTryOn && (
-            <motion.div className="fixed inset-0 z-[100] grid place-items-center"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="absolute inset-0 bg-black/55" onClick={()=>setShowTryOn(false)} />
-              <div className="relative w-full max-w-3xl">
-                <TryOnCustomizer
-                  initial={pendingTryOnPreset || undefined}
-                  onChange={()=>{}}
-                  onComplete={(form) => { setShowTryOn(false); setPendingTryOnPreset(null); runTryOn(form); }}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Export Drawer */}
-        <ExportDrawer
-          open={exportOpen}
-          onClose={() => setExportOpen(false)}
-          cutoutUrl={resultUrl}
-          defaultName="asset"
-        />
-      </main>
-    </Layout>
+      {/* Export Drawer (موجود لكن بدون Navbar/Footer) */}
+      <ExportDrawer
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        cutoutUrl={resultUrl}
+        defaultName="asset"
+      />
+    </main>
   );
 }
 
@@ -1017,11 +1005,14 @@ function Segmented({ items, value, onChange }) {
   );
 }
 
-function PresetCard({ title, subtitle, onClick, gradient }) {
+function PresetCard({ title, subtitle, onClick, gradient, preview }) {
   return (
     <button onClick={onClick}
       className="group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left">
-      <div className={`h-36 w-full bg-gradient-to-br ${gradient}`} />
+      {preview
+        ? <img src={preview} alt={title} className="h-36 w-full object-cover" loading="lazy" />
+        : <div className={`h-36 w-full bg-gradient-to-br ${gradient}`} />
+      }
       <div className="p-3">
         <div className="font-semibold">{title}</div>
         <div className="text-xs text-slate-500">{subtitle}</div>
@@ -1121,3 +1112,43 @@ function ListIcon(props){return(<svg viewBox="0 0 24 24" className={props.classN
 function StarIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 18l-6.2 3 1.2-6.9-5-4.8 6.9-1L12 2z" fill="currentColor"/></svg>);}
 function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
 function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M2 20l10-10 2 2L4 22H2zM14 2l2 2-2 2-2-2 2-2z" fill="currentColor"/></svg>);}
+
+/* ====== External UI needed (placeholders) ====== */
+function EnhanceCustomizer({ initial, onChange, onComplete }) {
+  // ضع مكوّن الإعدادات الحقيقي عندك
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow border">
+      <div className="text-sm font-semibold mb-2">Enhance Settings</div>
+      <button className="rounded-lg bg-indigo-600 text-white px-3 py-2" onClick={() => onComplete(initial || {})}>
+        Run
+      </button>
+    </div>
+  );
+}
+function TryOnCustomizer({ initial, onChange, onComplete }) {
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow border">
+      <div className="text-sm font-semibold mb-2">Try-On Settings</div>
+      <button className="rounded-lg bg-indigo-600 text-white px-3 py-2" onClick={() => onComplete(initial || {})}>
+        Run
+      </button>
+    </div>
+  );
+}
+function ExportDrawer({ open, onClose, cutoutUrl, defaultName }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[120]">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl p-4">
+        <div className="font-semibold mb-2">Export</div>
+        {cutoutUrl ? <img src={cutoutUrl} alt="export" className="w-full rounded-lg border" /> : <div className="text-xs text-slate-500">No image</div>}
+        <button className="mt-4 rounded-lg border px-3 py-2" onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+/* ====== Prompt helpers you already have ====== */
+function generateDynamicPrompt(selections){ return `dynamic: ${JSON.stringify(selections)}`; }
+function generateTryOnNegativePrompt(){ return 'lowres, artifacts, deformed'; }
