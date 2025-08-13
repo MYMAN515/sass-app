@@ -6,7 +6,7 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
-/* ---------------- helpers ---------------- */
+/* ───────────────────────── helpers ───────────────────────── */
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
@@ -14,17 +14,17 @@ const hexToRGBA = (hex, a = 1) => {
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = (n) & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
-const fileToDataURLOriginal = (file) =>
+const fileToDataURL = (file) =>
   new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
   });
 
 const STORAGE_BUCKET = 'img';
 
-/* ---------------- Presets (صور من /public مباشرة) ---------------- */
+/* ───────────────── Presets (images live in /public) ───────────────── */
 const ENHANCE_PRESETS = [
   {
     id: 'clean-studio',
@@ -33,7 +33,7 @@ const ENHANCE_PRESETS = [
     tag: 'Popular',
     config: {
       photographyStyle: 'studio product photography, 50mm prime',
-      background: 'white seamless',
+      background: 'white seamless backdrop',
       lighting: 'large softbox, gentle reflections',
       colorStyle: 'neutral whites, subtle grays',
       realism: 'hyperrealistic details',
@@ -51,7 +51,7 @@ const ENHANCE_PRESETS = [
       background: 'warm beige backdrop',
       lighting: 'golden hour, soft shadows',
       colorStyle: 'sand, beige, amber',
-      realism: 'photo-real, crisp textures',
+      realism: 'photo-real textures',
       outputQuality: '4k'
     },
     preview: '/desert-tones.webp'
@@ -123,37 +123,51 @@ const TRYON_PRESETS = [
   }
 ];
 
-/* ---------------- Tools ---------------- */
+/* ───────────────────────── Tools ───────────────────────── */
 const TOOLS = [
-  { id: 'removeBg', label: 'Remove BG', icon: ScissorsIcon },
-  { id: 'enhance', label: 'Enhance', icon: RocketIcon },
+  { id: 'studio', label: 'Studio', icon: SparklesIcon },         // Enhance + Remove BG together
   { id: 'tryon', label: 'Try-On', icon: PersonIcon },
   { id: 'modelSwap', label: 'Model Swap', icon: CubeIcon }
 ];
 
-export default function DashboardStudio() {
+export default function Dashboard() {
   const supabase = useSupabaseClient();
   const user = useUser();
   const router = useRouter();
 
-  /* ---------- state ---------- */
+  /* ───────── state ───────── */
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState('Free');
   const [credits, setCredits] = useState(0);
   const [err, setErr] = useState('');
 
-  const [active, setActive] = useState('enhance');
+  const [active, setActive] = useState('studio');
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
 
   // file/results
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState(''); // removeBg only
+  const [imageData, setImageData] = useState(''); // for remove-bg
   const [resultUrl, setResultUrl] = useState('');
 
-  // removeBg inspector
-  const [bgMode, setBgMode] = useState('color');   // color | gradient | pattern
+  // Studio toggles
+  const [applyEnhance, setApplyEnhance] = useState(true);
+  const [applyRemoveBg, setApplyRemoveBg] = useState(true);
+  const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
+
+  // Try-On
+  const [pendingTryOnPreset, setPendingTryOnPreset] = useState(null);
+
+  // Model Swap (two images)
+  const [swapImage1, setSwapImage1] = useState(null);
+  const [swapImage2, setSwapImage2] = useState(null);
+  const [swapPreview1, setSwapPreview1] = useState('');
+  const [swapPreview2, setSwapPreview2] = useState('');
+  const [swapPrompt, setSwapPrompt] = useState('Blend the two concepts into a coherent, photo-realistic composition.');
+
+  // removeBg presentation controls
+  const [bgMode, setBgMode] = useState('color'); // color|gradient|pattern
   const [color, setColor] = useState('#ffffff');
   const [color2, setColor2] = useState('#f1f5f9');
   const [angle, setAngle] = useState(35);
@@ -168,14 +182,6 @@ export default function DashboardStudio() {
   const [respOpen, setRespOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
-  // presets → pass to popups
-  const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
-  const [pendingTryOnPreset, setPendingTryOnPreset] = useState(null);
-
-  // backend model (from API)
-  const [models, setModels] = useState([]); // [{id,name,tags,desc,recommendFor}]
-  const [backendModel, setBackendModel] = useState('');
-
   // compare overlay
   const [compare, setCompare] = useState(false);
   const [compareOpacity, setCompareOpacity] = useState(50);
@@ -183,7 +189,7 @@ export default function DashboardStudio() {
   const dropRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  /* ---------- auth & workspace ---------- */
+  /* ───────── auth & profile ───────── */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -193,32 +199,21 @@ export default function DashboardStudio() {
       try {
         const { data } = await supabase
           .from('Data')
-          .select('plan, credits, model_backend')
+          .select('plan, credits')
           .eq('user_id', user.id)
           .single();
 
         if (!mounted) return;
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
-        setBackendModel(data?.model_backend || '');
       } catch {/* ignore */}
 
-      // ← ربط الموديل مع /api/model.js (وليس /api/models)
-      try {
-        const res = await fetch('/api/model', { cache: 'no-store' });
-        if (res.ok) {
-          const arr = await res.json();
-          if (Array.isArray(arr)) setModels(arr);
-          if (!backendModel && Array.isArray(arr) && arr[0]?.id) setBackendModel(arr[0].id);
-        }
-      } catch {/* ignore */}
-
-      if (mounted) setLoading(false);
+      setLoading(false);
     })();
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
-  // credits live refresh
+  // credits live refresh event
   useEffect(() => {
     const h = async () => {
       if (!user?.id) return;
@@ -231,7 +226,7 @@ export default function DashboardStudio() {
     }
   }, [supabase, user]);
 
-  /* ---------- drag & drop + paste ---------- */
+  /* ───────── drag & drop + paste ───────── */
   useEffect(() => {
     const el = dropRef.current; if (!el) return;
     const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-indigo-400'); };
@@ -251,42 +246,49 @@ export default function DashboardStudio() {
     };
   }, []);
 
-  /* ---------- keyboard shortcuts ---------- */
+  /* ───────── keyboard ───────── */
   const handleRun = useCallback(() => {
-    if (active !== 'modelSwap' && !file) { setErr('اختر صورة أولاً'); return; }
-    if (active === 'removeBg') return runRemoveBg();
-    if (active === 'enhance')  return setShowEnhance(true);
-    if (active === 'tryon')    return setShowTryOn(true);
-  }, [active, file]); // runRemoveBg stable
+    if (active === 'studio') {
+      if (!file) { setErr('Pick an image first'); return; }
+      return runStudio();
+    }
+    if (active === 'tryon') {
+      if (!file) { setErr('Pick an image first'); return; }
+      return setShowTryOn(true);
+    }
+    if (active === 'modelSwap') {
+      if (!swapImage1 || !swapImage2) { setErr('Pick two images for model swap'); return; }
+      return runModelSwap();
+    }
+  }, [active, file, swapImage1, swapImage2]); // eslint-disable-line
 
   useEffect(() => {
     const handler = (e) => {
       if (e.target && ['INPUT','TEXTAREA','SELECT','BUTTON'].includes(e.target.tagName)) return;
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleRun(); }
-      if (e.key >= '1' && e.key <= '4') {
+      if (e.key >= '1' && e.key <= '3') {
         const index = Number(e.key) - 1;
-        setActive(TOOLS[index]?.id || 'enhance');
+        setActive(TOOLS[index]?.id || 'studio');
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [handleRun]);
 
-  /* ---------- reset on tool switch ---------- */
+  /* ───────── reset on tool switch ───────── */
   useEffect(() => {
-    setPhase('idle'); setErr(''); setApiResponse(null);
-    if (active === 'modelSwap') return;
-    setResultUrl(''); setImageData('');
+    setPhase('idle'); setErr(''); setApiResponse(null); setResultUrl('');
+    if (active !== 'studio') { setApplyEnhance(false); setApplyRemoveBg(false); }
   }, [active]);
 
   const onPick = async (f) => {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
     setResultUrl(''); setPhase('idle'); setErr(''); setApiResponse(null);
-    if (active === 'removeBg') setImageData(await fileToDataURLOriginal(f));
+    setImageData(await fileToDataURL(f));
   };
 
-  /* ---------- styles ---------- */
+  /* ───────── style helpers (remove-bg frame) ───────── */
   const bgStyle = useMemo(() => {
     if (bgMode === 'color') return { background: color };
     if (bgMode === 'gradient') return { background: `linear-gradient(${angle}deg, ${color}, ${color2})` };
@@ -310,7 +312,12 @@ export default function DashboardStudio() {
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
-  /* ---------- prompts ---------- */
+  /* ───────── prompt builders ───────── */
+  const buildEnhancePrompt = (f) =>
+    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
+      .filter(Boolean).join(', ');
+  const generateDynamicPrompt = (selections) => `dynamic: ${JSON.stringify(selections)}`;
+  const generateTryOnNegativePrompt = () => 'lowres, artifacts, deformed';
   const pickFirstUrl = (obj) => {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
@@ -318,90 +325,112 @@ export default function DashboardStudio() {
     for (const k of keys) if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
     return '';
   };
-  const buildEnhancePrompt = (f) =>
-    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
-      .filter(Boolean).join(', ');
 
-  /* ---------- storage ---------- */
-  const uploadToStorage = useCallback(async () => {
-    if (!file) throw new Error('no file');
-    const ext = (file.name?.split('.').pop() || 'png').toLowerCase();
-    const path = `${user.id}/${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
-      cacheControl: '3600', upsert: false, contentType: file.type || 'image/*',
+  /* ───────── storage ───────── */
+  const uploadToStorage = useCallback(async (f) => {
+    const ext = (f.name?.split('.').pop() || 'png').toLowerCase();
+    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, f, {
+      cacheControl: '3600', upsert: false, contentType: f.type || 'image/*',
     });
-    if (upErr) throw upErr;
+    if (error) throw error;
     const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
     if (!data?.publicUrl) throw new Error('no public url');
     return data.publicUrl;
-  }, [file, supabase, user]);
+  }, [supabase, user]);
 
-  /* ---------- actions ---------- */
-  const runRemoveBg = useCallback(async () => {
+  /* ───────── actions ───────── */
+  // Studio: Remove BG (optional) → Enhance (optional)
+  const runStudio = useCallback(async () => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
-      const r = await fetch('/api/remove-bg', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData, backendModel }),
-      });
-      const j = await r.json(); setApiResponse(j);
-      if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from remove-bg');
-      setResultUrl(out);
-      setHistory(h => [{ tool:'removeBg', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
+      let workingUrl = null;
+
+      if (applyRemoveBg) {
+        const r = await fetch('/api/remove-bg', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageData })
+        });
+        const j = await r.json(); setApiResponse(j);
+        if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
+        workingUrl = pickFirstUrl(j);
+        if (!workingUrl) throw new Error('No output from remove-bg');
+      } else {
+        // just upload source to storage
+        workingUrl = await uploadToStorage(file);
+      }
+
+      if (applyEnhance) {
+        const prompt = buildEnhancePrompt(pendingEnhancePreset || ENHANCE_PRESETS[0].config);
+        const r2 = await fetch('/api/enhance', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: workingUrl, selections: pendingEnhancePreset, prompt, plan, user_email: user.email })
+        });
+        const j2 = await r2.json(); setApiResponse(j2);
+        if (!r2.ok) throw new Error(j2?.error || 'enhance failed');
+        workingUrl = pickFirstUrl(j2);
+        if (!workingUrl) throw new Error('No output from enhance');
+      }
+
+      setResultUrl(workingUrl);
+      setHistory(h => [{ tool:'studio', inputThumb: localUrl, outputUrl: workingUrl, ts: Date.now() }, ...h].slice(0,24));
       setPhase('ready');
       window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
-      console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
+      console.error(e); setPhase('error'); setErr('Failed to process. Please try again.');
     } finally { setBusy(false); }
-  }, [imageData, localUrl, backendModel]);
+  }, [applyRemoveBg, applyEnhance, imageData, pendingEnhancePreset, plan, user, localUrl, file, uploadToStorage]);
 
-  const runEnhance = useCallback(async (selections) => {
-    setBusy(true); setErr(''); setPhase('processing');
-    try {
-      const imageUrl = await uploadToStorage();
-      const prompt = buildEnhancePrompt(selections);
-      const r = await fetch('/api/enhance', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email, backendModel }),
-      });
-      const j = await r.json(); setApiResponse(j);
-      if (!r.ok) throw new Error(j?.error || 'enhance failed');
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from enhance');
-      setResultUrl(out);
-      setHistory(h => [{ tool:'enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
-      setPhase('ready'); window.dispatchEvent(new Event('credits:refresh'));
-    } catch (e) {
-      console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
-    } finally { setBusy(false); }
-  }, [uploadToStorage, plan, user, localUrl, backendModel]);
-
+  // Try-On
+  const [showTryOn, setShowTryOn] = useState(false);
   const runTryOn = useCallback(async (selections) => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
-      const imageUrl = await uploadToStorage();
+      const imageUrl = await uploadToStorage(file);
       const prompt = generateDynamicPrompt(selections);
       const negativePrompt = generateTryOnNegativePrompt();
       const r = await fetch('/api/tryon', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, prompt, negativePrompt, plan, user_email: user.email, backendModel }),
+        body: JSON.stringify({ imageUrl, prompt, negativePrompt, plan, user_email: user.email })
       });
       const j = await r.json(); setApiResponse(j);
       if (!r.ok) throw new Error(j?.error || 'tryon failed');
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
       setResultUrl(out);
-      setHistory(h => [{ tool:'tryon', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
+      setHistory(h => [{ tool:'tryon', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
       setPhase('ready'); window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
-      console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
+      console.error(e); setPhase('error'); setErr('Failed to process. Please try again.');
     } finally { setBusy(false); }
-  }, [uploadToStorage, plan, user, localUrl, backendModel]);
+  }, [uploadToStorage, plan, user, localUrl, file]);
 
-  /* ---------- modals ---------- */
-  const [showEnhance, setShowEnhance] = useState(false);
-  const [showTryOn, setShowTryOn] = useState(false);
+  // Model Swap (2 images + prompt → /api/model)
+  const runModelSwap = useCallback(async () => {
+    setBusy(true); setErr(''); setPhase('processing');
+    try {
+      const [url1, url2] = await Promise.all([uploadToStorage(swapImage1), uploadToStorage(swapImage2)]);
+      const r = await fetch('/api/model', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image1: url1,
+          image2: url2,
+          prompt: swapPrompt,
+          plan,
+          user_email: user.email
+        })
+      });
+      const j = await r.json(); setApiResponse(j);
+      if (!r.ok) throw new Error(j?.error || 'model-swap failed');
+      const out = pickFirstUrl(j); if (!out) throw new Error('No output from model-swap');
+      setResultUrl(out);
+      setHistory(h => [{ tool:'modelSwap', inputThumb: url1, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
+      setPhase('ready'); window.dispatchEvent(new Event('credits:refresh'));
+    } catch (e) {
+      console.error(e); setPhase('error'); setErr('Failed to process. Please try again.');
+    } finally { setBusy(false); }
+  }, [swapImage1, swapImage2, swapPrompt, uploadToStorage, plan, user]);
 
-  /* ---------- download helpers ---------- */
+  /* ───────── downloads & misc ───────── */
   const downloadDataUrl = (dataUrl, name = 'studio-output.png') => {
     const a = document.createElement('a'); a.href = dataUrl; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
@@ -466,14 +495,16 @@ export default function DashboardStudio() {
 
   const copyUrl = async () => {
     if (!resultUrl) return;
-    try { await navigator.clipboard.writeText(resultUrl); setErr('✔ تم نسخ الرابط'); setTimeout(()=>setErr(''),1500); } catch {}
+    try { await navigator.clipboard.writeText(resultUrl); setErr('Link copied'); setTimeout(()=>setErr(''),1500); } catch {}
   };
 
   const resetAll = () => {
-    setFile(null); setLocalUrl(''); setResultUrl(''); setImageData(''); setErr(''); setPhase('idle'); setApiResponse(null); setCompare(false);
+    setFile(null); setLocalUrl(''); setResultUrl(''); setImageData('');
+    setSwapImage1(null); setSwapImage2(null); setSwapPreview1(''); setSwapPreview2('');
+    setErr(''); setPhase('idle'); setApiResponse(null); setCompare(false);
   };
 
-  /* ---------- UI ---------- */
+  /* ───────── UI ───────── */
   if (loading || user === undefined) {
     return (
       <main className="min-h-screen grid place-items-center bg-gradient-to-b from-slate-50 to-slate-100 text-slate-600">
@@ -488,45 +519,6 @@ export default function DashboardStudio() {
     const p = n.split(' ').filter(Boolean);
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
-
-  /* ---------- Model Swap (panel from API) ---------- */
-  const ModelSwapPanel = () => (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {models?.length ? models.map((b) => {
-        const selected = backendModel === b.id;
-        return (
-          <button
-            key={b.id}
-            onClick={async () => {
-              setBackendModel(b.id);
-              try { await supabase.from('Data').update({ model_backend: b.id }).eq('user_id', user.id); } catch {}
-            }}
-            className={[
-              'text-left rounded-xl border p-4 transition shadow-sm hover:shadow-md',
-              selected ? 'border-indigo-500 ring-1 ring-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
-            ].join(' ')}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-semibold">{b.name}</div>
-                {b.desc && <div className="text-xs text-slate-600">{b.desc}</div>}
-              </div>
-              {selected && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600 text-white">Active</span>}
-            </div>
-            {Array.isArray(b.tags) && b.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {b.tags.map(t => (
-                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">{t}</span>
-                ))}
-              </div>
-            )}
-          </button>
-        );
-      }) : (
-        <div className="text-xs text-slate-500">No models from API.</div>
-      )}
-    </div>
-  );
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900">
@@ -543,7 +535,7 @@ export default function DashboardStudio() {
       )}
 
       <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
-        {/* ===== Left Sidebar ===== */}
+        {/* ───── Left Sidebar ───── */}
         <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-3 md:top-4 self-start h-fit">
           <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
             <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
@@ -558,11 +550,6 @@ export default function DashboardStudio() {
             ))}
           </Group>
 
-          <Group title="Models" defaultOpen>
-            <SideItem label="Model Swap" icon={CubeIcon} active={active === 'modelSwap'} onClick={() => setActive('modelSwap')} />
-            <SideItem label="History" icon={ListIcon} onClick={() => document.getElementById('history-anchor')?.scrollIntoView({ behavior:'smooth' })} />
-          </Group>
-
           <div className="mt-2 px-4 py-3 border-t border-slate-200">
             <div className="flex items-center gap-3">
               <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">{initials}</div>
@@ -573,68 +560,74 @@ export default function DashboardStudio() {
           </div>
         </aside>
 
-        {/* ===== Main Column ===== */}
+        {/* ───── Main Column ───── */}
         <section className="space-y-5 md:space-y-6">
+
           {/* Presets + Customize */}
-          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white/90 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
-                <p className="text-slate-600 text-xs sm:text-sm">اختر Preset جاهز أو افتح <span className="font-semibold">Customize</span> للتعديل اليدوي.</p>
+          {active !== 'modelSwap' && (
+            <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white/90 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
+                  <p className="text-slate-600 text-xs sm:text-sm">Pick a preset, or open <span className="font-semibold">Customize</span> to fine-tune.</p>
+                </div>
+                {active === 'studio' ? (
+                  <button
+                    onClick={() => { setPendingEnhancePreset(null); setApplyEnhance(true); setApplyRemoveBg(true); }}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
+                  >
+                    ✨ Default: Enhance + Remove BG
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setPendingTryOnPreset(null); setShowTryOn(true); }}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
+                  >
+                    🧍 Customize Try-On
+                  </button>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { setActive('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
-                >
-                  ✨ Customize Enhance
-                </button>
-                <button
-                  onClick={() => { setActive('tryon'); setPendingTryOnPreset(null); setShowTryOn(true); }}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
-                >
-                  🧍 Customize Try-On
-                </button>
-              </div>
-            </div>
 
-            {/* ENHANCE */}
-            <div className="mt-4">
-              <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {ENHANCE_PRESETS.map(p => (
-                  <PresetCard
-                    key={p.id}
-                    title={p.title}
-                    subtitle={p.subtitle}
-                    preview={p.preview}
-                    tag={p.tag}
-                    onClick={() => { setActive('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
-                  />
-                ))}
-              </div>
-            </div>
+              {active === 'studio' && (
+                <div className="mt-4">
+                  <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {ENHANCE_PRESETS.map(p => (
+                      <PresetCard
+                        key={p.id}
+                        title={p.title}
+                        subtitle={p.subtitle}
+                        preview={p.preview}
+                        tag={p.tag}
+                        onClick={() => { setPendingEnhancePreset(p.config); setApplyEnhance(true); }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            {/* TRY-ON */}
-            <div className="mt-6">
-              <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {TRYON_PRESETS.map(p => (
-                  <PresetCard
-                    key={p.id}
-                    title={p.title}
-                    subtitle={p.subtitle}
-                    preview={p.preview}
-                    tag={p.tag}
-                    onClick={() => { setActive('tryon'); setPendingTryOnPreset(p.config); setShowTryOn(true); }}
-                  />
-                ))}
-              </div>
+              {active === 'tryon' && (
+                <div className="mt-4">
+                  <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {TRYON_PRESETS.map(p => (
+                      <PresetCard
+                        key={p.id}
+                        title={p.title}
+                        subtitle={p.subtitle}
+                        preview={p.preview}
+                        tag={p.tag}
+                        onClick={() => { setPendingTryOnPreset(p.config); setShowTryOn(true); }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Workbench */}
-          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_360px]">
             {/* Canvas Panel */}
             <section className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm relative">
               {/* header */}
@@ -646,7 +639,7 @@ export default function DashboardStudio() {
                 </div>
               </div>
 
-              {/* dropzone / model swap */}
+              {/* dropzone / model swap area */}
               {active !== 'modelSwap' ? (
                 <div
                   ref={dropRef}
@@ -686,27 +679,46 @@ export default function DashboardStudio() {
                 </div>
               ) : (
                 <div className="m-3 sm:m-4 md:m-5">
-                  <div className="mb-2 text-sm font-semibold">Swap Backend Model</div>
-                  <ModelSwapPanel />
+                  <div className="mb-3 flex flex-col sm:flex-row gap-3">
+                    <SwapPicker
+                      title="Input Image 1"
+                      file={swapImage1}
+                      preview={swapPreview1}
+                      onPick={async (f) => { setSwapImage1(f); setSwapPreview1(URL.createObjectURL(f)); }}
+                    />
+                    <SwapPicker
+                      title="Input Image 2"
+                      file={swapImage2}
+                      preview={swapPreview2}
+                      onPick={async (f) => { setSwapImage2(f); setSwapPreview2(URL.createObjectURL(f)); }}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-xs text-slate-600">Prompt</label>
+                    <input
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                      value={swapPrompt}
+                      onChange={(e)=>setSwapPrompt(e.target.value)}
+                      placeholder="Describe how to merge both images…"
+                    />
+                  </div>
                 </div>
               )}
 
               {/* actions */}
               <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
-                {active !== 'modelSwap' && (
-                  <button
-                    onClick={handleRun}
-                    disabled={!file || busy}
-                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
-                  >
-                    {busy ? 'Processing…' : (<><PlayIcon className="size-4" />Run {TOOLS.find(t => t.id === active)?.label}</>)}
-                  </button>
-                )}
+                <button
+                  onClick={handleRun}
+                  disabled={(active!=='modelSwap' && !file) || (active==='modelSwap' && (!swapImage1 || !swapImage2)) || busy}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
+                >
+                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" />Run {TOOLS.find(t => t.id === active)?.label}</>)}
+                </button>
 
-                {resultUrl && active !== 'modelSwap' && (
+                {resultUrl && (
                   <>
                     <button
-                      onClick={active === 'removeBg' ? downloadRemoveBgPng : downloadResultAsPng}
+                      onClick={active === 'studio' && applyRemoveBg ? downloadRemoveBgPng : downloadResultAsPng}
                       className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50"
                     >
                       ⬇ Download PNG
@@ -729,7 +741,7 @@ export default function DashboardStudio() {
                     >
                       ↗ Open
                     </a>
-                    {localUrl && (
+                    {localUrl && active!=='modelSwap' && (
                       <>
                         <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2">
                           <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
@@ -791,39 +803,56 @@ export default function DashboardStudio() {
             <aside className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold text-slate-900">Inspector</div>
-                <span className="text-xs text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
+                <span className="text-xs text-slate-500">Mode: {TOOLS.find(t=>t.id===active)?.label}</span>
               </div>
 
-              {active === 'removeBg' && (
+              {active === 'studio' && (
                 <div className="space-y-3 mt-3">
-                  <ModeTabs mode={bgMode} setMode={setBgMode} />
-                  <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
-                  {bgMode === 'gradient' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="inline-flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked={applyRemoveBg} onChange={(e)=>setApplyRemoveBg(e.target.checked)} />
+                      Remove Background
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked={applyEnhance} onChange={(e)=>setApplyEnhance(e.target.checked)} />
+                      Apply Enhance
+                    </label>
+                  </div>
+
+                  {/* Remove-BG frame styling */}
+                  {applyRemoveBg && (
                     <>
-                      <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
-                      <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
+                      <ModeTabs mode={bgMode} setMode={setBgMode} />
+                      <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
+                      {bgMode === 'gradient' && (
+                        <>
+                          <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
+                          <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
+                        </>
+                      )}
+                      {bgMode === 'pattern' && (
+                        <Field label="Pattern opacity">
+                          <Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} />
+                        </Field>
+                      )}
+                      <Field label="Corner radius"><Range value={radius} onChange={setRadius} min={0} max={48} /></Field>
+                      <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
+                      <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-700">
+                        <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
+                        Shadow
+                      </label>
                     </>
                   )}
-                  {bgMode === 'pattern' && (
-                    <Field label="Pattern opacity">
-                      <Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} />
-                    </Field>
-                  )}
-                  <Field label="Radius"><Range value={radius} onChange={setRadius} min={0} max={48} /></Field>
-                  <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
-                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-700">
-                    <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
-                    Shadow
-                  </label>
 
-                  <div className="mt-3">
-                    <div className="text-xs text-slate-500 mb-2">Final Preview</div>
-                    <div style={frameStyle} className="relative rounded-xl overflow-hidden border border-slate-200">
+                  {/* Final Preview */}
+                  <div className="mt-2">
+                    <div className="text-xs text-slate-500 mb-2">Final preview</div>
+                    <div style={applyRemoveBg ? frameStyle : {}} className="relative rounded-xl overflow-hidden border border-slate-200">
                       <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
                         {resultUrl ? (
                           <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
                         ) : (
-                          <div className="grid place-items-center h-[140px] text-xs text-slate-400">— Run Remove BG first —</div>
+                          <div className="grid place-items-center h-[140px] text-xs text-slate-400">— Run Studio first —</div>
                         )}
                       </div>
                     </div>
@@ -831,9 +860,9 @@ export default function DashboardStudio() {
                 </div>
               )}
 
-              {(active === 'enhance' || active === 'tryon') && (
+              {active === 'tryon' && (
                 <div className="space-y-2 text-xs text-slate-600 mt-3">
-                  <div>اختر Preset من الأعلى أو اضغط <span className="font-semibold">Run/Customize</span>.</div>
+                  <div>Pick a Try-On preset above or click Run to open Customize.</div>
                   {resultUrl && (
                     <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                       <div className="relative w-full min-h-[140px] grid place-items-center">
@@ -845,13 +874,22 @@ export default function DashboardStudio() {
               )}
 
               {active === 'modelSwap' && (
-                <div className="text-xs text-slate-600 mt-3">اختر الـ Backend المناسب — يُحفظ تلقائيًا على حسابك.</div>
+                <div className="space-y-3 text-xs text-slate-600 mt-3">
+                  <p>Upload two images, write a short prompt, then run Model Swap.</p>
+                  {resultUrl && (
+                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                      <div className="relative w-full min-h-[140px] grid place-items-center">
+                        <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </aside>
           </div>
 
           {/* History */}
-          <div id="history-anchor" className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
+          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
             <div className="text-sm font-semibold text-slate-900 mb-2">History</div>
             {history.length === 0 ? (
               <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
@@ -879,21 +917,8 @@ export default function DashboardStudio() {
         </section>
       </div>
 
-      {/* ===== Modals ===== */}
+      {/* Modals */}
       <AnimatePresence>
-        {showEnhance && (
-          <motion.div className="fixed inset-0 z-[100] grid place-items-center"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-black/55" onClick={()=>setShowEnhance(false)} />
-            <div className="relative w-full max-w-3xl mx-3">
-              <EnhanceCustomizer
-                initial={pendingEnhancePreset || undefined}
-                onChange={()=>{}}
-                onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
-              />
-            </div>
-          </motion.div>
-        )}
         {showTryOn && (
           <motion.div className="fixed inset-0 z-[100] grid place-items-center"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -915,7 +940,7 @@ export default function DashboardStudio() {
   );
 }
 
-/* ================== Sidebar bits ================== */
+/* ───────────────── Sidebar bits ───────────────── */
 function Group({ title, children, defaultOpen=false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -962,7 +987,7 @@ function SideItem({ label, icon:Icon, active=false, onClick }) {
   );
 }
 
-/* ================== UI bits ================== */
+/* ───────────────── UI bits ───────────────── */
 function Segmented({ items, value, onChange }) {
   return (
     <div className="inline-flex rounded-full border border-slate-300 bg-white p-1">
@@ -987,7 +1012,6 @@ function Segmented({ items, value, onChange }) {
   );
 }
 
-/* بطاقة preset — تختفي تلقائيًا إذا فشلت الصورة (لتجنّب بطاقات بدون صور) */
 function PresetCard({ title, subtitle, onClick, preview, tag }) {
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -1039,7 +1063,7 @@ function StepBadge({ phase }) {
   );
 }
 
-/* ---------- form controls ---------- */
+/* ───────── controls ───────── */
 function Field({ label, children }) {
   return (
     <label className="flex items-center justify-between gap-3 text-xs text-slate-700">
@@ -1073,8 +1097,6 @@ function Range({ value, onChange, min, max, step=1 }) {
     </div>
   );
 }
-
-/* ---------- removeBG mode tabs ---------- */
 function ModeTabs({ mode, setMode }) {
   const tabs = [
     { id: 'color', label: 'Color' },
@@ -1099,44 +1121,32 @@ function ModeTabs({ mode, setMode }) {
   );
 }
 
-/* ---------- icons ---------- */
-function ScissorsIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor"/></svg>);}
-function RocketIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor"/><circle cx="15" cy="9" r="1.5" fill="#fff"/></svg>);}
-function PersonIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/></svg>);}
-function CubeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2.18L6 6.09v.1l6 3 6-3v-.1l-6-1.91zM6 8.4V18l6 3V11.4L6 8.4zm12 0l-6 3V21l6-3V8.4z" fill="currentColor"/></svg>);}
-function ListIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" fill="currentColor"/></svg>);}
-function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
-function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M2 20l10-10 2 2L4 22H2zM14 2l2 2-2 2-2-2 2-2z" fill="currentColor"/></svg>);}
-
-/* ====== محاكيان بسيطان لـ Customize (استبدلها بإعداداتك الكاملة) ====== */
-function EnhanceCustomizer({ initial, onChange, onComplete }) {
+/* ───────── Model Swap pickers ───────── */
+function SwapPicker({ title, file, preview, onPick }) {
+  const inputRef = useRef(null);
   return (
-    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
-      <div className="text-sm font-semibold">Enhance Settings</div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-        <label className="space-y-1">
-          <span className="text-slate-600">Style</span>
-          <input defaultValue={initial?.photographyStyle || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="studio product photography, 50mm" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600">Background</span>
-          <input defaultValue={initial?.background || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="white seamless" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600">Lighting</span>
-          <input defaultValue={initial?.lighting || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="softbox, gentle reflections" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600">Colors</span>
-          <input defaultValue={initial?.colorStyle || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="neutral whites, subtle grays" />
-        </label>
-      </div>
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={()=>onComplete(initial || {})}>Run</button>
+    <div className="flex-1 rounded-2xl border border-slate-200 bg-white p-3">
+      <div className="text-xs font-semibold mb-2">{title}</div>
+      <div
+        className="relative h-44 rounded-xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 grid place-items-center cursor-pointer"
+        onClick={() => inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file" accept="image/*" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }}
+        />
+        {preview ? (
+          <img src={preview} alt="pick" className="absolute inset-0 w-full h-full object-contain rounded-xl" />
+        ) : (
+          <div className="text-slate-500 text-xs">Click to choose</div>
+        )}
       </div>
     </div>
   );
 }
+
+/* ───────── simple Customize modals ───────── */
 function TryOnCustomizer({ initial, onChange, onComplete }) {
   return (
     <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
@@ -1157,6 +1167,7 @@ function TryOnCustomizer({ initial, onChange, onComplete }) {
     </div>
   );
 }
+
 function ExportDrawer({ open, onClose, cutoutUrl, defaultName }) {
   if (!open) return null;
   return (
@@ -1171,6 +1182,9 @@ function ExportDrawer({ open, onClose, cutoutUrl, defaultName }) {
   );
 }
 
-/* ====== Prompt helpers (بدائل خفيفة) ====== */
-function generateDynamicPrompt(selections){ return `dynamic: ${JSON.stringify(selections)}`; }
-function generateTryOnNegativePrompt(){ return 'lowres, artifacts, deformed'; }
+/* ───────── icons (clean, modern SVG) ───────── */
+function SparklesIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M5 11l2-5 2 5 5 2-5 2-2 5-2-5-5-2 5-2zm11-6l1-3 1 3 3 1-3 1-1 3-1-3-3-1 3-1zm1 9l1-2 1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="currentColor"/></svg>);}
+function PersonIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/></svg>);}
+function CubeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2.2L6.5 6.3 12 8.8 17.5 6.3 12 4.2zM6 7.8V18l6 3V10.8L6 7.8zm12 0l-6 3V21l6-3V7.8z" fill="currentColor"/></svg>);}
+function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M2 20l10-10 2 2L4 22H2zM14 2l2 2-2 2-2-2 2-2z" fill="currentColor"/></svg>);}
+function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
