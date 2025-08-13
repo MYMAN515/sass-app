@@ -16,7 +16,7 @@ const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
   const n = parseInt(v, 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = (n) & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
 
@@ -37,6 +37,7 @@ const TOOLS = [
   { id: 'removeBg', label: 'Remove BG', emoji: '✂️' },
   { id: 'enhance',  label: 'Enhance',   emoji: '🚀' },
   { id: 'tryon',    label: 'Try-On',    emoji: '🧍‍♂️' },
+  { id: 'mya',      label: 'Make Your Ad', emoji: '📣' }, // NEW
 ];
 
 export default function DashboardStudio() {
@@ -79,6 +80,7 @@ export default function DashboardStudio() {
   // modals
   const [showEnhance, setShowEnhance] = useState(false);
   const [showTryon, setShowTryon] = useState(false);
+  const [showMya, setShowMya] = useState(false); // NEW
 
   // Export drawer
   const [exportOpen, setExportOpen] = useState(false);
@@ -201,6 +203,23 @@ export default function DashboardStudio() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
+  /* ---------- MYA prompt ---------- */
+  const AD_STYLE_PACKS = {
+    luxury: "marble or onyx surface, subtle reflections, soft cool key light, minimal props",
+    tech:   "geometric backdrop, sleek subtle reflections, rim light, modern scene",
+    beauty: "pastel gradient background, soft rim light, gentle glow, clean composition",
+    sport:  "high-contrast lighting, dynamic angle hints, subtle motion feel",
+    gulf:   "warm tones, elegant fabric textures, tasteful gold accents, clean studio look",
+  };
+
+  const AD_NEGATIVE =
+    "blurry, low-res, watermark, heavy text, distorted edges, messy background, over/underexposed";
+
+  const buildAdPrompt = ({ productType = 'product', stylePack = 'luxury' } = {}) => {
+    const cues = AD_STYLE_PACKS[stylePack] || AD_STYLE_PACKS.luxury;
+    return `Commercial product ad photo for ${productType}. Clean studio-grade scene, ${cues}. Emphasize clarity and realistic materials. Soft key light, balanced shadows. No text, no watermarks.`;
+  };
+
   /* ---------- actions ---------- */
   const runRemoveBg = useCallback(async () => {
     setBusy(true); setErr(''); setPhase('processing');
@@ -280,11 +299,47 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl]);
 
+  // NEW: MYA uses the same /api/enhance with a different prompt + flag
+  const runMya = useCallback(async (form) => {
+    setBusy(true); setErr(''); setPhase('processing');
+    try {
+      const imageUrl = await uploadToStorage();
+      const prompt = buildAdPrompt({ productType: form?.productType, stylePack: form?.stylePack });
+      const selections = {
+        __mode: 'mya',                // لتمييزه في الباك-إند إن أردت
+        stylePack: form?.stylePack,
+        productType: form?.productType,
+        aspect_ratio: '1:1',
+        negativePrompt: AD_NEGATIVE,
+      };
+
+      const r = await fetch('/api/enhance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email }),
+      });
+      const j = await r.json();
+      setApiResponse(j);
+      if (!r.ok) throw new Error(j?.error || 'mya failed');
+
+      const out = pickFirstUrl(j);
+      if (!out) throw new Error('No output from mya');
+
+      setResultUrl(out);
+      setHistory(h => [{ tool:'mya', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,8));
+      setPhase('ready');
+      window.dispatchEvent(new Event('credits:refresh'));
+    } catch (e) {
+      console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
+    } finally { setBusy(false); }
+  }, [uploadToStorage, plan, user, localUrl]);
+
   const handleRun = useCallback(() => {
     if (!file) { setErr('اختر صورة أولاً'); return; }
     if (active === 'removeBg') return runRemoveBg();
     if (active === 'enhance')  return setShowEnhance(true);
     if (active === 'tryon')    return setShowTryon(true);
+    if (active === 'mya')      return setShowMya(true); // NEW
   }, [active, file, runRemoveBg]);
 
   /* ---------- download helpers ---------- */
@@ -603,6 +658,18 @@ export default function DashboardStudio() {
               </div>
             </motion.div>
           )}
+          {showMya && (
+            <motion.div className="fixed inset-0 z-[100] grid place-items-center"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <div className="absolute inset-0 bg-black/60" onClick={()=>setShowMya(false)} />
+              <div className="relative w-full max-w-xl rounded-2xl border border-white/10 bg-[#0e0b18] p-4">
+                <MyaMiniCustomizer
+                  onCancel={() => setShowMya(false)}
+                  onComplete={(form) => { setShowMya(false); runMya(form); }}
+                />
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* NEW — Export Drawer */}
@@ -611,7 +678,6 @@ export default function DashboardStudio() {
           onClose={() => setExportOpen(false)}
           cutoutUrl={resultUrl}       // الناتج (الأفضل يكون شفاف من Remove BG)
           defaultName="product"       // بدّلها لـ SKU عندك
-          // استخدم خلفية المصمم الحالية بدل الخلفية الافتراضية للقالب:
           // useCurrentBg={bgMode === 'color'}
           // currentBgColor={color}
         />
@@ -718,3 +784,51 @@ function Tab({ active, children, onClick }) {
 function Field({ label, children }) { return <label className="flex items-center justify-between gap-3 text-xs"><span className="min-w-28 text-white/70">{label}</span><div className="flex-1">{children}</div></label>; }
 function Color({ value, onChange }) { return (<div className="flex items-center gap-2"><input type="color" value={value} onChange={(e)=>onChange(e.target.value)} /><input className="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-1" value={value} onChange={(e)=>onChange(e.target.value)} /></div>); }
 function Range({ value, onChange, min, max, step=1 }) { return (<div className="flex items-center gap-2"><input type="range" value={value} min={min} max={max} step={step} onChange={(e)=>onChange(Number(e.target.value))} className="w-full" /><span className="w-10 text-right">{typeof value==='number'?value:''}</span></div>); }
+
+/* ---------- MYA mini customizer (inline component) ---------- */
+function MyaMiniCustomizer({ onCancel, onComplete }) {
+  const [productType, setProductType] = useState('perfume bottle');
+  const [stylePack, setStylePack] = useState('luxury');
+  const STYLES = Object.keys({
+    luxury:1, tech:1, beauty:1, sport:1, gulf:1
+  });
+  return (
+    <div className="text-sm text-white">
+      <div className="text-base font-semibold mb-3">Make Your Ad — Settings</div>
+
+      <label className="block mb-3">
+        <div className="mb-1 text-white/70 text-xs">Product type</div>
+        <input
+          value={productType}
+          onChange={(e)=>setProductType(e.target.value)}
+          className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2"
+          placeholder="perfume bottle, skincare jar, chips bag…"
+        />
+      </label>
+
+      <div className="mb-4">
+        <div className="mb-1 text-white/70 text-xs">Style pack</div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {STYLES.map(s => (
+            <button key={s}
+              onClick={()=>setStylePack(s)}
+              className={['rounded-lg px-3 py-2 capitalize text-xs',
+                stylePack===s ? 'bg-white text-black font-semibold' : 'border border-white/15 bg-white/10 hover:bg-white/15'
+              ].join(' ')}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={onCancel} className="rounded-lg border border-white/15 bg-white/10 px-3 py-1.5">Cancel</button>
+        <button
+          onClick={()=>onComplete({ productType, stylePack })}
+          className="rounded-lg bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-1.5 font-semibold">
+          Generate
+        </button>
+      </div>
+    </div>
+  );
+}
