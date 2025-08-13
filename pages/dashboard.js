@@ -6,6 +6,11 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
+import EnhanceCustomizer from '@/components/EnhanceCustomizer';
+import TryOnCustomizer from '@/components/TryOnCustomizer';
+import ExportDrawer from '@/components/ExportDrawer';
+import generateDynamicPrompt, { generateTryOnNegativePrompt } from '@/lib/generateDynamicPrompt';
+
 /* ---------------- helpers ---------------- */
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
@@ -24,82 +29,6 @@ const fileToDataURLOriginal = (file) =>
 
 const STORAGE_BUCKET = 'img';
 
-/* ---------------- Presets (مع صور معاينة) ---------------- */
-const ENHANCE_PRESETS = [
-  {
-    id: 'clean-studio',
-    title: 'Clean Studio',
-    subtitle: 'Soft light, white sweep',
-    config: {
-      photographyStyle: 'studio product photography, 50mm',
-      background: 'white seamless',
-      lighting: 'softbox, gentle reflections',
-      colorStyle: 'neutral whites, subtle grays',
-      realism: 'hyperrealistic details',
-      outputQuality: '4k sharp',
-    },
-    gradient: 'from-slate-100 via-white to-slate-100',
-    preview: '/presets/enhance/clean-studio.webp',
-  },
-  {
-    id: 'desert-tones',
-    title: 'Desert Tones',
-    subtitle: 'Warm, cinematic',
-    config: {
-      photographyStyle: 'cinematic product shot',
-      background: 'warm beige backdrop',
-      lighting: 'golden hour, soft shadows',
-      colorStyle: 'sand, beige, amber',
-      realism: 'photo-real, crisp textures',
-      outputQuality: '4k',
-    },
-    gradient: 'from-amber-200 via-orange-100 to-rose-100',
-    preview: '/presets/enhance/desert-tones.webp',
-  },
-  {
-    id: 'editorial-beige',
-    title: 'Editorial Beige',
-    subtitle: 'Minimal, magazine look',
-    config: {
-      photographyStyle: 'editorial catalog',
-      background: 'matte beige',
-      lighting: 'directional key + fill',
-      colorStyle: 'beige monochrome',
-      realism: 'realistic',
-      outputQuality: '4k print',
-    },
-    gradient: 'from-amber-50 via-rose-50 to-amber-50',
-    preview: '/presets/enhance/editorial-beige.webp',
-  },
-];
-
-const TRYON_PRESETS = [
-  {
-    id: 'streetwear',
-    title: 'Streetwear',
-    subtitle: 'Urban, moody',
-    config: { style: 'streetwear fit', setting: 'urban alley', lighting: 'overcast soft', mood: 'cool, editorial' },
-    gradient: 'from-slate-200 via-slate-100 to-slate-200',
-    preview: '/presets/tryon/streetwear.webp',
-  },
-  {
-    id: 'ecom-mannequin',
-    title: 'E-Com Mannequin',
-    subtitle: 'Plain backdrop',
-    config: { style: 'ecommerce mannequin front', setting: 'white cyclorama', lighting: 'soft studio', mood: 'catalog clean' },
-    gradient: 'from-white via-slate-50 to-white',
-    preview: '/presets/tryon/ecom-mannequin.webp',
-  },
-  {
-    id: 'lifestyle',
-    title: 'Lifestyle',
-    subtitle: 'Bright apartment',
-    config: { style: 'lifestyle casual', setting: 'sunlit room', lighting: 'window soft', mood: 'fresh & bright' },
-    gradient: 'from-emerald-50 via-teal-50 to-cyan-50',
-    preview: '/presets/tryon/lifestyle.webp',
-  },
-];
-
 /* ---------------- Tools ---------------- */
 const TOOLS = [
   { id: 'removeBg', label: 'Remove BG', icon: ScissorsIcon },
@@ -115,10 +44,12 @@ export default function DashboardStudio() {
 
   /* ---------- state ---------- */
   const [loading, setLoading] = useState(true);
+
+  // نقرأهم فقط لاستخدام شرط زر Home — بدون عرضهم في الواجهة
   const [plan, setPlan] = useState('Free');
   const [credits, setCredits] = useState(0);
-  const [err, setErr] = useState('');
 
+  const [err, setErr] = useState('');
   const [active, setActive] = useState('enhance'); // default
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
@@ -145,10 +76,7 @@ export default function DashboardStudio() {
   const [respOpen, setRespOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
-  // presets → pass to popups
-  const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
-  const [pendingTryOnPreset, setPendingTryOnPreset] = useState(null);
-
+  // presets → ألغيناها بالكامل حسب طلبك، نعتمد فقط على الـ Customizers
   // backend model (from API, NOT hardcoded here)
   const [models, setModels] = useState([]); // [{id,name,tags,desc,recommendFor}]
   const [backendModel, setBackendModel] = useState('');
@@ -167,7 +95,7 @@ export default function DashboardStudio() {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
 
-      // 1) fetch plan/credits/model for this user (⚠️ باستخدام user_id)
+      // 1) fetch plan/credits/model لهذا المستخدم — بالاعتماد على user_id
       try {
         const { data } = await supabase
           .from('Data')
@@ -181,7 +109,7 @@ export default function DashboardStudio() {
         setBackendModel(data?.model_backend || '');
       } catch {/* ignore */}
 
-      // 2) fetch model options from your API (no constants here)
+      // 2) fetch model options من API (لا تعتمد على ثابت)
       try {
         const res = await fetch('/api/models', { cache: 'no-store' });
         if (res.ok) {
@@ -196,7 +124,7 @@ export default function DashboardStudio() {
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
-  // credits live refresh (optional)
+  // credits live refresh (optional) — بدون عرض مباشر
   useEffect(() => {
     const h = async () => {
       if (!user?.id) return;
@@ -235,7 +163,7 @@ export default function DashboardStudio() {
     if (active === 'removeBg') return runRemoveBg();
     if (active === 'enhance')  return setShowEnhance(true);
     if (active === 'tryon')    return setShowTryOn(true);
-  }, [active, file]); // runRemoveBg is stable enough (no deps leak)
+  }, [active, file]); // runRemoveBg مستقل
 
   useEffect(() => {
     const handler = (e) => {
@@ -288,7 +216,7 @@ export default function DashboardStudio() {
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
-  /* ---------- prompts ---------- */
+  /* ---------- prompts & storage ---------- */
   const pickFirstUrl = (obj) => {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
@@ -300,7 +228,6 @@ export default function DashboardStudio() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
-  /* ---------- storage ---------- */
   const uploadToStorage = useCallback(async () => {
     if (!file) throw new Error('no file');
     const ext = (file.name?.split('.').pop() || 'png').toLowerCase();
@@ -515,7 +442,7 @@ export default function DashboardStudio() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      {/* زر Home فقط عند الخطة Free أو الكريدت 0 */}
+      {/* زر Home فقط عند الخطة Free أو الرصيد 0 */}
       {(plan === 'Free' || credits <= 0) && (
         <div className="fixed top-4 right-4 z-10">
           <button
@@ -529,7 +456,7 @@ export default function DashboardStudio() {
       )}
 
       <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 px-4 md:px-6 py-6">
-        {/* ===== Left Sidebar (لا يوجد Navbar/Footer) ===== */}
+        {/* ===== Left Sidebar (بدون Navbar/Footer) ===== */}
         <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-4 self-start h-fit">
           <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
             <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
@@ -568,67 +495,24 @@ export default function DashboardStudio() {
 
           <div className="mt-2 px-4 py-3 border-t border-slate-200">
             <div className="flex items-center gap-3">
-              <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">{initials}</div>
-              <div className="text-sm">
-                <div className="font-medium leading-tight">{user.user_metadata?.name || user.email}</div>
-                <div className="text-xs text-slate-500">Plan: <span className="font-medium">{plan}</span></div>
+              <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">
+                {(() => {
+                  const n = user?.user_metadata?.name || user?.email || 'U';
+                  const p = n.split(' ').filter(Boolean);
+                  return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
+                })()}
               </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-100 px-3 py-2 text-xs">
-              <span className="text-slate-600">Credits</span>
-              <span className="font-semibold">{credits}</span>
+              <div className="text-sm">
+                <div className="font-medium leading-tight truncate max-w-[140px]">{user.user_metadata?.name || user.email}</div>
+                {/* لا نعرض Plan/Credits حسب طلبك */}
+              </div>
             </div>
           </div>
         </aside>
 
         {/* ===== Main Column ===== */}
         <section className="space-y-6">
-          {/* Presets row */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
-                <p className="text-slate-600 text-sm">اختر إعداد جاهز — يفتح لك النافذة مع القيم المعبأة.</p>
-              </div>
-              <div className="text-xs rounded-full border px-3 py-1 bg-slate-50">
-                Current Model: <span className="font-semibold">{models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {ENHANCE_PRESETS.map(p => (
-                  <PresetCard
-                    key={p.id}
-                    title={p.title}
-                    subtitle={p.subtitle}
-                    gradient={p.gradient}
-                    preview={p.preview}
-                    onClick={() => { setActive('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {TRYON_PRESETS.map(p => (
-                  <PresetCard
-                    key={p.id}
-                    title={p.title}
-                    subtitle={p.subtitle}
-                    gradient={p.gradient}
-                    preview={p.preview}
-                    onClick={() => { setActive('tryon'); setPendingTryOnPreset(p.config); setShowTryOn(true); }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Workbench */}
+          {/* Workbench فقط (بدون Presets) */}
           <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
             {/* Canvas Panel */}
             <section className="rounded-3xl border border-slate-200 bg-white shadow-sm relative">
@@ -829,7 +713,7 @@ export default function DashboardStudio() {
 
               {active === 'enhance' && (
                 <div className="space-y-2 text-xs text-slate-600">
-                  <div>اضغط <span className="font-semibold">Run</span> لفتح نافذة الإعدادات — أو اختر Preset من الأعلى.</div>
+                  <div>اضغط <span className="font-semibold">Run</span> لفتح نافذة الإعدادات.</div>
                   <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
                   {resultUrl && (
                     <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
@@ -843,7 +727,7 @@ export default function DashboardStudio() {
 
               {active === 'tryon' && (
                 <div className="space-y-2 text-xs text-slate-600">
-                  <div>اختر Preset من قسم Try-On أو اضغط <span className="font-semibold">Run</span>.</div>
+                  <div>اضغط <span className="font-semibold">Run</span> لفتح إعدادات الـ Try-On.</div>
                   <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
                   {resultUrl && (
                     <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
@@ -898,11 +782,10 @@ export default function DashboardStudio() {
           <motion.div className="fixed inset-0 z-[100] grid place-items-center"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={()=>setShowEnhance(false)} />
-            <div className="relative w-full max-w-3xl">
+            <div className="relative w-full max-w-3xl mx-4">
               <EnhanceCustomizer
-                initial={pendingEnhancePreset || undefined}
                 onChange={()=>{}}
-                onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
+                onComplete={(form) => { setShowEnhance(false); runEnhance(form || {}); }}
               />
             </div>
           </motion.div>
@@ -911,18 +794,17 @@ export default function DashboardStudio() {
           <motion.div className="fixed inset-0 z-[100] grid place-items-center"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={()=>setShowTryOn(false)} />
-            <div className="relative w-full max-w-3xl">
+            <div className="relative w-full max-w-3xl mx-4">
               <TryOnCustomizer
-                initial={pendingTryOnPreset || undefined}
                 onChange={()=>{}}
-                onComplete={(form) => { setShowTryOn(false); setPendingTryOnPreset(null); runTryOn(form); }}
+                onComplete={(form) => { setShowTryOn(false); runTryOn(form || {}); }}
               />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Export Drawer (موجود لكن بدون Navbar/Footer) */}
+      {/* Export Drawer */}
       <ExportDrawer
         open={exportOpen}
         onClose={() => setExportOpen(false)}
@@ -983,7 +865,7 @@ function SideItem({ label, icon:Icon, active=false, onClick }) {
 /* ================== UI bits ================== */
 function Segmented({ items, value, onChange }) {
   return (
-    <div className="inline-flex rounded-full border border-slate-300 bg-white p-1">
+    <div className="inline-flex rounded-full border border-slate-300 bg-white p-1 overflow-x-auto max-w-full">
       {items.map((it) => {
         const Active = value === it.id;
         const Icon = it.icon;
@@ -992,7 +874,7 @@ function Segmented({ items, value, onChange }) {
             key={it.id}
             onClick={() => onChange(it.id)}
             className={[
-              'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
+              'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition whitespace-nowrap',
               Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 hover:bg-slate-100'
             ].join(' ')}
           >
@@ -1002,25 +884,6 @@ function Segmented({ items, value, onChange }) {
         );
       })}
     </div>
-  );
-}
-
-function PresetCard({ title, subtitle, onClick, gradient, preview }) {
-  return (
-    <button onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left">
-      {preview
-        ? <img src={preview} alt={title} className="h-36 w-full object-cover" loading="lazy" />
-        : <div className={`h-36 w-full bg-gradient-to-br ${gradient}`} />
-      }
-      <div className="p-3">
-        <div className="font-semibold">{title}</div>
-        <div className="text-xs text-slate-500">{subtitle}</div>
-      </div>
-      <div className="absolute top-3 right-3 rounded-full bg-white/80 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
-        Use preset
-      </div>
-    </button>
   );
 }
 
@@ -1112,43 +975,3 @@ function ListIcon(props){return(<svg viewBox="0 0 24 24" className={props.classN
 function StarIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 18l-6.2 3 1.2-6.9-5-4.8 6.9-1L12 2z" fill="currentColor"/></svg>);}
 function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
 function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M2 20l10-10 2 2L4 22H2zM14 2l2 2-2 2-2-2 2-2z" fill="currentColor"/></svg>);}
-
-/* ====== External UI needed (placeholders) ====== */
-function EnhanceCustomizer({ initial, onChange, onComplete }) {
-  // ضع مكوّن الإعدادات الحقيقي عندك
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow border">
-      <div className="text-sm font-semibold mb-2">Enhance Settings</div>
-      <button className="rounded-lg bg-indigo-600 text-white px-3 py-2" onClick={() => onComplete(initial || {})}>
-        Run
-      </button>
-    </div>
-  );
-}
-function TryOnCustomizer({ initial, onChange, onComplete }) {
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow border">
-      <div className="text-sm font-semibold mb-2">Try-On Settings</div>
-      <button className="rounded-lg bg-indigo-600 text-white px-3 py-2" onClick={() => onComplete(initial || {})}>
-        Run
-      </button>
-    </div>
-  );
-}
-function ExportDrawer({ open, onClose, cutoutUrl, defaultName }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[120]">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl p-4">
-        <div className="font-semibold mb-2">Export</div>
-        {cutoutUrl ? <img src={cutoutUrl} alt="export" className="w-full rounded-lg border" /> : <div className="text-xs text-slate-500">No image</div>}
-        <button className="mt-4 rounded-lg border px-3 py-2" onClick={onClose}>Close</button>
-      </div>
-    </div>
-  );
-}
-
-/* ====== Prompt helpers you already have ====== */
-function generateDynamicPrompt(selections){ return `dynamic: ${JSON.stringify(selections)}`; }
-function generateTryOnNegativePrompt(){ return 'lowres, artifacts, deformed'; }
