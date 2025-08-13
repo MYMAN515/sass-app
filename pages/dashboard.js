@@ -6,12 +6,6 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
-// 👇 نستوردهم مثل قبل (تأكد الملفات موجودة بمكانها)
-import EnhanceCustomizer from '@/components/EnhanceCustomizer';
-import TryOnCustomizer from '@/components/TryOnCustomizer';
-import ExportDrawer from '@/components/ExportDrawer';
-import generateDynamicPrompt, { generateTryOnNegativePrompt } from '@/lib/generateDynamicPrompt';
-
 /* ---------------- helpers ---------------- */
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
@@ -30,36 +24,28 @@ const fileToDataURLOriginal = (file) =>
 
 const STORAGE_BUCKET = 'img';
 
-/* ---------------- Presets (الصور في مجلد /public مباشرة) ---------------- */
-// ضع هذه الملفات في /public:
-// - /enhance-clean-studio.webp
-// - /enhance-desert-tones.webp
-// - /enhance-editorial-beige.webp
-// - /enhance-slate-contrast.webp
-// - /tryon-streetwear.webp
-// - /tryon-ecom.webp
-// - /tryon-lifestyle.webp
-// - /tryon-outdoor.webp
+/* ---------------- Presets (الصور من /public) ---------------- */
 const ENHANCE_PRESETS = [
   {
     id: 'clean-studio',
     title: 'Clean Studio',
     subtitle: 'Soft light • white sweep',
+    tag: 'Popular',
     config: {
-      photographyStyle: 'studio product photography, 50mm',
+      photographyStyle: 'studio product photography, 50mm prime',
       background: 'white seamless',
-      lighting: 'softbox, gentle reflections',
+      lighting: 'large softbox, gentle reflections',
       colorStyle: 'neutral whites, subtle grays',
       realism: 'hyperrealistic details',
       outputQuality: '4k sharp',
     },
-    preview: '/enhance-clean-studio.webp',
-    badge: 'Popular',
+    preview: '/clean-studio.webp',
   },
   {
     id: 'desert-tones',
     title: 'Desert Tones',
     subtitle: 'Warm • cinematic',
+    tag: 'Warm',
     config: {
       photographyStyle: 'cinematic product shot',
       background: 'warm beige backdrop',
@@ -68,12 +54,13 @@ const ENHANCE_PRESETS = [
       realism: 'photo-real, crisp textures',
       outputQuality: '4k',
     },
-    preview: '/enhance-desert-tones.webp',
+    preview: '/desert-tones.webp',
   },
   {
     id: 'editorial-beige',
     title: 'Editorial Beige',
     subtitle: 'Minimal • magazine look',
+    tag: 'Editorial',
     config: {
       photographyStyle: 'editorial catalog',
       background: 'matte beige',
@@ -82,22 +69,22 @@ const ENHANCE_PRESETS = [
       realism: 'realistic',
       outputQuality: '4k print',
     },
-    preview: '/enhance-editorial-beige.webp',
+    preview: '/editorial-beige.webp',
   },
   {
     id: 'slate-contrast',
     title: 'Slate Contrast',
     subtitle: 'Dark slate • specular',
+    tag: 'High-contrast',
     config: {
-      photographyStyle: 'premium product hero',
-      background: 'charcoal slate plate',
-      lighting: 'specular rim + soft key',
-      colorStyle: 'cool neutrals, deep blacks',
-      realism: 'hyperrealistic micro-details',
-      outputQuality: '4k ecom',
+      photographyStyle: 'hero product shot',
+      background: 'charcoal slate',
+      lighting: 'hard key + rim, controlled specular',
+      colorStyle: 'cool slate, deep blacks',
+      realism: 'high-fidelity',
+      outputQuality: '4k',
     },
-    preview: '/enhance-slate-contrast.webp',
-    badge: 'High-contrast',
+    preview: '/slate-contrast.webp',
   },
 ];
 
@@ -106,31 +93,53 @@ const TRYON_PRESETS = [
     id: 'streetwear',
     title: 'Streetwear',
     subtitle: 'Urban • moody',
-    config: { style: 'streetwear fit', setting: 'urban alley', lighting: 'overcast soft', mood: 'cool, editorial' },
-    preview: '/tryon-streetwear.webp',
-    badge: 'Model',
+    tag: 'Model',
+    config: {
+      style: 'streetwear fit',
+      setting: 'urban alley, textured wall',
+      lighting: 'overcast soft',
+      mood: 'cool, editorial',
+    },
+    preview: '/streetwear.webp',
   },
   {
     id: 'ecom-mannequin',
     title: 'E-Com Mannequin',
     subtitle: 'Plain white',
-    config: { style: 'ecommerce mannequin front', setting: 'white cyclorama', lighting: 'soft studio', mood: 'catalog clean' },
-    preview: '/tryon-ecom.webp',
+    tag: 'Catalog',
+    config: {
+      style: 'ecommerce mannequin front',
+      setting: 'white cyclorama',
+      lighting: 'soft studio',
+      mood: 'catalog clean',
+    },
+    preview: '/ecom-mannequin.webp',
   },
   {
     id: 'lifestyle',
     title: 'Lifestyle',
     subtitle: 'Sunlit room',
-    config: { style: 'lifestyle casual', setting: 'bright apartment', lighting: 'window soft', mood: 'fresh & bright' },
-    preview: '/tryon-lifestyle.webp',
-    badge: 'Natural',
+    tag: 'Natural',
+    config: {
+      style: 'lifestyle casual',
+      setting: 'sunlit apartment, wood floor',
+      lighting: 'window soft',
+      mood: 'fresh & bright',
+    },
+    preview: '/lifestyle.webp',
   },
   {
     id: 'outdoor',
     title: 'Outdoor',
     subtitle: 'Park • daylight',
-    config: { style: 'casual outdoor', setting: 'green park path', lighting: 'daylight', mood: 'friendly & open' },
-    preview: '/tryon-outdoor.webp',
+    tag: 'Daylight',
+    config: {
+      style: 'outdoor casual',
+      setting: 'green park, path & trees',
+      lighting: 'midday diffuse',
+      mood: 'open & vibrant',
+    },
+    preview: '/outdoor.webp',
   },
 ];
 
@@ -149,13 +158,11 @@ export default function DashboardStudio() {
 
   /* ---------- state ---------- */
   const [loading, setLoading] = useState(true);
-
-  // نستخدمهم فقط لزر Home — غير معروضين UI
   const [plan, setPlan] = useState('Free');
   const [credits, setCredits] = useState(0);
-
   const [err, setErr] = useState('');
-  const [active, setActive] = useState('enhance'); // default
+
+  const [active, setActive] = useState('enhance');
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
 
@@ -165,7 +172,7 @@ export default function DashboardStudio() {
   const [imageData, setImageData] = useState(''); // removeBg only
   const [resultUrl, setResultUrl] = useState('');
 
-  // BG inspector
+  // removeBg inspector
   const [bgMode, setBgMode] = useState('color');   // color | gradient | pattern
   const [color, setColor] = useState('#ffffff');
   const [color2, setColor2] = useState('#f1f5f9');
@@ -181,13 +188,11 @@ export default function DashboardStudio() {
   const [respOpen, setRespOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
-  // Customizers
-  const [showEnhance, setShowEnhance] = useState(false);
-  const [showTryOn, setShowTryOn] = useState(false);
-  const [enhanceInitial, setEnhanceInitial] = useState(null);
-  const [tryonInitial, setTryonInitial] = useState(null);
+  // presets → pass to popups
+  const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
+  const [pendingTryOnPreset, setPendingTryOnPreset] = useState(null);
 
-  // backend model (من API)
+  // backend model (from API, NOT hardcoded here)
   const [models, setModels] = useState([]); // [{id,name,tags,desc,recommendFor}]
   const [backendModel, setBackendModel] = useState('');
 
@@ -205,7 +210,7 @@ export default function DashboardStudio() {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
 
-      // 1) fetch plan/credits/model لهذا المستخدم
+      // 1) fetch plan/credits/model (بحسب user_id)
       try {
         const { data } = await supabase
           .from('Data')
@@ -219,7 +224,7 @@ export default function DashboardStudio() {
         setBackendModel(data?.model_backend || '');
       } catch {/* ignore */}
 
-      // 2) fetch models من API
+      // 2) fetch model options from your API (لا تثبّت محلي)
       try {
         const res = await fetch('/api/models', { cache: 'no-store' });
         if (res.ok) {
@@ -234,7 +239,7 @@ export default function DashboardStudio() {
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
-  // live credits refresh (اختياري)
+  // credits live refresh
   useEffect(() => {
     const h = async () => {
       if (!user?.id) return;
@@ -271,13 +276,13 @@ export default function DashboardStudio() {
   const handleRun = useCallback(() => {
     if (active !== 'modelSwap' && !file) { setErr('اختر صورة أولاً'); return; }
     if (active === 'removeBg') return runRemoveBg();
-    if (active === 'enhance')  { setEnhanceInitial(null); return setShowEnhance(true); }
-    if (active === 'tryon')    { setTryonInitial(null); return setShowTryOn(true); }
-  }, [active, file]); // runRemoveBg مستقل
+    if (active === 'enhance')  return setShowEnhance(true);
+    if (active === 'tryon')    return setShowTryOn(true);
+  }, [active, file]); // runRemoveBg stable
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.target && ['INPUT','TEXTAREA','SELECT','BUTTON'].includes(e.target.tagName)) return;
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleRun(); }
       if (e.key >= '1' && e.key <= '4') {
         const index = Number(e.key) - 1;
@@ -326,7 +331,7 @@ export default function DashboardStudio() {
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
 
-  /* ---------- prompts & storage ---------- */
+  /* ---------- prompts ---------- */
   const pickFirstUrl = (obj) => {
     if (!obj) return '';
     if (typeof obj === 'string') return obj;
@@ -338,6 +343,7 @@ export default function DashboardStudio() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
+  /* ---------- storage ---------- */
   const uploadToStorage = useCallback(async () => {
     if (!file) throw new Error('no file');
     const ext = (file.name?.split('.').pop() || 'png').toLowerCase();
@@ -412,14 +418,9 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl, backendModel]);
 
-  const openEnhancePreset = (presetConfig) => {
-    setEnhanceInitial(presetConfig || null);
-    setShowEnhance(true);
-  };
-  const openTryOnPreset = (presetConfig) => {
-    setTryonInitial(presetConfig || null);
-    setShowTryOn(true);
-  };
+  /* ---------- modals ---------- */
+  const [showEnhance, setShowEnhance] = useState(false);
+  const [showTryOn, setShowTryOn] = useState(false);
 
   /* ---------- download helpers ---------- */
   const downloadDataUrl = (dataUrl, name = 'studio-output.png') => {
@@ -459,8 +460,8 @@ export default function DashboardStudio() {
       const r = radius;
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(r,0); ctx.arcTo(cw,0,cw,ch,r); ctx.arcTo(cw,ch,0,0,r);
-      ctx.arcTo(0,0,cw,0,r); ctx.closePath(); ctx.clip();
+      ctx.moveTo(r,0); ctx.arcTo(cw,0,cw,ch,r); ctx.arcTo(cw,ch,0,ch,r);
+      ctx.arcTo(0,ch,0,0,r); ctx.arcTo(0,0,cw,0,r); ctx.closePath(); ctx.clip();
     }
 
     ctx.drawImage(bmp, padPx, padPx);
@@ -557,7 +558,7 @@ export default function DashboardStudio() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      {/* زر Home فقط عند الخطة Free أو الرصيد 0 */}
+      {/* زر Home فقط عند Free أو رصيد 0 */}
       {(plan === 'Free' || credits <= 0) && (
         <div className="fixed top-4 right-4 z-10">
           <button
@@ -570,9 +571,9 @@ export default function DashboardStudio() {
         </div>
       )}
 
-      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 px-4 md:px-6 py-6">
-        {/* ===== Left Sidebar (بدون Navbar/Footer) ===== */}
-        <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-4 self-start h-fit">
+      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
+        {/* ===== Left Sidebar ===== */}
+        <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-3 md:top-4 self-start h-fit">
           <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
             <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
               <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/></svg>
@@ -612,77 +613,78 @@ export default function DashboardStudio() {
             <div className="flex items-center gap-3">
               <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">{initials}</div>
               <div className="text-sm">
-                <div className="font-medium leading-tight truncate max-w-[160px]">{user.user_metadata?.name || user.email}</div>
+                <div className="font-medium leading-tight">{user.user_metadata?.name || user.email}</div>
               </div>
             </div>
           </div>
         </aside>
 
         {/* ===== Main Column ===== */}
-        <section className="space-y-6">
-          {/* Presets Row (Enhance + Try-On) */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 md:p-7 shadow-sm">
+        <section className="space-y-5 md:space-y-6">
+          {/* Presets + Customize row */}
+          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Quick Start</h1>
-                <p className="text-slate-600 text-sm">اختر Preset جاهز أو افتح Customize لضبط الإعدادات يدويًا.</p>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
+                <p className="text-slate-600 text-xs sm:text-sm">اختر Preset أو اضغط <span className="font-semibold">Customize</span> لتعديل الإعدادات يدويًا.</p>
               </div>
-              <div className="text-[11px] rounded-full border px-3 py-1 bg-slate-50">
-                Current Model: <span className="font-semibold">{models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setActive('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
+                >
+                  ✨ Customize Enhance
+                </button>
+                <button
+                  onClick={() => { setActive('tryon'); setPendingTryOnPreset(null); setShowTryOn(true); }}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
+                >
+                  🧍 Customize Try-On
+                </button>
               </div>
             </div>
 
-            {/* Enhance presets */}
+            {/* ENHANCE */}
             <div className="mt-4">
               <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
-              <div className="flex gap-3 overflow-x-auto pb-1 snap-x">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {ENHANCE_PRESETS.map(p => (
                   <PresetCard
                     key={p.id}
                     title={p.title}
                     subtitle={p.subtitle}
                     preview={p.preview}
-                    badge={p.badge}
-                    onClick={() => { setActive('enhance'); openEnhancePreset(p.config); }}
+                    tag={p.tag}
+                    onClick={() => { setActive('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
                   />
                 ))}
-                <CustomizeCard
-                  label="Customize"
-                  hint="Open Enhance settings"
-                  onClick={() => { setActive('enhance'); setEnhanceInitial(null); setShowEnhance(true); }}
-                />
               </div>
             </div>
 
-            {/* Try-On presets */}
+            {/* TRY-ON */}
             <div className="mt-6">
               <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
-              <div className="flex gap-3 overflow-x-auto pb-1 snap-x">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {TRYON_PRESETS.map(p => (
                   <PresetCard
                     key={p.id}
                     title={p.title}
                     subtitle={p.subtitle}
                     preview={p.preview}
-                    badge={p.badge}
-                    onClick={() => { setActive('tryon'); openTryOnPreset(p.config); }}
+                    tag={p.tag}
+                    onClick={() => { setActive('tryon'); setPendingTryOnPreset(p.config); setShowTryOn(true); }}
                   />
                 ))}
-                <CustomizeCard
-                  label="Customize"
-                  hint="Open Try-On settings"
-                  onClick={() => { setActive('tryon'); setTryonInitial(null); setShowTryOn(true); }}
-                />
               </div>
             </div>
           </div>
 
           {/* Workbench */}
-          <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_340px]">
             {/* Canvas Panel */}
-            <section className="rounded-3xl border border-slate-200 bg-white shadow-sm relative">
+            <section className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm relative">
               {/* header */}
-              <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
                 <Segmented items={TOOLS} value={active} onChange={setActive} />
                 <div className="flex items-center gap-2">
                   <StepBadge phase={phase} />
@@ -694,7 +696,7 @@ export default function DashboardStudio() {
               {active !== 'modelSwap' ? (
                 <div
                   ref={dropRef}
-                  className="m-4 md:m-5 min-h-[280px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
                   onClick={() => fileInputRef.current?.click()}
                   title="Drag & drop / Click / Paste (Ctrl+V)"
                 >
@@ -705,11 +707,11 @@ export default function DashboardStudio() {
                   />
                   {!localUrl && !resultUrl ? (
                     <div className="text-center text-slate-500 text-sm">
-                      <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white border border-slate-200">⬆</div>
+                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-slate-200">⬆</div>
                       Drag & drop an image here, click to choose, or paste (Ctrl+V)
                     </div>
                   ) : (
-                    <div className="relative w-full h-full grid place-items-center p-3">
+                    <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
                       {/* compare overlay */}
                       {compare && localUrl && resultUrl ? (
                         <div className="relative max-w-full max-h-[70vh]">
@@ -723,25 +725,26 @@ export default function DashboardStudio() {
                           alt="preview"
                           className="max-w-full max-h-[70vh] object-contain rounded-xl"
                           draggable={false}
+                          loading="lazy"
                         />
                       )}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="m-4 md:m-5">
+                <div className="m-3 sm:m-4 md:m-5">
                   <div className="mb-2 text-sm font-semibold">Swap Backend Model</div>
                   <ModelSwapPanel />
                 </div>
               )}
 
               {/* actions */}
-              <div className="flex flex-wrap items-center gap-2 px-4 md:px-5 pb-5">
+              <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
                 {active !== 'modelSwap' && (
                   <button
                     onClick={handleRun}
                     disabled={!file || busy}
-                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                   >
                     {busy ? 'Processing…' : (<><PlayIcon className="size-4" />Run {TOOLS.find(t => t.id === active)?.label}</>)}
                   </button>
@@ -751,31 +754,31 @@ export default function DashboardStudio() {
                   <>
                     <button
                       onClick={active === 'removeBg' ? downloadRemoveBgPng : downloadResultAsPng}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50"
                     >
                       ⬇ Download PNG
                     </button>
                     <button
                       onClick={() => setExportOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50"
                     >
                       🧰 Export
                     </button>
                     <button
                       onClick={copyUrl}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50"
                     >
                       🔗 Copy URL
                     </button>
                     <a
                       href={resultUrl} target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50"
                     >
                       ↗ Open
                     </a>
                     {localUrl && (
                       <>
-                        <label className="inline-flex items-center gap-2 text-xs ml-2">
+                        <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2">
                           <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
                           Compare
                         </label>
@@ -799,7 +802,7 @@ export default function DashboardStudio() {
                 {busy && (
                   <motion.div
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="pointer-events-none absolute inset-0 rounded-3xl grid place-items-center bg-white/60"
+                    className="pointer-events-none absolute inset-0 rounded-2xl md:rounded-3xl grid place-items-center bg-white/60"
                   >
                     <div className="text-xs px-3 py-2 rounded-lg bg-white border shadow">Working…</div>
                   </motion.div>
@@ -808,7 +811,7 @@ export default function DashboardStudio() {
 
               {/* API response (collapsible) */}
               {apiResponse && (
-                <div className="px-4 md:px-5 pb-5">
+                <div className="px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
                   <button
                     onClick={() => setRespOpen(v => !v)}
                     className="w-full text-left rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
@@ -832,43 +835,43 @@ export default function DashboardStudio() {
             </section>
 
             {/* Inspector */}
-            <aside className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
-              <div className="text-sm font-semibold text-slate-900 mb-3">Inspector</div>
+            <aside className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-900">Inspector</div>
+                <span className="text-xs text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
+              </div>
 
+              {/* Remove BG controls */}
               {active === 'removeBg' && (
-                <div className="space-y-3">
+                <div className="space-y-3 mt-3">
                   <ModeTabs mode={bgMode} setMode={setBgMode} />
                   <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
-
                   {bgMode === 'gradient' && (
                     <>
                       <Field label="Secondary"><Color value={color2} onChange={setColor2} /></Field>
                       <Field label="Angle"><Range value={angle} onChange={setAngle} min={0} max={360} /></Field>
                     </>
                   )}
-
                   {bgMode === 'pattern' && (
                     <Field label="Pattern opacity">
                       <Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} />
                     </Field>
                   )}
-
                   <Field label="Radius"><Range value={radius} onChange={setRadius} min={0} max={48} /></Field>
                   <Field label="Padding"><Range value={padding} onChange={setPadding} min={0} max={64} /></Field>
-
                   <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-700">
                     <input type="checkbox" checked={shadow} onChange={(e)=>setShadow(e.target.checked)} />
                     Shadow
                   </label>
 
-                  <div className="mt-4">
+                  <div className="mt-3">
                     <div className="text-xs text-slate-500 mb-2">Final Preview</div>
                     <div style={frameStyle} className="relative rounded-xl overflow-hidden border border-slate-200">
-                      <div className="relative w-full min-h-[160px] grid place-items-center">
+                      <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
                         {resultUrl ? (
-                          <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
+                          <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
                         ) : (
-                          <div className="grid place-items-center h-[160px] text-xs text-slate-400">— Run Remove BG first —</div>
+                          <div className="grid place-items-center h-[140px] text-xs text-slate-400">— Run Remove BG first —</div>
                         )}
                       </div>
                     </div>
@@ -876,28 +879,13 @@ export default function DashboardStudio() {
                 </div>
               )}
 
-              {active === 'enhance' && (
-                <div className="space-y-2 text-xs text-slate-600">
-                  <div>اختر Preset من الأعلى أو اضغط <span className="font-semibold">Run</span>/<span className="font-semibold">Customize</span> لفتح الإعدادات.</div>
-                  <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
+              {(active === 'enhance' || active === 'tryon') && (
+                <div className="space-y-2 text-xs text-slate-600 mt-3">
+                  <div>اختر Preset من الأعلى أو اضغط <span className="font-semibold">Run/Customize</span> لفتح الإعدادات.</div>
                   {resultUrl && (
-                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                      <div className="relative w-full min-h-[160px] grid place-items-center">
-                        <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {active === 'tryon' && (
-                <div className="space-y-2 text-xs text-slate-600">
-                  <div>اختر Preset أو افتح <span className="font-semibold">Customize</span> لضبط تفاصيل الـ Try-On.</div>
-                  <div className="mt-3 text-[11px] text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</div>
-                  {resultUrl && (
-                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                      <div className="relative w-full min-h-[160px] grid place-items-center">
-                        <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
+                    <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                      <div className="relative w-full min-h-[140px] grid place-items-center">
+                        <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
                       </div>
                     </div>
                   )}
@@ -905,7 +893,7 @@ export default function DashboardStudio() {
               )}
 
               {active === 'modelSwap' && (
-                <div className="text-xs text-slate-600">
+                <div className="text-xs text-slate-600 mt-3">
                   اختر الـ Backend المناسب — يتم الحفظ تلقائيًا على حسابك.
                 </div>
               )}
@@ -913,7 +901,7 @@ export default function DashboardStudio() {
           </div>
 
           {/* History */}
-          <div id="history-anchor" className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
+          <div id="history-anchor" className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
             <div className="text-sm font-semibold text-slate-900 mb-2">History</div>
             {history.length === 0 ? (
               <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
@@ -947,11 +935,11 @@ export default function DashboardStudio() {
           <motion.div className="fixed inset-0 z-[100] grid place-items-center"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={()=>setShowEnhance(false)} />
-            <div className="relative w-full max-w-3xl mx-4">
+            <div className="relative w-full max-w-3xl mx-3">
               <EnhanceCustomizer
-                initial={enhanceInitial || undefined}
+                initial={pendingEnhancePreset || undefined}
                 onChange={()=>{}}
-                onComplete={(form) => { setShowEnhance(false); setEnhanceInitial(null); runEnhance(form || {}); }}
+                onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
               />
             </div>
           </motion.div>
@@ -960,11 +948,11 @@ export default function DashboardStudio() {
           <motion.div className="fixed inset-0 z-[100] grid place-items-center"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={()=>setShowTryOn(false)} />
-            <div className="relative w-full max-w-3xl mx-4">
+            <div className="relative w-full max-w-3xl mx-3">
               <TryOnCustomizer
-                initial={tryonInitial || undefined}
+                initial={pendingTryOnPreset || undefined}
                 onChange={()=>{}}
-                onComplete={(form) => { setShowTryOn(false); setTryonInitial(null); runTryOn(form || {}); }}
+                onComplete={(form) => { setShowTryOn(false); setPendingTryOnPreset(null); runTryOn(form); }}
               />
             </div>
           </motion.div>
@@ -1032,7 +1020,7 @@ function SideItem({ label, icon:Icon, active=false, onClick }) {
 /* ================== UI bits ================== */
 function Segmented({ items, value, onChange }) {
   return (
-    <div className="inline-flex rounded-full border border-slate-300 bg-white p-1 overflow-x-auto max-w-full">
+    <div className="inline-flex rounded-full border border-slate-300 bg-white p-1">
       {items.map((it) => {
         const Active = value === it.id;
         const Icon = it.icon;
@@ -1041,7 +1029,7 @@ function Segmented({ items, value, onChange }) {
             key={it.id}
             onClick={() => onChange(it.id)}
             className={[
-              'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition whitespace-nowrap',
+              'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
               Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 hover:bg-slate-100'
             ].join(' ')}
           >
@@ -1054,41 +1042,25 @@ function Segmented({ items, value, onChange }) {
   );
 }
 
-function PresetCard({ title, subtitle, preview, onClick, badge }) {
+function PresetCard({ title, subtitle, onClick, preview, tag }) {
   return (
-    <button
-      onClick={onClick}
-      className="snap-start min-w-[240px] sm:min-w-[260px] group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left"
-    >
-      <div className="relative">
-        <img src={preview} alt={title} className="h-36 w-full object-cover" loading="lazy" />
-        {badge && (
-          <div className="absolute top-2 left-2 rounded-full bg-black/50 text-white text-[10px] px-2 py-0.5 backdrop-blur">
-            {badge}
-          </div>
+    <button onClick={onClick}
+      className="group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left">
+      <div className="relative h-36 w-full bg-slate-100">
+        {/* صورة من public */}
+        <img src={preview} alt={title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+        {tag && (
+          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 text-white">
+            {tag}
+          </span>
         )}
-        <div className="absolute top-2 right-2 rounded-full bg-white/80 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
+        <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
           Use preset
         </div>
       </div>
       <div className="p-3">
         <div className="font-semibold">{title}</div>
         <div className="text-xs text-slate-500">{subtitle}</div>
-      </div>
-    </button>
-  );
-}
-
-function CustomizeCard({ label='Customize', hint='Open settings', onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className="snap-start min-w-[240px] sm:min-w-[260px] rounded-2xl border-2 border-dashed border-slate-300 text-left bg-slate-50 hover:bg-slate-100 transition grid place-items-center"
-    >
-      <div className="p-5 text-center">
-        <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white border border-slate-200">⚙️</div>
-        <div className="font-semibold">{label}</div>
-        <div className="text-[11px] text-slate-500">{hint}</div>
       </div>
     </button>
   );
@@ -1176,9 +1148,73 @@ function RocketIcon(props){return(<svg viewBox="0 0 24 24" className={props.clas
 function PersonIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/></svg>);}
 function CubeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2.18L6 6.09v.1l6 3 6-3v-.1l-6-1.91zM6 8.4V18l6 3V11.4L6 8.4zm12 0l-6 3V21l6-3V8.4z" fill="currentColor"/></svg>);}
 function ImageIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14h18zM5 5h14v10l-4-4-3 3-4-4-3 3V5z" fill="currentColor"/></svg>);}
-function GalleryIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M3 5h7v7H3zM14 5h7v7h-7zM3 16h7v7H3zM14 16h7v7h-7z" transform="scale(.9) translate(1, -2)" fill="currentColor"/></svg>);}
-function CodeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 17l-5-5 5-5 1.5 1.5L6 12l-3.5 3.5L8 17zm8-10l5 5-5 5-1.5-1.5L18 12l-3.5-3.5L16 7z" fill="currentColor"/></svg>);}
 function ListIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" fill="currentColor"/></svg>);}
-function StarIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 18l-6.2 3 1.2-6.9-5-4.8 6.9-1L12 2z" fill="currentColor"/></svg>);}
 function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
 function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M2 20l10-10 2 2L4 22H2zM14 2l2 2-2 2-2-2 2-2z" fill="currentColor"/></svg>);}
+
+/* ====== Minimal placeholders (استبدلها بمكوّناتك إن وُجدت) ====== */
+function EnhanceCustomizer({ initial, onChange, onComplete }) {
+  return (
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
+      <div className="text-sm font-semibold">Enhance Settings</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <label className="space-y-1">
+          <span className="text-slate-600">Style</span>
+          <input defaultValue={initial?.photographyStyle || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="studio product photography, 50mm" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-slate-600">Background</span>
+          <input defaultValue={initial?.background || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="white seamless" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-slate-600">Lighting</span>
+          <input defaultValue={initial?.lighting || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="softbox, gentle reflections" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-slate-600">Colors</span>
+          <input defaultValue={initial?.colorStyle || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="neutral whites, subtle grays" />
+        </label>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={()=>onComplete(initial || {})}>Run</button>
+      </div>
+    </div>
+  );
+}
+function TryOnCustomizer({ initial, onChange, onComplete }) {
+  return (
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
+      <div className="text-sm font-semibold">Try-On Settings</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <label className="space-y-1">
+          <span className="text-slate-600">Style</span>
+          <input defaultValue={initial?.style || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="streetwear fit" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-slate-600">Setting</span>
+          <input defaultValue={initial?.setting || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="urban alley" />
+        </label>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={()=>onComplete(initial || {})}>Run</button>
+      </div>
+    </div>
+  );
+}
+function ExportDrawer({ open, onClose, cutoutUrl, defaultName }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[120]">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl p-4">
+        <div className="font-semibold mb-2">Export</div>
+        {cutoutUrl ? <img src={cutoutUrl} alt="export" className="w-full rounded-lg border" /> : <div className="text-xs text-slate-500">No image</div>}
+        <button className="mt-4 rounded-lg border px-3 py-2" onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+/* ====== Prompt helpers (بدائل خفيفة لو ما عندك المكتبة) ====== */
+function generateDynamicPrompt(selections){ return `dynamic: ${JSON.stringify(selections)}`; }
+function generateTryOnNegativePrompt(){ return 'lowres, artifacts, deformed'; }
