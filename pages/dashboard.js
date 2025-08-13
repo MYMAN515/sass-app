@@ -182,7 +182,7 @@ export default function DashboardStudio() {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
 
-      // 1) fetch plan/credits/model from Supabase once (single client via hook)
+      // 1) fetch plan/credits/model from Supabase
       try {
         const { data } = await supabase
           .from('Data')
@@ -191,7 +191,6 @@ export default function DashboardStudio() {
           .single();
 
         if (!mounted) return;
-
         setPlan(data?.plan || 'Free');
         setCredits(typeof data?.credits === 'number' ? data.credits : 0);
         setBackendModel(data?.model_backend || '');
@@ -199,7 +198,7 @@ export default function DashboardStudio() {
         // ignore – keep defaults
       }
 
-      // 2) fetch model options from your API (no constants here)
+      // 2) fetch model options from your API
       try {
         const res = await fetch('/api/models', { cache: 'no-store' });
         if (res.ok) {
@@ -214,7 +213,7 @@ export default function DashboardStudio() {
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
-  // credits live refresh (optional)
+  // credits live refresh
   useEffect(() => {
     const h = async () => {
       if (!user?.email) return;
@@ -227,49 +226,19 @@ export default function DashboardStudio() {
     }
   }, [supabase, user]);
 
-  /* ---------- drag & drop + paste ---------- */
-  useEffect(() => {
-    const el = dropRef.current; if (!el) return;
-    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-indigo-400'); };
-    const leave = () => el.classList.remove('ring-2','ring-indigo-400');
-    const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
-    el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
+  /* ---------- helpers (prompts) ---------- */
+  const pickFirstUrl = (obj) => {
+    if (!obj) return '';
+    if (typeof obj === 'string') return obj;
+    const keys = ['image', 'image_url', 'output', 'result', 'url'];
+    for (const k of keys) if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
+    return '';
+  };
+  const buildEnhancePrompt = (f) =>
+    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
+      .filter(Boolean).join(', ');
 
-    const onPaste = async (e) => {
-      const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
-      const f = item?.getAsFile?.(); if (f) await onPick(f);
-    };
-    window.addEventListener('paste', onPaste);
-
-    return () => {
-      el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop);
-      window.removeEventListener('paste', onPaste);
-    };
-  }, []);
-
-  /* ---------- keyboard shortcuts ---------- */
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
-      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleRun(); }
-      if (e.key >= '1' && e.key <= '4') {
-        const index = Number(e.key) - 1;
-        setActive(TOOLS[index]?.id || 'enhance');
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [handleRun]);
-
-  /* ---------- reset on tool switch ---------- */
-  useEffect(() => {
-    setPhase('idle'); setErr(''); setApiResponse(null);
-    // لا نمسح الملف عند التنقل بين الأدوات باستثناء modelSwap
-    if (active === 'modelSwap') return;
-    setResultUrl('');
-    setImageData('');
-  }, [active]);
-
+  /* ---------- onPick (قبل أي useEffect يستخدمه) ---------- */
   const onPick = async (f) => {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
@@ -300,18 +269,6 @@ export default function DashboardStudio() {
     boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.12), 0 6px 18px rgba(0,0,0,.06)' : 'none',
     transition: 'all .25s ease',
   }), [bgStyle, radius, padding, shadow]);
-
-  /* ---------- prompts ---------- */
-  const pickFirstUrl = (obj) => {
-    if (!obj) return '';
-    if (typeof obj === 'string') return obj;
-    const keys = ['image', 'image_url', 'output', 'result', 'url'];
-    for (const k of keys) if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
-    return '';
-  };
-  const buildEnhancePrompt = (f) =>
-    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
-      .filter(Boolean).join(', ');
 
   /* ---------- storage ---------- */
   const uploadToStorage = useCallback(async () => {
@@ -388,6 +345,11 @@ export default function DashboardStudio() {
     } finally { setBusy(false); }
   }, [uploadToStorage, plan, user, localUrl, backendModel]);
 
+  /* ---------- modals ---------- */
+  const [showEnhance, setShowEnhance] = useState(false);
+  const [showTryOn, setShowTryOn] = useState(false);
+
+  /* ---------- handleRun (قبل أي useEffect يعتمد عليه) ---------- */
   const handleRun = useCallback(() => {
     if (active !== 'modelSwap' && !file) { setErr('اختر صورة أولاً'); return; }
     if (active === 'removeBg') return runRemoveBg();
@@ -395,9 +357,49 @@ export default function DashboardStudio() {
     if (active === 'tryon')    return setShowTryOn(true);
   }, [active, file, runRemoveBg]);
 
-  /* ---------- modals ---------- */
-  const [showEnhance, setShowEnhance] = useState(false);
-  const [showTryOn, setShowTryOn] = useState(false);
+  /* ---------- drag & drop + paste ---------- */
+  useEffect(() => {
+    const el = dropRef.current; if (!el) return;
+    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-indigo-400'); };
+    const leave = () => el.classList.remove('ring-2','ring-indigo-400');
+    const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
+    el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
+
+    const onPaste = async (e) => {
+      const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
+      const f = item?.getAsFile?.(); if (f) await onPick(f);
+    };
+    window.addEventListener('paste', onPaste);
+
+    return () => {
+      el.removeEventListener('dragover', over);
+      el.removeEventListener('dragleave', leave);
+      el.removeEventListener('drop', drop);
+      window.removeEventListener('paste', onPaste);
+    };
+  }, [onPick]);
+
+  /* ---------- keyboard shortcuts ---------- */
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); handleRun(); }
+      if (e.key >= '1' && e.key <= '4') {
+        const index = Number(e.key) - 1;
+        setActive(TOOLS[index]?.id || 'enhance');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleRun]);
+
+  /* ---------- reset on tool switch ---------- */
+  useEffect(() => {
+    setPhase('idle'); setErr(''); setApiResponse(null);
+    if (active === 'modelSwap') return;
+    setResultUrl('');
+    setImageData('');
+  }, [active]);
 
   /* ---------- download helpers ---------- */
   const downloadDataUrl = (dataUrl, name = 'studio-output.png') => {
@@ -654,7 +656,7 @@ export default function DashboardStudio() {
                 {active !== 'modelSwap' ? (
                   <div
                     ref={dropRef}
-                    className="m-4 md:m-5 min-h-[280px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+                    className="m-4 md:m-5 min-h[280px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                     title="Drag & drop / Click / Paste (Ctrl+V)"
                   >
