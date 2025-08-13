@@ -12,7 +12,7 @@ import TryOnCustomizer from '@/components/TryOnCustomizer';
 import generateDynamicPrompt, { generateTryOnNegativePrompt } from '@/lib/generateDynamicPrompt';
 import ExportDrawer from '@/components/ExportDrawer';
 
-/* ---------- helpers ---------- */
+/* ---------------- helpers ---------------- */
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
@@ -28,14 +28,131 @@ const fileToDataURLOriginal = (file) =>
     reader.readAsDataURL(file);
   });
 
-/* ---------- constants ---------- */
 const STORAGE_BUCKET = 'img';
 
-/* ---------- tools ---------- */
+/* ---------------- Models (backend choices) ---------------- */
+const BACKENDS = [
+  {
+    id: 'flux-pro',
+    name: 'FLUX Pro',
+    tags: ['Quality', 'Ads'],
+    desc: 'جودة إعلان عالية (أبطأ/أغلى)',
+    recommendFor: ['enhance'],
+  },
+  {
+    id: 'flux-dev',
+    name: 'FLUX Dev',
+    tags: ['Fast', 'Cheap'],
+    desc: 'سريع وعملي للدفعات',
+    recommendFor: ['enhance', 'tryon'],
+  },
+  {
+    id: 'sdxl-turbo',
+    name: 'SDXL Turbo',
+    tags: ['Realtime'],
+    desc: 'فوريّ تقريبًا، أفضل للمعاينات',
+    recommendFor: ['enhance'],
+  },
+  {
+    id: 'instant-id',
+    name: 'Instant-ID',
+    tags: ['Face', 'Consistency'],
+    desc: 'ثبات الوجه/الهوية لجلسات Try-On',
+    recommendFor: ['tryon'],
+  },
+];
+
+/* ---------------- Presets ---------------- */
+const ENHANCE_PRESETS = [
+  {
+    id: 'clean-studio',
+    title: 'Clean Studio',
+    subtitle: 'Soft light, white sweep',
+    config: {
+      photographyStyle: 'studio product photography, 50mm',
+      background: 'white seamless',
+      lighting: 'softbox, gentle reflections',
+      colorStyle: 'neutral whites, subtle grays',
+      realism: 'hyperrealistic details',
+      outputQuality: '4k sharp',
+    },
+    gradient: 'from-slate-100 via-white to-slate-100',
+  },
+  {
+    id: 'desert-tones',
+    title: 'Desert Tones',
+    subtitle: 'Warm, cinematic',
+    config: {
+      photographyStyle: 'cinematic product shot',
+      background: 'warm beige backdrop',
+      lighting: 'golden hour, soft shadows',
+      colorStyle: 'sand, beige, amber',
+      realism: 'photo-real, crisp textures',
+      outputQuality: '4k',
+    },
+    gradient: 'from-amber-200 via-orange-100 to-rose-100',
+  },
+  {
+    id: 'editorial-beige',
+    title: 'Editorial Beige',
+    subtitle: 'Minimal, magazine look',
+    config: {
+      photographyStyle: 'editorial catalog',
+      background: 'matte beige',
+      lighting: 'directional key + fill',
+      colorStyle: 'beige monochrome',
+      realism: 'realistic',
+      outputQuality: '4k print',
+    },
+    gradient: 'from-amber-50 via-rose-50 to-amber-50',
+  },
+];
+
+const TRYON_PRESETS = [
+  {
+    id: 'streetwear',
+    title: 'Streetwear',
+    subtitle: 'Urban, moody',
+    config: {
+      style: 'streetwear fit',
+      setting: 'urban alley',
+      lighting: 'overcast soft',
+      mood: 'cool, editorial',
+    },
+    gradient: 'from-slate-200 via-slate-100 to-slate-200',
+  },
+  {
+    id: 'ecom-mannequin',
+    title: 'E-Com Mannequin',
+    subtitle: 'Plain backdrop',
+    config: {
+      style: 'ecommerce mannequin front',
+      setting: 'white cyclorama',
+      lighting: 'soft studio',
+      mood: 'catalog clean',
+    },
+    gradient: 'from-white via-slate-50 to-white',
+  },
+  {
+    id: 'lifestyle',
+    title: 'Lifestyle',
+    subtitle: 'Bright apartment',
+    config: {
+      style: 'lifestyle casual',
+      setting: 'sunlit room',
+      lighting: 'window soft',
+      mood: 'fresh & bright',
+    },
+    gradient: 'from-emerald-50 via-teal-50 to-cyan-50',
+  },
+];
+
+/* ---------------- Tools ---------------- */
 const TOOLS = [
   { id: 'removeBg', label: 'Remove BG', icon: ScissorsIcon },
-  { id: 'enhance',  label: 'Enhance',   icon: RocketIcon },
-  { id: 'tryon',    label: 'Try-On',    icon: PersonIcon },
+  { id: 'enhance', label: 'Enhance', icon: RocketIcon },
+  { id: 'tryon', label: 'Try-On', icon: PersonIcon },
+  { id: 'modelSwap', label: 'Model Swap', icon: CubeIcon },
 ];
 
 export default function DashboardStudio() {
@@ -49,7 +166,7 @@ export default function DashboardStudio() {
   const [credits, setCredits] = useState(0);
   const [err, setErr] = useState('');
 
-  const [active, setActive] = useState('removeBg');
+  const [active, setActive] = useState('enhance'); // default to Enhance
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
 
@@ -75,6 +192,13 @@ export default function DashboardStudio() {
   const [respOpen, setRespOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
+  // presets → pass to popups
+  const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
+  const [pendingTryOnPreset, setPendingTryOnPreset] = useState(null);
+
+  // backend model (Model Swap)
+  const [backendModel, setBackendModel] = useState('flux-pro');
+
   const dropRef = useRef(null);
 
   /* ---------- auth & workspace ---------- */
@@ -84,22 +208,21 @@ export default function DashboardStudio() {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('Data')
-          .select('plan, credits')
+          .select('plan, credits, model_backend')
           .eq('email', user.email)
           .single();
 
         if (!mounted) return;
-        if (error) {
-          setPlan('Free');
-          setCredits(0);
-        } else {
-          setPlan(data?.plan || 'Free');
-          setCredits(typeof data?.credits === 'number' ? data.credits : 0);
-        }
+
+        setPlan(data?.plan || 'Free');
+        setCredits(typeof data?.credits === 'number' ? data.credits : 0);
+
+        // pull saved backend model if exists
+        if (data?.model_backend) setBackendModel(data.model_backend);
       } catch {
-        setErr('Failed to load workspace.');
+        // ignore
       } finally {
         if (mounted) setLoading(false);
       }
@@ -199,25 +322,40 @@ export default function DashboardStudio() {
     return data.publicUrl;
   }, [file, supabase, user]);
 
+  /* ---------- history save (optional) ---------- */
+  const saveHistoryRow = useCallback(async (tool, inputThumb, outputUrl) => {
+    try {
+      if (!user) return;
+      await supabase.from('History').insert({
+        user_id: user.id,
+        tool,
+        input_url: inputThumb,
+        output_url: outputUrl,
+        ts: new Date().toISOString(),
+      });
+    } catch { /* ignore */ }
+  }, [supabase, user]);
+
   /* ---------- actions ---------- */
   const runRemoveBg = useCallback(async () => {
     setBusy(true); setErr(''); setPhase('processing');
     try {
       const r = await fetch('/api/remove-bg', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData }),
+        body: JSON.stringify({ imageData, backendModel }), // pass backend for parity
       });
       const j = await r.json(); setApiResponse(j);
       if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from remove-bg');
       setResultUrl(out);
-      setHistory(h => [{ tool:'removeBg', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,8));
+      setHistory(h => [{ tool:'removeBg', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
+      saveHistoryRow('removeBg', localUrl, out);
       setPhase('ready');
       window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
       console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
     } finally { setBusy(false); }
-  }, [imageData, localUrl]);
+  }, [imageData, localUrl, backendModel, saveHistoryRow]);
 
   const runEnhance = useCallback(async (selections) => {
     setBusy(true); setErr(''); setPhase('processing');
@@ -226,18 +364,19 @@ export default function DashboardStudio() {
       const prompt = buildEnhancePrompt(selections);
       const r = await fetch('/api/enhance', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email }),
+        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email, backendModel }),
       });
       const j = await r.json(); setApiResponse(j);
       if (!r.ok) throw new Error(j?.error || 'enhance failed');
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from enhance');
       setResultUrl(out);
-      setHistory(h => [{ tool:'enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,8));
+      setHistory(h => [{ tool:'enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
+      saveHistoryRow('enhance', localUrl, out);
       setPhase('ready'); window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
       console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
     } finally { setBusy(false); }
-  }, [uploadToStorage, plan, user, localUrl]);
+  }, [uploadToStorage, plan, user, localUrl, backendModel, saveHistoryRow]);
 
   const runTryOn = useCallback(async (selections) => {
     setBusy(true); setErr(''); setPhase('processing');
@@ -247,29 +386,31 @@ export default function DashboardStudio() {
       const negativePrompt = generateTryOnNegativePrompt();
       const r = await fetch('/api/tryon', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, prompt, negativePrompt, plan, user_email: user.email }),
+        body: JSON.stringify({ imageUrl, prompt, negativePrompt, plan, user_email: user.email, backendModel }),
       });
       const j = await r.json(); setApiResponse(j);
       if (!r.ok) throw new Error(j?.error || 'tryon failed');
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
       setResultUrl(out);
-      setHistory(h => [{ tool:'tryon', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,8));
+      setHistory(h => [{ tool:'tryon', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,18));
+      saveHistoryRow('tryon', localUrl, out);
       setPhase('ready'); window.dispatchEvent(new Event('credits:refresh'));
     } catch (e) {
       console.error(e); setPhase('error'); setErr('تعذر تنفيذ العملية.');
     } finally { setBusy(false); }
-  }, [uploadToStorage, plan, user, localUrl]);
+  }, [uploadToStorage, plan, user, localUrl, backendModel, saveHistoryRow]);
 
   const handleRun = useCallback(() => {
-    if (!file) { setErr('اختر صورة أولاً'); return; }
+    if (!file && active !== 'modelSwap') { setErr('اختر صورة أولاً'); return; }
     if (active === 'removeBg') return runRemoveBg();
     if (active === 'enhance')  return setShowEnhance(true);
-    if (active === 'tryon')    return setShowTryon(true);
+    if (active === 'tryon')    return setShowTryOn(true);
+    if (active === 'modelSwap') return; // nothing to run here
   }, [active, file, runRemoveBg]);
 
   /* ---------- modals ---------- */
   const [showEnhance, setShowEnhance] = useState(false);
-  const [showTryon, setShowTryon] = useState(false);
+  const [showTryOn, setShowTryOn] = useState(false);
 
   /* ---------- download helpers ---------- */
   const downloadDataUrl = (dataUrl, name = 'studio-output.png') => {
@@ -352,11 +493,51 @@ export default function DashboardStudio() {
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
 
+  /* ---------- Model Swap (panel) ---------- */
+  const ModelSwapPanel = () => (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {BACKENDS.map(b => {
+        const selected = backendModel === b.id;
+        return (
+          <button
+            key={b.id}
+            onClick={async () => {
+              setBackendModel(b.id);
+              try {
+                await supabase.from('Data').update({ model_backend: b.id }).eq('email', user.email);
+              } catch {}
+            }}
+            className={[
+              'text-left rounded-xl border p-4 transition shadow-sm',
+              selected ? 'border-indigo-500 ring-1 ring-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
+            ].join(' ')}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-semibold">{b.name}</div>
+                <div className="text-xs text-slate-600">{b.desc}</div>
+              </div>
+              {selected && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600 text-white">Active</span>}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              {b.tags.map(t => (
+                <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">{t}</span>
+              ))}
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500">
+              Recommended for: {b.recommendFor.join(', ')}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <Layout title="Studio">
       <main className="min-h-screen bg-slate-50 text-slate-900">
         <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 px-4 md:px-6 py-6">
-          {/* ===== Left Sidebar (FSHN-like) ===== */}
+          {/* ===== Left Sidebar ===== */}
           <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-4 self-start h-fit">
             <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
               <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
@@ -365,18 +546,33 @@ export default function DashboardStudio() {
               <div className="font-semibold tracking-tight">AI Studio</div>
             </div>
 
-            <nav className="px-2 py-3 space-y-1">
-              {/* NO Home item per your request */}
-              <NavItem label="Studio" icon={SparklesIcon} active />
-              <NavItem label="Edit" icon={WandIcon} />
-              <NavItem label="Models" icon={CubeIcon} />
-              <NavItem label="Background" icon={ImageIcon} />
-              <NavItem label="My Gallery" icon={GalleryIcon} />
-              <div className="pt-2 border-t border-slate-200/70 mt-2">
-                <NavItem label="Developer API" icon={CodeIcon} />
-                <NavItem label="Changelog" icon={ListIcon} />
-              </div>
-            </nav>
+            {/* Tools group */}
+            <Group title="Tools" defaultOpen>
+              {TOOLS.map(t => (
+                <SideItem
+                  key={t.id}
+                  label={t.label}
+                  icon={t.icon}
+                  active={active === t.id}
+                  onClick={() => setActive(t.id)}
+                />
+              ))}
+            </Group>
+
+            {/* Models group */}
+            <Group title="Models" defaultOpen>
+              <SideItem
+                label="Model Swap"
+                icon={CubeIcon}
+                active={active === 'modelSwap'}
+                onClick={() => setActive('modelSwap')}
+              />
+              <SideItem
+                label="History"
+                icon={ListIcon}
+                onClick={() => document.getElementById('history-anchor')?.scrollIntoView({ behavior:'smooth' })}
+              />
+            </Group>
 
             <div className="mt-2 px-4 py-3 border-t border-slate-200">
               <div className="flex items-center gap-3">
@@ -390,47 +586,51 @@ export default function DashboardStudio() {
                 <span className="text-slate-600">Credits</span>
                 <span className="font-semibold">{credits}</span>
               </div>
-
-              <button
-                className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 text-sm font-semibold shadow-sm transition"
-                onClick={() => alert('Pricing page…')}
-              >
-                <StarIcon className="size-4" /> Pricing
-              </button>
             </div>
           </aside>
 
           {/* ===== Main Column ===== */}
           <section className="space-y-6">
-            {/* Hero */}
+            {/* Presets row */}
             <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
-              <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-slate-900">
-                What will your next photoshoot be?
-              </h1>
-              <p className="mt-2 text-slate-600">
-                Pick a mood, upload your product or outfit, then run a tool. Simple.
-              </p>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
+                  <p className="text-slate-600 text-sm">اختر إعداد جاهز — يفتح لك النافذة مع القيم المعبأة.</p>
+                </div>
+                <div className="text-xs rounded-full border px-3 py-1 bg-slate-50">
+                  Current Model: <span className="font-semibold">{BACKENDS.find(b=>b.id===backendModel)?.name || backendModel}</span>
+                </div>
+              </div>
 
-              {/* Mood Cards */}
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <MoodCard
-                  title="Desert Tones"
-                  subtitle="Warm, cinematic"
-                  onClick={() => { setActive('enhance'); setShowEnhance(true); }}
-                  gradient="from-amber-200 via-orange-100 to-rose-100"
-                />
-                <MoodCard
-                  title="Clean Studio"
-                  subtitle="Soft shadows"
-                  onClick={() => { setActive('enhance'); setShowEnhance(true); }}
-                  gradient="from-slate-100 via-white to-slate-100"
-                />
-                <MoodCard
-                  title="Neutral Beige"
-                  subtitle="Editorial look"
-                  onClick={() => { setActive('enhance'); setShowEnhance(true); }}
-                  gradient="from-amber-50 via-rose-50 to-amber-50"
-                />
+              <div className="mt-4">
+                <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {ENHANCE_PRESETS.map(p => (
+                    <PresetCard
+                      key={p.id}
+                      title={p.title}
+                      subtitle={p.subtitle}
+                      gradient={p.gradient}
+                      onClick={() => { setPendingEnhancePreset(p.config); setActive('enhance'); setShowEnhance(true); }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {TRYON_PRESETS.map(p => (
+                    <PresetCard
+                      key={p.id}
+                      title={p.title}
+                      subtitle={p.subtitle}
+                      gradient={p.gradient}
+                      onClick={() => { setPendingTryOnPreset(p.config); setActive('tryon'); setShowTryOn(true); }}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -438,56 +638,65 @@ export default function DashboardStudio() {
             <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
               {/* Canvas Panel */}
               <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                {/* tool tabs (segmented) */}
+                {/* header */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-4">
                   <Segmented items={TOOLS} value={active} onChange={setActive} />
                   <StepBadge phase={phase} />
                 </div>
 
-                {/* dropzone */}
-                <div
-                  ref={dropRef}
-                  className="m-4 md:m-5 min-h-[280px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                  onClick={() => document.getElementById('file-input')?.click()}
-                  title="Drag & drop or click to upload"
-                >
-                  <input
-                    id="file-input" type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
-                  />
-                  {!localUrl && !resultUrl ? (
-                    <div className="text-center text-slate-500 text-sm">
-                      <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white border border-slate-200">⬆</div>
-                      Drag & drop an image here, or click to choose
-                    </div>
-                  ) : (
-                    <div className="relative w-full h-full grid place-items-center p-3">
-                      <img
-                        src={resultUrl || localUrl}
-                        alt="preview"
-                        className="max-w-full max-h-[70vh] object-contain rounded-xl"
-                        draggable={false}
-                      />
-                    </div>
-                  )}
-                </div>
+                {/* dropzone / model swap content */}
+                {active !== 'modelSwap' ? (
+                  <div
+                    ref={dropRef}
+                    className="m-4 md:m-5 min-h-[280px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+                    onClick={() => document.getElementById('file-input')?.click()}
+                    title="Drag & drop or click to upload"
+                  >
+                    <input
+                      id="file-input" type="file" accept="image/*" className="hidden"
+                      onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
+                    />
+                    {!localUrl && !resultUrl ? (
+                      <div className="text-center text-slate-500 text-sm">
+                        <div className="mx-auto mb-3 grid place-items-center size-12 rounded-full bg-white border border-slate-200">⬆</div>
+                        Drag & drop an image here, or click to choose
+                      </div>
+                    ) : (
+                      <div className="relative w-full h-full grid place-items-center p-3">
+                        <img
+                          src={resultUrl || localUrl}
+                          alt="preview"
+                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                          draggable={false}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="m-4 md:m-5">
+                    <div className="mb-2 text-sm font-semibold">Swap Backend Model</div>
+                    <ModelSwapPanel />
+                  </div>
+                )}
 
                 {/* actions */}
                 <div className="flex flex-wrap items-center gap-2 px-4 md:px-5 pb-5">
-                  <button
-                    onClick={handleRun}
-                    disabled={!file || busy}
-                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
-                  >
-                    {busy ? 'Processing…' : (
-                      <>
-                        <PlayIcon className="size-4" />
-                        Run {TOOLS.find(t => t.id === active)?.label}
-                      </>
-                    )}
-                  </button>
+                  {active !== 'modelSwap' && (
+                    <button
+                      onClick={handleRun}
+                      disabled={!file || busy}
+                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
+                    >
+                      {busy ? 'Processing…' : (
+                        <>
+                          <PlayIcon className="size-4" />
+                          Run {TOOLS.find(t => t.id === active)?.label}
+                        </>
+                      )}
+                    </button>
+                  )}
 
-                  {resultUrl && (
+                  {resultUrl && active !== 'modelSwap' && (
                     <>
                       <button
                         onClick={active === 'removeBg' ? downloadRemoveBgPng : downloadResultAsPng}
@@ -536,10 +745,9 @@ export default function DashboardStudio() {
               <aside className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
                 <div className="text-sm font-semibold text-slate-900 mb-3">Inspector</div>
 
-                {active === 'removeBg' ? (
+                {active === 'removeBg' && (
                   <div className="space-y-3">
                     <ModeTabs mode={bgMode} setMode={setBgMode} />
-
                     <Field label="Primary"><Color value={color} onChange={setColor} /></Field>
 
                     {bgMode === 'gradient' && (
@@ -576,26 +784,46 @@ export default function DashboardStudio() {
                       </div>
                     </div>
                   </div>
-                ) : (
+                )}
+
+                {active === 'enhance' && (
                   <div className="space-y-2 text-xs text-slate-600">
-                    <div>اضغط Run لفتح نافذة الإعدادات (Pop-Up) واختيار التفاصيل.</div>
+                    <div>اضغط <span className="font-semibold">Run</span> لفتح نافذة الإعدادات (Pop-Up) — أو اختر Preset من فوق.</div>
+                    <div className="mt-3 text-[11px] text-slate-500">Model: {BACKENDS.find(b=>b.id===backendModel)?.name}</div>
                     {resultUrl && (
-                      <div className="mt-3">
-                        <div className="text-xs text-slate-500 mb-2">Final Preview</div>
-                        <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                          <div className="relative w-full min-h-[160px] grid place-items-center">
-                            <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
-                          </div>
+                      <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                        <div className="relative w-full min-h-[160px] grid place-items-center">
+                          <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {active === 'tryon' && (
+                  <div className="space-y-2 text-xs text-slate-600">
+                    <div>جرّب Preset من قسم Try-On أو اضغط <span className="font-semibold">Run</span>.</div>
+                    <div className="mt-3 text-[11px] text-slate-500">Model: {BACKENDS.find(b=>b.id===backendModel)?.name}</div>
+                    {resultUrl && (
+                      <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                        <div className="relative w-full min-h-[160px] grid place-items-center">
+                          <img src={resultUrl} alt="final" className="max-w-full max-h-[40vh] object-contain" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {active === 'modelSwap' && (
+                  <div className="text-xs text-slate-600">
+                    اختر باك-إند مناسب لاستخدامك (يحفظ تلقائيًا).
                   </div>
                 )}
               </aside>
             </div>
 
             {/* History */}
-            <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
+            <div id="history-anchor" className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
               <div className="text-sm font-semibold text-slate-900 mb-2">History</div>
               {history.length === 0 ? (
                 <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
@@ -623,16 +851,25 @@ export default function DashboardStudio() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="absolute inset-0 bg-black/55" onClick={()=>setShowEnhance(false)} />
               <div className="relative w-full max-w-3xl">
-                <EnhanceCustomizer onChange={()=>{}} onComplete={(form) => { setShowEnhance(false); runEnhance(form); }} />
+                {/* نمرر initial لو كان الكومبوننت يدعمها، وإلا يتجاهلها */}
+                <EnhanceCustomizer
+                  initial={pendingEnhancePreset || undefined}
+                  onChange={()=>{}}
+                  onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
+                />
               </div>
             </motion.div>
           )}
-          {showTryon && (
+          {showTryOn && (
             <motion.div className="fixed inset-0 z-[100] grid place-items-center"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="absolute inset-0 bg-black/55" onClick={()=>setShowTryon(false)} />
+              <div className="absolute inset-0 bg-black/55" onClick={()=>setShowTryOn(false)} />
               <div className="relative w-full max-w-3xl">
-                <TryOnCustomizer onChange={()=>{}} onComplete={(form) => { setShowTryon(false); runTryOn(form); }} />
+                <TryOnCustomizer
+                  initial={pendingTryOnPreset || undefined}
+                  onChange={()=>{}}
+                  onComplete={(form) => { setShowTryOn(false); setPendingTryOnPreset(null); runTryOn(form); }}
+                />
               </div>
             </motion.div>
           )}
@@ -650,12 +887,42 @@ export default function DashboardStudio() {
   );
 }
 
-/* ================== UI bits ================== */
-function NavItem({ label, icon:Icon, active=false }) {
+/* ================== Sidebar bits ================== */
+function Group({ title, children, defaultOpen=false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="px-2 py-2 border-b border-slate-200/70">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between text-sm px-2 py-1.5 rounded-lg hover:bg-slate-50"
+      >
+        <span className="flex items-center gap-2">
+          {title === 'Tools' ? <WandIcon className="size-4 text-slate-500" /> : <PersonIcon className="size-4 text-slate-500" />}
+          <span className="font-semibold">{title}</span>
+        </span>
+        <span className="text-xs text-slate-500">{open ? '▾' : '▸'}</span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="pl-7 pr-1 pt-1 space-y-1"
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+function SideItem({ label, icon:Icon, active=false, onClick }) {
   return (
     <button
+      onClick={onClick}
       className={[
-        'w-full group flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition',
+        'w-full group flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition',
         active
           ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
           : 'text-slate-700 hover:bg-slate-100 border border-transparent'
@@ -667,6 +934,7 @@ function NavItem({ label, icon:Icon, active=false }) {
   );
 }
 
+/* ================== UI bits ================== */
 function Segmented({ items, value, onChange }) {
   return (
     <div className="inline-flex rounded-full border border-slate-300 bg-white p-1">
@@ -691,17 +959,17 @@ function Segmented({ items, value, onChange }) {
   );
 }
 
-function MoodCard({ title, subtitle, onClick, gradient }) {
+function PresetCard({ title, subtitle, onClick, gradient }) {
   return (
     <button onClick={onClick}
       className="group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left">
-      <div className={`h-40 w-full bg-gradient-to-br ${gradient}`} />
+      <div className={`h-36 w-full bg-gradient-to-br ${gradient}`} />
       <div className="p-3">
         <div className="font-semibold">{title}</div>
         <div className="text-xs text-slate-500">{subtitle}</div>
       </div>
       <div className="absolute top-3 right-3 rounded-full bg-white/80 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
-        Try preset
+        Use preset
       </div>
     </button>
   );
@@ -787,8 +1055,6 @@ function ModeTabs({ mode, setMode }) {
 function ScissorsIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor"/></svg>);}
 function RocketIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor"/><circle cx="15" cy="9" r="1.5" fill="#fff"/></svg>);}
 function PersonIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/></svg>);}
-function SparklesIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M5 9l2-5 2 5 5 2-5 2-2 5-2-5-5-2 5-2zM16 3l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" fill="currentColor"/></svg>);}
-function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M2 20l10-10 2 2L4 22H2zM14 2l2 2-2 2-2-2 2-2z" fill="currentColor"/></svg>);}
 function CubeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2.18L6 6.09v.1l6 3 6-3v-.1l-6-1.91zM6 8.4V18l6 3V11.4L6 8.4zm12 0l-6 3V21l6-3V8.4z" fill="currentColor"/></svg>);}
 function ImageIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14h18zM5 5h14v10l-4-4-3 3-4-4-3 3V5z" fill="currentColor"/></svg>);}
 function GalleryIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M3 5h7v7H3zM14 5h7v7h-7zM3 16h7v7H3zM14 16h7v7h-7z" transform="scale(.9) translate(1, -2)" fill="currentColor"/></svg>);}
