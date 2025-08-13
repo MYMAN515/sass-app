@@ -24,7 +24,7 @@ const fileToDataURLOriginal = (file) =>
 
 const STORAGE_BUCKET = 'img';
 
-/* ---------------- Presets (الصور من /public) ---------------- */
+/* ---------------- Presets (صور من /public مباشرة) ---------------- */
 const ENHANCE_PRESETS = [
   {
     id: 'clean-studio',
@@ -37,9 +37,9 @@ const ENHANCE_PRESETS = [
       lighting: 'large softbox, gentle reflections',
       colorStyle: 'neutral whites, subtle grays',
       realism: 'hyperrealistic details',
-      outputQuality: '4k sharp',
+      outputQuality: '4k sharp'
     },
-    preview: '/clean-studio.webp',
+    preview: '/clean-studio.webp'
   },
   {
     id: 'desert-tones',
@@ -52,9 +52,9 @@ const ENHANCE_PRESETS = [
       lighting: 'golden hour, soft shadows',
       colorStyle: 'sand, beige, amber',
       realism: 'photo-real, crisp textures',
-      outputQuality: '4k',
+      outputQuality: '4k'
     },
-    preview: '/desert-tones.webp',
+    preview: '/desert-tones.webp'
   },
   {
     id: 'editorial-beige',
@@ -67,9 +67,9 @@ const ENHANCE_PRESETS = [
       lighting: 'directional key + fill',
       colorStyle: 'beige monochrome',
       realism: 'realistic',
-      outputQuality: '4k print',
+      outputQuality: '4k print'
     },
-    preview: '/editorial-beige.webp',
+    preview: '/editorial-beige.webp'
   },
   {
     id: 'slate-contrast',
@@ -82,10 +82,10 @@ const ENHANCE_PRESETS = [
       lighting: 'hard key + rim, controlled specular',
       colorStyle: 'cool slate, deep blacks',
       realism: 'high-fidelity',
-      outputQuality: '4k',
+      outputQuality: '4k'
     },
-    preview: '/slate-contrast.webp',
-  },
+    preview: '/slate-contrast.webp'
+  }
 ];
 
 const TRYON_PRESETS = [
@@ -94,53 +94,33 @@ const TRYON_PRESETS = [
     title: 'Streetwear',
     subtitle: 'Urban • moody',
     tag: 'Model',
-    config: {
-      style: 'streetwear fit',
-      setting: 'urban alley, textured wall',
-      lighting: 'overcast soft',
-      mood: 'cool, editorial',
-    },
-    preview: '/streetwear.webp',
+    config: { style: 'streetwear fit', setting: 'urban alley, textured wall', lighting: 'overcast soft', mood: 'cool, editorial' },
+    preview: '/streetwear.webp'
   },
   {
     id: 'ecom-mannequin',
     title: 'E-Com Mannequin',
     subtitle: 'Plain white',
     tag: 'Catalog',
-    config: {
-      style: 'ecommerce mannequin front',
-      setting: 'white cyclorama',
-      lighting: 'soft studio',
-      mood: 'catalog clean',
-    },
-    preview: '/ecom-mannequin.webp',
+    config: { style: 'ecommerce mannequin front', setting: 'white cyclorama', lighting: 'soft studio', mood: 'catalog clean' },
+    preview: '/ecom-mannequin.webp'
   },
   {
     id: 'lifestyle',
     title: 'Lifestyle',
     subtitle: 'Sunlit room',
     tag: 'Natural',
-    config: {
-      style: 'lifestyle casual',
-      setting: 'sunlit apartment, wood floor',
-      lighting: 'window soft',
-      mood: 'fresh & bright',
-    },
-    preview: '/lifestyle.webp',
+    config: { style: 'lifestyle casual', setting: 'sunlit apartment, wood floor', lighting: 'window soft', mood: 'fresh & bright' },
+    preview: '/lifestyle.webp'
   },
   {
     id: 'outdoor',
     title: 'Outdoor',
     subtitle: 'Park • daylight',
     tag: 'Daylight',
-    config: {
-      style: 'outdoor casual',
-      setting: 'green park, path & trees',
-      lighting: 'midday diffuse',
-      mood: 'open & vibrant',
-    },
-    preview: '/outdoor.webp',
-  },
+    config: { style: 'outdoor casual', setting: 'green park, path & trees', lighting: 'midday diffuse', mood: 'open & vibrant' },
+    preview: '/outdoor.webp'
+  }
 ];
 
 /* ---------------- Tools ---------------- */
@@ -148,7 +128,7 @@ const TOOLS = [
   { id: 'removeBg', label: 'Remove BG', icon: ScissorsIcon },
   { id: 'enhance', label: 'Enhance', icon: RocketIcon },
   { id: 'tryon', label: 'Try-On', icon: PersonIcon },
-  { id: 'modelSwap', label: 'Model Swap', icon: CubeIcon },
+  { id: 'modelSwap', label: 'Model Swap', icon: CubeIcon }
 ];
 
 export default function DashboardStudio() {
@@ -192,7 +172,7 @@ export default function DashboardStudio() {
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [pendingTryOnPreset, setPendingTryOnPreset] = useState(null);
 
-  // backend model (from API, NOT hardcoded here)
+  // backend model (from API)
   const [models, setModels] = useState([]); // [{id,name,tags,desc,recommendFor}]
   const [backendModel, setBackendModel] = useState('');
 
@@ -210,7 +190,6 @@ export default function DashboardStudio() {
       if (user === undefined) return;
       if (!user) { router.replace('/login'); return; }
 
-      // 1) fetch plan/credits/model (بحسب user_id)
       try {
         const { data } = await supabase
           .from('Data')
@@ -224,9 +203,9 @@ export default function DashboardStudio() {
         setBackendModel(data?.model_backend || '');
       } catch {/* ignore */}
 
-      // 2) fetch model options from your API (لا تثبّت محلي)
+      // ← ربط الموديل مع /api/model.js (وليس /api/models)
       try {
-        const res = await fetch('/api/models', { cache: 'no-store' });
+        const res = await fetch('/api/model', { cache: 'no-store' });
         if (res.ok) {
           const arr = await res.json();
           if (Array.isArray(arr)) setModels(arr);
@@ -497,8 +476,8 @@ export default function DashboardStudio() {
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
     return (
-      <main className="min-h-screen grid place-items-center bg-slate-50 text-slate-600">
-        <div className="text-sm">Loading your studio…</div>
+      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-slate-50 to-slate-100 text-slate-600">
+        <div className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 border shadow-sm text-sm">Loading your studio…</div>
       </main>
     );
   }
@@ -520,12 +499,10 @@ export default function DashboardStudio() {
             key={b.id}
             onClick={async () => {
               setBackendModel(b.id);
-              try {
-                await supabase.from('Data').update({ model_backend: b.id }).eq('user_id', user.id);
-              } catch {}
+              try { await supabase.from('Data').update({ model_backend: b.id }).eq('user_id', user.id); } catch {}
             }}
             className={[
-              'text-left rounded-xl border p-4 transition shadow-sm',
+              'text-left rounded-xl border p-4 transition shadow-sm hover:shadow-md',
               selected ? 'border-indigo-500 ring-1 ring-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
             ].join(' ')}
           >
@@ -537,15 +514,10 @@ export default function DashboardStudio() {
               {selected && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600 text-white">Active</span>}
             </div>
             {Array.isArray(b.tags) && b.tags.length > 0 && (
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 {b.tags.map(t => (
                   <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">{t}</span>
                 ))}
-              </div>
-            )}
-            {Array.isArray(b.recommendFor) && (
-              <div className="mt-2 text-[11px] text-slate-500">
-                Recommended: {b.recommendFor.join(', ')}
               </div>
             )}
           </button>
@@ -557,13 +529,12 @@ export default function DashboardStudio() {
   );
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      {/* زر Home فقط عند Free أو رصيد 0 */}
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900">
       {(plan === 'Free' || credits <= 0) && (
         <div className="fixed top-4 right-4 z-10">
           <button
             onClick={() => router.push('/')}
-            className="rounded-full border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold shadow-sm"
+            className="rounded-full border border-slate-300 bg-white/90 hover:bg-white px-4 py-2 text-sm font-semibold shadow-sm backdrop-blur"
             title="Back to Home"
           >
             ⬅ Home
@@ -581,32 +552,15 @@ export default function DashboardStudio() {
             <div className="font-semibold tracking-tight">AI Studio</div>
           </div>
 
-          {/* Tools group */}
           <Group title="Tools" defaultOpen>
             {TOOLS.map(t => (
-              <SideItem
-                key={t.id}
-                label={t.label}
-                icon={t.icon}
-                active={active === t.id}
-                onClick={() => setActive(t.id)}
-              />
+              <SideItem key={t.id} label={t.label} icon={t.icon} active={active === t.id} onClick={() => setActive(t.id)} />
             ))}
           </Group>
 
-          {/* Models group */}
           <Group title="Models" defaultOpen>
-            <SideItem
-              label="Model Swap"
-              icon={CubeIcon}
-              active={active === 'modelSwap'}
-              onClick={() => setActive('modelSwap')}
-            />
-            <SideItem
-              label="History"
-              icon={ListIcon}
-              onClick={() => document.getElementById('history-anchor')?.scrollIntoView({ behavior:'smooth' })}
-            />
+            <SideItem label="Model Swap" icon={CubeIcon} active={active === 'modelSwap'} onClick={() => setActive('modelSwap')} />
+            <SideItem label="History" icon={ListIcon} onClick={() => document.getElementById('history-anchor')?.scrollIntoView({ behavior:'smooth' })} />
           </Group>
 
           <div className="mt-2 px-4 py-3 border-t border-slate-200">
@@ -621,12 +575,12 @@ export default function DashboardStudio() {
 
         {/* ===== Main Column ===== */}
         <section className="space-y-5 md:space-y-6">
-          {/* Presets + Customize row */}
-          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm">
+          {/* Presets + Customize */}
+          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white/90 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
-                <p className="text-slate-600 text-xs sm:text-sm">اختر Preset أو اضغط <span className="font-semibold">Customize</span> لتعديل الإعدادات يدويًا.</p>
+                <p className="text-slate-600 text-xs sm:text-sm">اختر Preset جاهز أو افتح <span className="font-semibold">Customize</span> للتعديل اليدوي.</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -692,7 +646,7 @@ export default function DashboardStudio() {
                 </div>
               </div>
 
-              {/* dropzone / model swap content */}
+              {/* dropzone / model swap */}
               {active !== 'modelSwap' ? (
                 <div
                   ref={dropRef}
@@ -712,7 +666,6 @@ export default function DashboardStudio() {
                     </div>
                   ) : (
                     <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
-                      {/* compare overlay */}
                       {compare && localUrl && resultUrl ? (
                         <div className="relative max-w-full max-h-[70vh]">
                           <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
@@ -744,7 +697,7 @@ export default function DashboardStudio() {
                   <button
                     onClick={handleRun}
                     disabled={!file || busy}
-                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                   >
                     {busy ? 'Processing…' : (<><PlayIcon className="size-4" />Run {TOOLS.find(t => t.id === active)?.label}</>)}
                   </button>
@@ -809,7 +762,7 @@ export default function DashboardStudio() {
                 )}
               </AnimatePresence>
 
-              {/* API response (collapsible) */}
+              {/* API response */}
               {apiResponse && (
                 <div className="px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
                   <button
@@ -841,7 +794,6 @@ export default function DashboardStudio() {
                 <span className="text-xs text-slate-500">Model: {models.find(m=>m.id===backendModel)?.name || backendModel || '—'}</span>
               </div>
 
-              {/* Remove BG controls */}
               {active === 'removeBg' && (
                 <div className="space-y-3 mt-3">
                   <ModeTabs mode={bgMode} setMode={setBgMode} />
@@ -881,7 +833,7 @@ export default function DashboardStudio() {
 
               {(active === 'enhance' || active === 'tryon') && (
                 <div className="space-y-2 text-xs text-slate-600 mt-3">
-                  <div>اختر Preset من الأعلى أو اضغط <span className="font-semibold">Run/Customize</span> لفتح الإعدادات.</div>
+                  <div>اختر Preset من الأعلى أو اضغط <span className="font-semibold">Run/Customize</span>.</div>
                   {resultUrl && (
                     <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                       <div className="relative w-full min-h-[140px] grid place-items-center">
@@ -893,9 +845,7 @@ export default function DashboardStudio() {
               )}
 
               {active === 'modelSwap' && (
-                <div className="text-xs text-slate-600 mt-3">
-                  اختر الـ Backend المناسب — يتم الحفظ تلقائيًا على حسابك.
-                </div>
+                <div className="text-xs text-slate-600 mt-3">اختر الـ Backend المناسب — يُحفظ تلقائيًا على حسابك.</div>
               )}
             </aside>
           </div>
@@ -960,12 +910,7 @@ export default function DashboardStudio() {
       </AnimatePresence>
 
       {/* Export Drawer */}
-      <ExportDrawer
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        cutoutUrl={resultUrl}
-        defaultName="asset"
-      />
+      <ExportDrawer open={exportOpen} onClose={() => setExportOpen(false)} cutoutUrl={resultUrl} defaultName="asset" />
     </main>
   );
 }
@@ -1042,15 +987,27 @@ function Segmented({ items, value, onChange }) {
   );
 }
 
+/* بطاقة preset — تختفي تلقائيًا إذا فشلت الصورة (لتجنّب بطاقات بدون صور) */
 function PresetCard({ title, subtitle, onClick, preview, tag }) {
+  const [broken, setBroken] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  if (broken) return null;
+
   return (
     <button onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left">
-      <div className="relative h-36 w-full bg-slate-100">
-        {/* صورة من public */}
-        <img src={preview} alt={title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+      className="group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left hover:shadow-md">
+      <div className="relative w-full aspect-[4/3] bg-slate-100">
+        {!loaded && <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100" />}
+        <img
+          src={preview}
+          alt={title}
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          onError={() => setBroken(true)}
+        />
         {tag && (
-          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 text-white">
+          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 text-white shadow">
             {tag}
           </span>
         )}
@@ -1147,12 +1104,11 @@ function ScissorsIcon(props){return(<svg viewBox="0 0 24 24" className={props.cl
 function RocketIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor"/><circle cx="15" cy="9" r="1.5" fill="#fff"/></svg>);}
 function PersonIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/></svg>);}
 function CubeIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2.18L6 6.09v.1l6 3 6-3v-.1l-6-1.91zM6 8.4V18l6 3V11.4L6 8.4zm12 0l-6 3V21l6-3V8.4z" fill="currentColor"/></svg>);}
-function ImageIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14h18zM5 5h14v10l-4-4-3 3-4-4-3 3V5z" fill="currentColor"/></svg>);}
 function ListIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" fill="currentColor"/></svg>);}
 function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
 function WandIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M2 20l10-10 2 2L4 22H2zM14 2l2 2-2 2-2-2 2-2z" fill="currentColor"/></svg>);}
 
-/* ====== Minimal placeholders (استبدلها بمكوّناتك إن وُجدت) ====== */
+/* ====== محاكيان بسيطان لـ Customize (استبدلها بإعداداتك الكاملة) ====== */
 function EnhanceCustomizer({ initial, onChange, onComplete }) {
   return (
     <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
@@ -1215,6 +1171,6 @@ function ExportDrawer({ open, onClose, cutoutUrl, defaultName }) {
   );
 }
 
-/* ====== Prompt helpers (بدائل خفيفة لو ما عندك المكتبة) ====== */
+/* ====== Prompt helpers (بدائل خفيفة) ====== */
 function generateDynamicPrompt(selections){ return `dynamic: ${JSON.stringify(selections)}`; }
 function generateTryOnNegativePrompt(){ return 'lowres, artifacts, deformed'; }
