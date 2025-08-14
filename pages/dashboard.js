@@ -1182,13 +1182,56 @@ function PieceTypeModal({ onCancel, onConfirm }) {
 }
 
 /* ----- Icons (SVG) ----- */
-function SparkleIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor"/></svg>);}
-function BoxIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor"/></svg>);}
-function PersonIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/></svg>);}
-function ScissorsIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor"/>);}
-function RocketIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor"/><circle cx="15" cy="9" r="1.5" fill="#fff"/></svg>);}
-function SwapIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor"/>);}
-function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/>);}
+function SparkleIcon(props){
+  return (
+    <svg viewBox="0 0 24 24" className={props.className||''}>
+      <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor"/>
+    </svg>
+  );
+}
+function BoxIcon(props){
+  return (
+    <svg viewBox="0 0 24 24" className={props.className||''}>
+      <path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor"/>
+    </svg>
+  );
+}
+function PersonIcon(props){
+  return (
+    <svg viewBox="0 0 24 24" className={props.className||''}>
+      <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/>
+    </svg>
+  );
+}
+function ScissorsIcon(props){
+  return (
+    <svg viewBox="0 0 24 24" className={props.className||''}>
+      <path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor"/>
+    </svg>
+  );
+}
+function RocketIcon(props){
+  return (
+    <svg viewBox="0 0 24 24" className={props.className||''}>
+      <path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor"/>
+      <circle cx="15" cy="9" r="1.5" fill="#fff"/>
+    </svg>
+  );
+}
+function SwapIcon(props){
+  return (
+    <svg viewBox="0 0 24 24" className={props.className||''}>
+      <path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor"/>
+    </svg>
+  );
+}
+function PlayIcon(props){
+  return (
+    <svg viewBox="0 0 24 24" className={props.className||''}>
+      <path d="M8 5v14l11-7z" fill="currentColor"/>
+    </svg>
+  );
+}
 
 /* -------------------------------------------------------
    Export helpers
