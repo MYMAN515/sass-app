@@ -413,24 +413,38 @@ const buildTryOnPrompt = (pt) => {
       t.update({ msg: 'Enhance failed', type: 'error' }); setTimeout(() => t.close(), 1500);
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, uploadToStorage, plan, user, localUrl, toasts]);
+// ===== Replacement: runTryOn (English, clear errors) =====
 const runTryOn = useCallback(async () => {
-  if (!selectedModel?.url) return setErr('Pick a model first.');
-  if (!file) return setErr('Upload a clothing image first.');
-  if (!pieceType) return setErr('Choose clothing type.');
+  if (!file)              { setErr('Please upload a clothing image first.'); return; }
+  if (!selectedModel?.url){ setErr('Please select a model first.'); return; }
+  if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
 
-  // ✅ make model URL absolute for the server (Replicate can't fetch relative paths)
-  const origin = typeof window !== 'undefined' && window.location?.origin
-    ? window.location.origin
-    : (process.env.NEXT_PUBLIC_SITE_URL || 'https://aistoreassistant.app');
+  // Early tip for better print/logo preservation
+  if (file?.type && !/png/i.test(file.type)) {
+    toasts.push('Tip: Transparent PNG works best for preserving prints/logos.', { type: 'info' });
+  }
+
+  const origin =
+    (typeof window !== 'undefined' && window.location?.origin) ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://aistoreassistant.app';
 
   const modelUrlAbs = selectedModel.url.startsWith('http')
     ? selectedModel.url
     : new URL(selectedModel.url, origin).toString();
 
-  setBusy(true); setErr(''); setPhase('processing');
+  setBusy(true);
+  setErr('');
+  setPhase('processing');
+
   const prompt = buildTryOnPrompt(pieceType);
-  const t = toasts.push('Generating try-on…', { progress: 10 });
-  let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
+  const toast = toasts.push('Generating try-on…', { progress: 10 });
+
+  let progress = 10;
+  const iv = setInterval(() => {
+    progress = Math.min(progress + 6, 88);
+    toast.update({ progress });
+  }, 500);
 
   try {
     const clothUrl = await uploadToStorage(file);
@@ -439,26 +453,57 @@ const runTryOn = useCallback(async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        modelUrl: modelUrlAbs,                 // ⬅️ use absolute here
+        modelUrl: modelUrlAbs,
         clothUrl,
+        pieceType, // ✅ now sent to API
         prompt,
-        negativePrompt: 'lowres, bad hands, deformed, extra limbs, wrong background, different pose, different face, text, watermark',
+        negativePrompt:
+          'lowres, bad hands, deformed, extra limbs, wrong background, different pose, different face, text, watermark',
         plan,
         user_email: user.email
       })
     });
 
-    const j = await r.json();
-    if (!r.ok) throw new Error(j?.error || 'try-on failed');
+    const j = await r.json().catch(() => ({}));
 
-    const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
+    if (!r.ok) {
+      const msg =
+        j?.error ||
+        (r.status === 400 ? 'Missing required fields.' :
+         r.status === 401 ? 'Unauthorized.' :
+         r.status === 403 ? 'No credits left.' :
+         r.status === 404 ? 'User not found.' :
+         r.status === 500 ? 'Generation failed on the server.' :
+         `Unexpected error (${r.status}).`);
+      throw new Error(msg);
+    }
+
+    const out =
+      j?.image || j?.url || j?.result ||
+      (Array.isArray(j?.output) ? j.output[0] : j?.output);
+
+    if (!out) throw new Error('No output image returned from the API.');
+
     setResultUrl(out);
-    setHistory(h => [{ tool:'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-    setPhase('ready'); t.update({ progress: 100, msg: 'Try-On ✓' }); setTimeout(() => t.close(), 700);
+    setHistory(h => [
+      { tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() },
+      ...h
+    ].slice(0, 24));
+
+    setPhase('ready');
+    toast.update({ progress: 100, msg: 'Try-On ✓' });
+    setTimeout(() => toast.close(), 700);
   } catch (e) {
-    console.error(e); setPhase('error'); setErr('Failed to process.');
-    t.update({ msg: 'Try-On failed', type: 'error' }); setTimeout(() => t.close(), 1500);
-  } finally { clearInterval(iv); setBusy(false); }
+    console.error(e);
+    setPhase('error');
+    const msg = e?.message || 'Processing failed.';
+    setErr(msg);
+    toast.update({ msg: `Try-On failed: ${msg}`, type: 'error' });
+    setTimeout(() => toast.close(), 1500);
+  } finally {
+    clearInterval(iv);
+    setBusy(false);
+  }
 }, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
 
 
