@@ -413,37 +413,95 @@ const buildTryOnPrompt = (pt) => {
       t.update({ msg: 'Enhance failed', type: 'error' }); setTimeout(() => t.close(), 1500);
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, uploadToStorage, plan, user, localUrl, toasts]);
-// ===== Replacement: runTryOn (English, clear errors) =====
-async function runTryOn() {
+
+   // ===== Replacement: runTryOn (paste this whole function) =====
+const runTryOn = useCallback(async () => {
+  // تحقّقات سريعة
+  if (!file)              { setErr('Please upload a clothing image first.'); return; }
+  if (!selectedModel?.url){ setErr('Please select a model first.'); return; }
+  if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
+
+  // أصل الروابط لعمل /models/... كرابط مطلق
+  const origin =
+    (typeof window !== 'undefined' && window.location?.origin) ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://aistoreassistant.app';
+
+  // IMAGE 1 = صورة الشخص/المودل (مطلقة)
+  const modelUrlAbs = selectedModel.url.startsWith('http')
+    ? selectedModel.url
+    : new URL(selectedModel.url, origin).toString();
+
+  setBusy(true);
+  setErr('');
+  setPhase('processing');
+
+  // برومبت حسب نوع القطعة (تبقيه كما هو عندك)
+  const prompt = buildTryOnPrompt(pieceType);
+
+  // توست تقدّم
+  const toast = toasts.push('Generating try-on…', { progress: 10 });
+  let progress = 10;
+  const iv = setInterval(() => {
+    progress = Math.min(progress + 6, 88);
+    toast.update({ progress });
+  }, 500);
+
   try {
-    const response = await fetch('/api/tryon', {
+    // IMAGE 2 = رفع صورة القطعة إلى ستوريج ورجوع رابط عام
+    const clothUrl = await uploadToStorage(file);
+
+    // استدعاء API المختصر: 4 حقول فقط
+    const r = await fetch('/api/tryon', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        image1: modelUrlAbs,  // صورة الشخص / الموديل
-        image2: clothUrl,     // صورة القطعة
-        prompt,               // النص النهائي
+        image1: modelUrlAbs,       // IMAGE 1
+        image2: clothUrl,          // IMAGE 2
+        prompt,                    // نص الـTry-On
         plan,
-        user_email: user.email,
-      }),
+        user_email: user.email
+      })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('❌ Try-On API Error:', errorData);
-      throw new Error(errorData?.error || 'Failed to generate try-on');
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg =
+        j?.error ||
+        (r.status === 400 ? 'Missing required fields.' :
+         r.status === 401 ? 'Unauthorized.' :
+         r.status === 403 ? 'No credits left.' :
+         r.status === 404 ? 'User not found.' :
+         r.status === 500 ? 'Generation failed on the server.' :
+         `Unexpected error (${r.status}).`);
+      throw new Error(msg);
     }
 
-    const data = await response.json();
-    console.log('✅ Try-On Success:', data);
-    return data;
-  } catch (error) {
-    console.error('❌ Try-On Request Failed:', error.message);
-    throw error;
+    // التقاط رابط الإخراج
+    const out = j?.image || j?.url || j?.result || (Array.isArray(j?.output) ? j.output[0] : '');
+    if (!out) throw new Error('No output image returned from the API.');
+
+    setResultUrl(out);
+    setHistory(h => [
+      { tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() },
+      ...h
+    ].slice(0, 24));
+
+    setPhase('ready');
+    toast.update({ progress: 100, msg: 'Try-On ✓' });
+    setTimeout(() => toast.close(), 700);
+  } catch (e) {
+    console.error(e);
+    setPhase('error');
+    setErr(e?.message || 'Processing failed.');
+    toast.update({ msg: `Try-On failed: ${e?.message || 'Error'}`, type: 'error' });
+    setTimeout(() => toast.close(), 1500);
+  } finally {
+    clearInterval(iv);
+    setBusy(false);
   }
-}
+}, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
+
 
   const runModelSwap = useCallback(async () => {
     if (!file1 || !file2) return setErr('Pick both images.');
