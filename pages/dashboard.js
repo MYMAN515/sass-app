@@ -406,45 +406,54 @@ export default function Dashboard() {
       t.update({ msg: 'Enhance failed', type: 'error' }); setTimeout(() => t.close(), 1500);
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, uploadToStorage, plan, user, localUrl, toasts]);
+const runTryOn = useCallback(async () => {
+  if (!selectedModel?.url) return setErr('Pick a model first.');
+  if (!file) return setErr('Upload a clothing image first.');
+  if (!pieceType) return setErr('Choose clothing type.');
 
-  const runTryOn = useCallback(async () => {
-    if (!selectedModel?.url) return setErr('Pick a model first.');
-    if (!file) return setErr('Upload a clothing image first.');
-    if (!pieceType) return setErr('Choose clothing type.');
+  // ✅ make model URL absolute for the server (Replicate can't fetch relative paths)
+  const origin = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : (process.env.NEXT_PUBLIC_SITE_URL || 'https://aistoreassistant.app');
 
-    setBusy(true); setErr(''); setPhase('processing');
-    const prompt = buildTryOnPrompt(pieceType);
-    const t = toasts.push('Generating try-on…', { progress: 10 });
-    let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
+  const modelUrlAbs = selectedModel.url.startsWith('http')
+    ? selectedModel.url
+    : new URL(selectedModel.url, origin).toString();
 
-    try {
-      // ارفع صورة الملابس فقط — صورة المودل من مكتبتك URL عام
-      const clothUrl = await uploadToStorage(file);
+  setBusy(true); setErr(''); setPhase('processing');
+  const prompt = buildTryOnPrompt(pieceType);
+  const t = toasts.push('Generating try-on…', { progress: 10 });
+  let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
 
-      const r = await fetch('/api/tryon', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modelUrl: selectedModel.url,
-          clothUrl,
-          prompt,
-          negativePrompt: 'lowres, bad hands, deformed, extra limbs, wrong background, different pose, different face, text, watermark',
-          plan,
-          user_email: user.email
-        })
-      });
+  try {
+    const clothUrl = await uploadToStorage(file);
 
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || 'try-on failed');
+    const r = await fetch('/api/tryon', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        modelUrl: modelUrlAbs,                 // ⬅️ use absolute here
+        clothUrl,
+        prompt,
+        negativePrompt: 'lowres, bad hands, deformed, extra limbs, wrong background, different pose, different face, text, watermark',
+        plan,
+        user_email: user.email
+      })
+    });
 
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
-      setResultUrl(out);
-      setHistory(h => [{ tool:'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-      setPhase('ready'); t.update({ progress: 100, msg: 'Try-On ✓' }); setTimeout(() => t.close(), 700);
-    } catch (e) {
-      console.error(e); setPhase('error'); setErr('Failed to process.');
-      t.update({ msg: 'Try-On failed', type: 'error' }); setTimeout(() => t.close(), 1500);
-    } finally { clearInterval(iv); setBusy(false); }
-  }, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j?.error || 'try-on failed');
+
+    const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
+    setResultUrl(out);
+    setHistory(h => [{ tool:'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
+    setPhase('ready'); t.update({ progress: 100, msg: 'Try-On ✓' }); setTimeout(() => t.close(), 700);
+  } catch (e) {
+    console.error(e); setPhase('error'); setErr('Failed to process.');
+    t.update({ msg: 'Try-On failed', type: 'error' }); setTimeout(() => t.close(), 1500);
+  } finally { clearInterval(iv); setBusy(false); }
+}, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
+
 
   const runModelSwap = useCallback(async () => {
     if (!file1 || !file2) return setErr('Pick both images.');
