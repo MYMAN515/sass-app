@@ -1,16 +1,14 @@
 // /pages/api/tryon.js
-// Next.js API Route — Try-On (شخص + قطعة لبس) بدون negative prompt
-
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = { api: { bodyParser: true } };
 
-const REPLICATE_URL = 'https://api.replicate.com/v1/predictions';
+const REPLICATE_PREDICT_URL = 'https://api.replicate.com/v1/predictions';
+const REPLICATE_MODEL_URL   = 'https://api.replicate.com/v1/models';
 const POLL_STEP_MS = 1500;
 const POLL_MAX_MS  = 90_000;
 
 /* ------------ helpers ------------ */
-// يعيد URL مطلق حتى لو وصلك relative
 function toAbsoluteUrl(u, req) {
   try { return new URL(u).toString(); }
   catch {
@@ -20,44 +18,86 @@ function toAbsoluteUrl(u, req) {
   }
 }
 
-// نتحقق بشكل مرن — بعض CDNs/Supabase يرجّع octet-stream أو يحجب HEAD
 async function assertPublicImage(url) {
   const r = await fetch(url, { method: 'HEAD' }).catch(() => null);
-  if (!r || !r.ok) return; // لا نفشل بدري لو HEAD محجوب
+  if (!r || !r.ok) return; // بعض CDNs يحجب HEAD
   const ct = (r.headers.get('content-type') || '').toLowerCase();
   if (!(ct.startsWith('image/') || ct === 'application/octet-stream')) {
     throw new Error(`URL is not an image: ${url} (${ct})`);
   }
 }
 
-// نص برومبت مضبوط حسب نوع القطعة؛ يدمج أي نص إضافي من المستخدم (اختياري)
 function buildTryOnPrompt(pieceType, userPrompt) {
   const pt = (pieceType || 'upper').toLowerCase();
-  let scope;
-  if (pt === 'upper') {
-    scope = 'Replace ONLY the TOP with the garment from IMAGE 2. Do NOT stack clothes.';
-  } else if (pt === 'lower') {
-    scope = 'Replace ONLY the BOTTOM (pants/skirt) with the garment from IMAGE 2. Do NOT stack clothes.';
-  } else {
-    scope = 'Replace the FULL OUTFIT with the garment from IMAGE 2 as a one-piece dress. Do NOT stack clothes.';
-  }
+  const scope =
+    pt === 'upper'
+      ? 'Replace ONLY the TOP with the garment from IMAGE 2. Do NOT stack clothes.'
+      : pt === 'lower'
+      ? 'Replace ONLY the BOTTOM (pants/skirt) with the garment from IMAGE 2. Do NOT stack clothes.'
+      : 'Replace the FULL OUTFIT with the garment from IMAGE 2 as a one-piece dress. Do NOT stack clothes.';
 
   const base = [
     'Photorealistic virtual try-on.',
     'Use IMAGE 1 as the person AND background; keep face, hair, body shape, pose, camera and lighting IDENTICAL.',
     scope,
-    'Reproduce the exact fabric, color, pattern, buttons, collar/pockets and prints/logos with correct position and scale.',
+    'Reproduce fabric, color, pattern, buttons and prints/logos with correct position and scale.',
     pt === 'upper'
-      ? 'Align shoulder seams and neckline precisely; correct sleeve length.'
+      ? 'Align shoulder seams and neckline; correct sleeve length.'
       : pt === 'lower'
-      ? 'Align waist/hips correctly; accurate rise and inseam.'
-      : 'Align neckline, shoulders, waist and hem correctly.',
+      ? 'Align waist/hips; accurate rise and inseam.'
+      : 'Align neckline, shoulders, waist and hem.',
     'Natural fit and drape; realistic wrinkles, seams and shadows.',
     'Single final photo, uncropped, sharp 4k.'
   ].join(' ');
 
-  // نضيف أي وصف إضافي يرسله المستخدم بدون ما نلخبط القواعد الأساسية
   return userPrompt ? `${base} ${userPrompt}` : base;
+}
+
+/** يبدأ توقع Replicate:
+ *  - يحاول إرسال { model: owner/name }
+ *  - إن رجع 400 وفيه "version is required" → يجلب latest_version.id ويعيد بـ { version }
+ */
+async function startReplicate({ token, modelName, input }) {
+  const common = {
+    method: 'POST',
+    headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
+  };
+
+  // المحاولة الأولى بـ model
+  let start = await fetch(REPLICATE_PREDICT_URL, {
+    ...common,
+    body: JSON.stringify({ model: modelName, input }),
+  });
+
+  let data = await start.json().catch(() => ({}));
+  const needsVersion =
+    start.status === 400 &&
+    (data?.error?.includes?.('version is required') ||
+     data?.detail?.includes?.('version is required') ||
+     JSON.stringify(data).toLowerCase().includes('version is required'));
+
+  if (!needsVersion) return { resp: start, json: data };
+
+  // جلب أحدث نسخة
+  const meta = await fetch(`${REPLICATE_MODEL_URL}/${modelName}`, {
+    headers: { Authorization: `Token ${token}` },
+  }).then(r => r.json()).catch(() => ({}));
+
+  const versionId = meta?.latest_version?.id || meta?.versions?.[0]?.id;
+  if (!versionId) {
+    return {
+      resp: { ok: false, status: 400 },
+      json: { error: 'Replicate model version not found', detail: meta }
+    };
+  }
+
+  // إعادة الإرسال بـ version
+  start = await fetch(REPLICATE_PREDICT_URL, {
+    ...common,
+    body: JSON.stringify({ version: versionId, input }),
+  });
+  data = await start.json().catch(() => ({}));
+  return { resp: start, json: data };
 }
 
 /* ------------ handler ------------ */
@@ -68,24 +108,15 @@ export default async function handler(req, res) {
   if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing Replicate token' });
 
   const {
-    modelUrl,        // صورة الشخص/المودل (IMAGE 1)
-    clothUrl,        // صورة القطعة (IMAGE 2)
-    pieceType,       // upper | lower | dress
-    prompt,          // (مطلوب) وصف إضافي من الواجهة الأمامية
-    user_email,      // لحساب الرصيد
-    // اختياري:
-    aspect_ratio,
-    seed,
-    output_format,
-    safety_tolerance,
+    modelUrl, clothUrl, pieceType, prompt, user_email,
+    aspect_ratio, seed, output_format, safety_tolerance,
   } = req.body || {};
 
-  // required
   const missing = [];
   if (!modelUrl)   missing.push('modelUrl');
   if (!clothUrl)   missing.push('clothUrl');
   if (!pieceType)  missing.push('pieceType');
-  if (!prompt)     missing.push('prompt'); // نبقيها مطلوبة زي أسلوبك
+  if (!prompt)     missing.push('prompt');
   if (!user_email) missing.push('user_email');
   if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
 
@@ -106,49 +137,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    // URLs مطلقة + تحقق مرن
     const img1 = toAbsoluteUrl(modelUrl, req);
     const img2 = toAbsoluteUrl(clothUrl, req);
     await Promise.all([assertPublicImage(img1), assertPublicImage(img2)]);
 
-    // برومبت نهائي (بدون negative)
     const finalPrompt = buildTryOnPrompt(pieceType, prompt);
 
-    // بدء التوليد — نستخدم endpoint العام ونمرر اسم الموديل
-    const start = await fetch(REPLICATE_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Token ${REPLICATE_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'flux-kontext-apps/multi-image-kontext-max',
-        input: {
-          // نُمرّر التسميتين لضمان التوافق
-          image_1: img1, input_image_1: img1,
-          image_2: img2, input_image_2: img2,
-          prompt: finalPrompt,
-          num_outputs: 1,
-          aspect_ratio: aspect_ratio || 'match_image_1',
-          seed: typeof seed === 'number' ? seed : 42,
-          output_format: output_format || 'jpg',
-          safety_tolerance: typeof safety_tolerance === 'number' ? safety_tolerance : 2,
-        }
-      }),
+    // ابدأ التوقع (مع fallback للـ version)
+    const { resp: start, json: startData } = await startReplicate({
+      token: REPLICATE_TOKEN,
+      modelName: 'flux-kontext-apps/multi-image-kontext-max',
+      input: {
+        image_1: img1, input_image_1: img1,
+        image_2: img2, input_image_2: img2,
+        prompt: finalPrompt,
+        num_outputs: 1,
+        aspect_ratio: aspect_ratio || 'match_image_1',
+        seed: typeof seed === 'number' ? seed : 42,
+        output_format: output_format || 'jpg',
+        safety_tolerance: typeof safety_tolerance === 'number' ? safety_tolerance : 2,
+      }
     });
 
-    const startData = await start.json().catch(() => ({}));
     if (!start.ok || !startData?.urls?.get) {
-      const msg =
-        startData?.error?.message ||
-        startData?.detail ||
-        (typeof startData === 'string' ? startData : '') ||
-        'Failed to start prediction';
+      const msg = startData?.error?.message || startData?.error || startData?.detail || 'Failed to start prediction';
       console.error('Replicate start error:', { status: start.status, startData });
       return res.status(500).json({ error: msg, detail: startData });
     }
 
-    // Poll حتى 90 ثانية
+    // Poll
     const statusUrl = startData.urls.get;
     let output = null;
     for (let i = 0; i < Math.ceil(POLL_MAX_MS / POLL_STEP_MS); i++) {
@@ -164,9 +181,8 @@ export default async function handler(req, res) {
     if (!output) return res.status(500).json({ error: 'Image generation timed out' });
     const generatedImage = Array.isArray(output) ? output[0] : output;
 
-    // خصم رصيد لغير الـ Pro
     if (userData.plan !== 'Pro') {
-      try { await supabase.rpc('decrement_credit', { user_email }); } catch { /* ignore */ }
+      try { await supabase.rpc('decrement_credit', { user_email }); } catch {}
     }
 
     return res.status(200).json({
