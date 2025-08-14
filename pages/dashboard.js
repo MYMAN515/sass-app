@@ -344,20 +344,27 @@ export default function Dashboard() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
-  const buildTryOnPrompt = (pt) => {
-    const typeLine =
-      pt === 'upper' ? 'Apply the uploaded garment as an UPPER-BODY top (shirt/tee/jacket).'
-    : pt === 'lower' ? 'Apply the uploaded garment as a LOWER-BODY item (pants/jeans/skirt).'
-    : pt === 'dress' ? 'Apply the uploaded garment as a FULL one-piece DRESS.'
-    : 'Apply the uploaded garment naturally.';
-    return [
-      typeLine,
-      'Keep the original model EXACTLY the same: identity, skin tone, hair, hands, pose, camera, lighting.',
-      'Preserve the ORIGINAL BACKGROUND without changes.',
-      'Fit and drape the cloth realistically on the body; avoid clipping or artifacts.',
-      'No extra accessories, no cropping, no text overlays.',
-    ].join(' ');
-  };
+const buildTryOnPrompt = (pt) => {
+  const scope =
+    pt === 'upper'
+      ? 'Replace the person’s TOP with the uploaded garment.'
+      : pt === 'lower'
+      ? 'Replace the person’s BOTTOM (pants/skirt) with the uploaded garment.'
+      : 'Replace the person’s FULL OUTFIT with the uploaded garment as a one-piece dress.';
+
+  return [
+    'Virtual try-on task. Photorealistic.',
+    scope,
+    'Use the uploaded garment exactly; match its fabric, color, pattern, buttons, collar and pockets.',
+    'Remove/replace any existing clothing in that region; do not stack clothes.',
+    'Keep the original person IDENTICAL: face, hair, hands, body shape, skin tone, pose, camera and lighting must stay the same.',
+    'Fit and drape naturally: correct scaling and perspective, shoulder seams aligned, sleeve length accurate, neckline shape from the garment, realistic wrinkles and shadows.',
+    'Preserve the ORIGINAL BACKGROUND unchanged.',
+    'No extra accessories, no cropping, no text.',
+    'High-detail, sharp, 4k realistic output.'
+  ].join(' ');
+};
+
 
   /* ---------- runners ---------- */
   const runRemoveBg = useCallback(async () => {
