@@ -1,9 +1,8 @@
+// /pages/api/tryon.js
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = {
-  api: {
-    bodyParser: true,
-  },
+  api: { bodyParser: true },
 };
 
 export default async function handler(req, res) {
@@ -11,20 +10,20 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
 
-  const { imageUrl, prompt, plan, user_email } = req.body;
   const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
-
   if (!REPLICATE_TOKEN) {
-    console.error("❌ Missing REPLICATE_API_TOKEN");
+    console.error('❌ Missing REPLICATE_API_TOKEN');
     return res.status(500).json({ error: 'Missing Replicate token' });
   }
 
-  if (!imageUrl || !prompt || !user_email) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  // من الداشبورد: modelUrl (صورة المودل الثابتة), clothUrl (صورة القطعة), prompt مبني داخلياً, optional negativePrompt
+  const { modelUrl, clothUrl, prompt, negativePrompt, plan, user_email } = req.body || {};
+  if (!modelUrl || !clothUrl || !prompt || !user_email) {
+    return res.status(400).json({ error: 'Missing required fields (modelUrl, clothUrl, prompt, user_email)' });
   }
 
+  // Auth via Supabase (مثل باقي APIs)
   const supabase = createPagesServerClient({ req, res });
-
   const {
     data: { session },
     error: sessionError,
@@ -34,7 +33,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // 🧠 Fetch user data
+  // بيانات المستخدم + الرصيد
   const { data: userData, error: userError } = await supabase
     .from('Data')
     .select('credits, plan')
@@ -45,28 +44,39 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  if (userData.plan !== 'Pro' && userData.credits <= 0) {
+  if (userData.plan !== 'Pro' && (userData.credits ?? 0) <= 0) {
     return res.status(403).json({ error: 'No credits left' });
   }
 
-  // 🧠 Replicate request
-  const start = await fetch('https://api.replicate.com/v1/predictions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Token ${REPLICATE_TOKEN}`,
-      'Content-Type': 'application/json',
+  // بدء التنبؤ على Replicate (موديل صورتين)
+  // ملاحظة: بعض نسخ الموديل تدعم negative_prompt؛ نرسلها لو وجدت.
+  const replicateBody = {
+    version: 'flux-kontext-apps/multi-image-kontext-pro',
+    input: {
+      prompt,
+      ...(negativePrompt ? { negative_prompt: negativePrompt } : {}),
+      input_image_1: modelUrl,   // صورة المودل المختارة من المكتبة
+      input_image_2: clothUrl,   // صورة القطعة التي رفعها المستخدم
+      aspect_ratio: 'match_input_image',
+      output_format: 'jpg',
+      safety_tolerance: 2,
     },
-    body: JSON.stringify({
-      version: 'black-forest-labs/flux-kontext-pro',
-      input: {
-        prompt,
-        input_image: imageUrl,
-        aspect_ratio: 'match_input_image',
-        output_format: 'jpg',
-        safety_tolerance: 2,
+  };
+
+  let start;
+  try {
+    start = await fetch('https://api.replicate.com/v1/predictions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${REPLICATE_TOKEN}`,
+        'Content-Type': 'application/json',
       },
-    }),
-  });
+      body: JSON.stringify(replicateBody),
+    });
+  } catch (e) {
+    console.error('Replicate start error:', e?.message || e);
+    return res.status(500).json({ error: 'Failed to reach Replicate' });
+  }
 
   const startData = await start.json();
 
@@ -80,22 +90,20 @@ export default async function handler(req, res) {
   const statusUrl = startData.urls.get;
   let output = null;
 
+  // Polling
   for (let i = 0; i < 20; i++) {
     const statusRes = await fetch(statusUrl, {
       headers: { Authorization: `Token ${REPLICATE_TOKEN}` },
     });
-
     const statusData = await statusRes.json();
 
-    if (statusData.status === 'succeeded') {
+    if (statusData?.status === 'succeeded') {
       output = statusData.output;
       break;
     }
-
-    if (statusData.status === 'failed') {
-      return res.status(500).json({ error: 'Image generation failed' });
+    if (statusData?.status === 'failed' || statusData?.status === 'canceled') {
+      return res.status(500).json({ error: 'Image generation failed', detail: statusData });
     }
-
     await new Promise((r) => setTimeout(r, 1500));
   }
 
@@ -105,12 +113,20 @@ export default async function handler(req, res) {
 
   const generatedImage = Array.isArray(output) ? output[0] : output;
 
-  // ✅ Deduct credit if needed
+  // خصم الرصيد لغير الـ Pro
   if (userData.plan !== 'Pro') {
-    await supabase.rpc('decrement_credit', {
-      user_email,
-    });
+    try {
+      await supabase.rpc('decrement_credit', { user_email });
+    } catch (e) {
+      console.error('decrement_credit failed', e?.message || e);
+      // ما نوقف الإرجاع لو فشل الخصم — فقط نطبع الخطأ
+    }
   }
 
-  return res.status(200).json({ success: true, image: generatedImage });
+  return res.status(200).json({
+    success: true,
+    image: generatedImage, // الفرونت يستخدم pickFirstUrl على "image"
+    model: 'flux-kontext-apps/multi-image-kontext-pro',
+    used_images: [modelUrl, clothUrl],
+  });
 }
