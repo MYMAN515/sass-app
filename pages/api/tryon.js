@@ -1,21 +1,17 @@
 // /pages/api/tryon.js
-// Next.js API Route — Multi-Image فقط (شخص + لبس)
+// Next.js API Route — Try-On (شخص + قطعة لبس) بدون negative prompt
 
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
-export const config = {
-  api: { bodyParser: true }, // نحافظ على أسلوبك
-};
+export const config = { api: { bodyParser: true } };
 
-const REPLICATE_URL =
-  'https://api.replicate.com/v1/models/flux-kontext-apps/multi-image-kontext-max/predictions';
-
+const REPLICATE_URL = 'https://api.replicate.com/v1/predictions';
 const POLL_STEP_MS = 1500;
 const POLL_MAX_MS  = 90_000;
 
-/* ------------ helpers (تعليقات "لماذا" فقط) ------------ */
+/* ------------ helpers ------------ */
+// يعيد URL مطلق حتى لو وصلك relative
 function toAbsoluteUrl(u, req) {
-  // Why: Replicate لا يجلب relative
   try { return new URL(u).toString(); }
   catch {
     const proto = req.headers['x-forwarded-proto'] || 'https';
@@ -24,40 +20,44 @@ function toAbsoluteUrl(u, req) {
   }
 }
 
+// نتحقق بشكل مرن — بعض CDNs/Supabase يرجّع octet-stream أو يحجب HEAD
 async function assertPublicImage(url) {
-  // Why: نفشل مبكرًا لو الرابط غير علني أو ليس صورة
   const r = await fetch(url, { method: 'HEAD' }).catch(() => null);
-  if (!r || !r.ok) throw new Error(`Image not reachable: ${url}`);
-  const ct = r.headers.get('content-type') || '';
-  if (!ct.startsWith('image/')) throw new Error(`URL is not an image: ${url}`);
+  if (!r || !r.ok) return; // لا نفشل بدري لو HEAD محجوب
+  const ct = (r.headers.get('content-type') || '').toLowerCase();
+  if (!(ct.startsWith('image/') || ct === 'application/octet-stream')) {
+    throw new Error(`URL is not an image: ${url} (${ct})`);
+  }
 }
 
-function regionHint(pieceType) {
-  if (pieceType === 'upper')
-    return 'Align shoulders & neckline; correct sleeve length; keep chest prints/logos exactly.';
-  if (pieceType === 'lower')
-    return 'Align waist/hips; correct rise & inseam; keep pockets and stitching.';
-  return 'Align shoulders/neckline & waist; correct hem; keep pattern continuity.'; // dress
-}
+// نص برومبت مضبوط حسب نوع القطعة؛ يدمج أي نص إضافي من المستخدم (اختياري)
+function buildTryOnPrompt(pieceType, userPrompt) {
+  const pt = (pieceType || 'upper').toLowerCase();
+  let scope;
+  if (pt === 'upper') {
+    scope = 'Replace ONLY the TOP with the garment from IMAGE 2. Do NOT stack clothes.';
+  } else if (pt === 'lower') {
+    scope = 'Replace ONLY the BOTTOM (pants/skirt) with the garment from IMAGE 2. Do NOT stack clothes.';
+  } else {
+    scope = 'Replace the FULL OUTFIT with the garment from IMAGE 2 as a one-piece dress. Do NOT stack clothes.';
+  }
 
-function buildPrompts({ userPrompt, negativePrompt, pieceType }) {
-  // Why: صورة واحدة، الخلفية/الوجه كما هي، تثبيت الطباعة/الشعار
-  const region = pieceType || 'upper';
-  const prompt = [
-    userPrompt || 'Photorealistic virtual try-on, high fidelity.',
-    'Use IMAGE 1 as person AND background; keep face, hair, pose, camera and lighting IDENTICAL.',
-    `Replace ONLY the ${region} with the garment from IMAGE 2. Do NOT stack clothes.`,
-    'Reproduce fabric, color, buttons, collar/pockets and ALL prints/logos at exact position and scale.',
-    regionHint(region),
+  const base = [
+    'Photorealistic virtual try-on.',
+    'Use IMAGE 1 as the person AND background; keep face, hair, body shape, pose, camera and lighting IDENTICAL.',
+    scope,
+    'Reproduce the exact fabric, color, pattern, buttons, collar/pockets and prints/logos with correct position and scale.',
+    pt === 'upper'
+      ? 'Align shoulder seams and neckline precisely; correct sleeve length.'
+      : pt === 'lower'
+      ? 'Align waist/hips correctly; accurate rise and inseam.'
+      : 'Align neckline, shoulders, waist and hem correctly.',
     'Natural fit and drape; realistic wrinkles, seams and shadows.',
-    'Single photo only.'
+    'Single final photo, uncropped, sharp 4k.'
   ].join(' ');
 
-  const negative =
-    (negativePrompt ? negativePrompt + ', ' : '') +
-    'split screen, side-by-side, collage, before and after, duplicate person, twins, floating clothing, overlay sticker, text, watermark, border, wrong background, blur, smudged print, extra arms, extra hands';
-
-  return { prompt, negative };
+  // نضيف أي وصف إضافي يرسله المستخدم بدون ما نلخبط القواعد الأساسية
+  return userPrompt ? `${base} ${userPrompt}` : base;
 }
 
 /* ------------ handler ------------ */
@@ -68,13 +68,11 @@ export default async function handler(req, res) {
   if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing Replicate token' });
 
   const {
-    modelUrl,        // صورة الشخص/المودل
-    clothUrl,        // صورة القطعة
+    modelUrl,        // صورة الشخص/المودل (IMAGE 1)
+    clothUrl,        // صورة القطعة (IMAGE 2)
     pieceType,       // upper | lower | dress
-    prompt,          // وصف المستخدم
-    negativePrompt,  // اختياري
+    prompt,          // (مطلوب) وصف إضافي من الواجهة الأمامية
     user_email,      // لحساب الرصيد
-
     // اختياري:
     aspect_ratio,
     seed,
@@ -87,7 +85,7 @@ export default async function handler(req, res) {
   if (!modelUrl)   missing.push('modelUrl');
   if (!clothUrl)   missing.push('clothUrl');
   if (!pieceType)  missing.push('pieceType');
-  if (!prompt)     missing.push('prompt');
+  if (!prompt)     missing.push('prompt'); // نبقيها مطلوبة زي أسلوبك
   if (!user_email) missing.push('user_email');
   if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
 
@@ -108,16 +106,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    // URLs مطلقة + علنية
+    // URLs مطلقة + تحقق مرن
     const img1 = toAbsoluteUrl(modelUrl, req);
     const img2 = toAbsoluteUrl(clothUrl, req);
-    await assertPublicImage(img1);
-    await assertPublicImage(img2);
+    await Promise.all([assertPublicImage(img1), assertPublicImage(img2)]);
 
-    // برومبت
-    const { prompt: posPrompt, negative } = buildPrompts({ userPrompt: prompt, negativePrompt, pieceType });
+    // برومبت نهائي (بدون negative)
+    const finalPrompt = buildTryOnPrompt(pieceType, prompt);
 
-    // بدء التوليد
+    // بدء التوليد — نستخدم endpoint العام ونمرر اسم الموديل
     const start = await fetch(REPLICATE_URL, {
       method: 'POST',
       headers: {
@@ -125,15 +122,15 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        model: 'flux-kontext-apps/multi-image-kontext-max',
         input: {
-          // Why: تمرير التسميتين لسهولة التوافق
+          // نُمرّر التسميتين لضمان التوافق
           image_1: img1, input_image_1: img1,
           image_2: img2, input_image_2: img2,
-          prompt: posPrompt,
-          negative_prompt: negative,
-          num_outputs: 1,                                 // صورة واحدة
-          aspect_ratio: aspect_ratio || 'match_image_1',  // طابق نسبة صورة المودل
-          seed: typeof seed === 'number' ? seed : 42,     // ثبات
+          prompt: finalPrompt,
+          num_outputs: 1,
+          aspect_ratio: aspect_ratio || 'match_image_1',
+          seed: typeof seed === 'number' ? seed : 42,
           output_format: output_format || 'jpg',
           safety_tolerance: typeof safety_tolerance === 'number' ? safety_tolerance : 2,
         }
@@ -142,14 +139,16 @@ export default async function handler(req, res) {
 
     const startData = await start.json().catch(() => ({}));
     if (!start.ok || !startData?.urls?.get) {
+      const msg =
+        startData?.error?.message ||
+        startData?.detail ||
+        (typeof startData === 'string' ? startData : '') ||
+        'Failed to start prediction';
       console.error('Replicate start error:', { status: start.status, startData });
-      return res.status(500).json({
-        error: startData?.error?.message || startData?.error || 'Failed to start prediction',
-        detail: startData
-      });
+      return res.status(500).json({ error: msg, detail: startData });
     }
 
-    // Poll حتى 90 ثانية تقريبًا
+    // Poll حتى 90 ثانية
     const statusUrl = startData.urls.get;
     let output = null;
     for (let i = 0; i < Math.ceil(POLL_MAX_MS / POLL_STEP_MS); i++) {
