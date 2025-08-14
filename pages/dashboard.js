@@ -414,98 +414,36 @@ const buildTryOnPrompt = (pt) => {
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, uploadToStorage, plan, user, localUrl, toasts]);
 // ===== Replacement: runTryOn (English, clear errors) =====
-const runTryOn = useCallback(async () => {
-  if (!file)              { setErr('Please upload a clothing image first.'); return; }
-  if (!selectedModel?.url){ setErr('Please select a model first.'); return; }
-  if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
-
-  // Early tip for better print/logo preservation
-  if (file?.type && !/png/i.test(file.type)) {
-    toasts.push('Tip: Transparent PNG works best for preserving prints/logos.', { type: 'info' });
-  }
-
-  const origin =
-    (typeof window !== 'undefined' && window.location?.origin) ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://aistoreassistant.app';
-
-  const modelUrlAbs = selectedModel.url.startsWith('http')
-    ? selectedModel.url
-    : new URL(selectedModel.url, origin).toString();
-
-  setBusy(true);
-  setErr('');
-  setPhase('processing');
-
-  const prompt = buildTryOnPrompt(pieceType);
-  const toast = toasts.push('Generating try-on…', { progress: 10 });
-
-  let progress = 10;
-  const iv = setInterval(() => {
-    progress = Math.min(progress + 6, 88);
-    toast.update({ progress });
-  }, 500);
-
+async function runTryOn() {
   try {
-    const clothUrl = await uploadToStorage(file);
-
-    const r = await fetch('/api/tryon', {
+    const response = await fetch('/api/tryon', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        modelUrl: modelUrlAbs,
-        clothUrl,
-        pieceType, // ✅ now sent to API
-        prompt,
-        negativePrompt:
-          'lowres, bad hands, deformed, extra limbs, wrong background, different pose, different face, text, watermark',
+        image1: modelUrlAbs,  // صورة الشخص / الموديل
+        image2: clothUrl,     // صورة القطعة
+        prompt,               // النص النهائي
         plan,
-        user_email: user.email
-      })
+        user_email: user.email,
+      }),
     });
 
-    const j = await r.json().catch(() => ({}));
-
-    if (!r.ok) {
-      const msg =
-        j?.error ||
-        (r.status === 400 ? 'Missing required fields.' :
-         r.status === 401 ? 'Unauthorized.' :
-         r.status === 403 ? 'No credits left.' :
-         r.status === 404 ? 'User not found.' :
-         r.status === 500 ? 'Generation failed on the server.' :
-         `Unexpected error (${r.status}).`);
-      throw new Error(msg);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Try-On API Error:', errorData);
+      throw new Error(errorData?.error || 'Failed to generate try-on');
     }
 
-    const out =
-      j?.image || j?.url || j?.result ||
-      (Array.isArray(j?.output) ? j.output[0] : j?.output);
-
-    if (!out) throw new Error('No output image returned from the API.');
-
-    setResultUrl(out);
-    setHistory(h => [
-      { tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() },
-      ...h
-    ].slice(0, 24));
-
-    setPhase('ready');
-    toast.update({ progress: 100, msg: 'Try-On ✓' });
-    setTimeout(() => toast.close(), 700);
-  } catch (e) {
-    console.error(e);
-    setPhase('error');
-    const msg = e?.message || 'Processing failed.';
-    setErr(msg);
-    toast.update({ msg: `Try-On failed: ${msg}`, type: 'error' });
-    setTimeout(() => toast.close(), 1500);
-  } finally {
-    clearInterval(iv);
-    setBusy(false);
+    const data = await response.json();
+    console.log('✅ Try-On Success:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Try-On Request Failed:', error.message);
+    throw error;
   }
-}, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
-
+}
 
   const runModelSwap = useCallback(async () => {
     if (!file1 || !file2) return setErr('Pick both images.');
