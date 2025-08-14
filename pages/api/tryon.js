@@ -1,20 +1,19 @@
 // /pages/api/tryon.js
-// Next.js API Route — JavaScript فقط
+// Next.js API Route — JavaScript فقط (بدون JSX)
 
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = { api: { bodyParser: { sizeLimit: '12mb' } } };
 
-// Why: موديل يدعم صورتين (شخص + قطعة).
 const REPLICATE_URL =
   'https://api.replicate.com/v1/models/flux-kontext-apps/multi-image-kontext-max/predictions';
 
 const POLL_STEP_MS = 1500;
 const POLL_MAX_MS  = 90_000;
 
-/* ---------------- helpers (why-driven comments) ---------------- */
-function toAbsoluteUrl(u, req) {
-  // Why: Replicate لا يجلب relative؛ نضمن URL مطلق.
+/* ---------------- helpers (WHY only) ---------------- */
+function absUrl(u, req) {
+  // Why: Replicate يحتاج روابط مطلقة
   try { return new URL(u).toString(); }
   catch {
     const proto = req.headers['x-forwarded-proto'] || 'https';
@@ -24,26 +23,44 @@ function toAbsoluteUrl(u, req) {
 }
 
 async function assertPublicImage(url) {
-  // Why: نفشل مبكراً إذا الرابط لا يفتح علناً أو ليس صورة.
+  // Why: نفشل مبكراً إذا غير علني/ليست صورة
   const r = await fetch(url, { method: 'HEAD' }).catch(() => null);
   if (!r || !r.ok) throw new Error(`Image not reachable: ${url}`);
   const ct = r.headers.get('content-type') || '';
   if (!ct.startsWith('image/')) throw new Error(`URL is not an image: ${url}`);
 }
 
+function regionHints(region) {
+  // Why: ضبط ملاءمة حسب نوع القطعة
+  if (region === 'upper') {
+    return 'Align shoulder seams and neckline from garment; correct sleeve length and cuff; respect chest prints/logos exactly.';
+  }
+  if (region === 'lower') {
+    return 'Align waist and hips; correct rise and inseam; preserve pocket placement; respect fabric texture and stitching.';
+  }
+  // dress
+  return 'Align neckline/shoulders and waist; correct hem length; natural drape from shoulders to hem; keep pattern continuity.';
+}
+
 function buildPrompts({ userPrompt, negativePrompt, pieceType }) {
-  // Why: نمنع before/after ونفرض استبدال منطقة محددة فقط.
-  const region  = pieceType || 'upper';
-  const prompt  = [
-    userPrompt || 'Virtual try-on, photorealistic.',
-    'Generate ONE single photo of the SAME person from image 1 WEARING the garment from image 2.',
-    'Keep the ORIGINAL background, face, pose and camera.',
-    `Replace ONLY the ${region} with the uploaded garment. Do NOT stack clothes.`,
-    'Natural fit, correct scaling, seams aligned, neckline/sleeve from garment, realistic shadows & wrinkles.'
+  // Why: فرض صورة واحدة، الحفاظ على الخلفية والوجه، وتثبيت الطباعة/الشعار بدقة
+  const region = pieceType || 'upper';
+
+  const prompt = [
+    userPrompt || 'Photorealistic virtual try-on, high fidelity, 4k sharp.',
+    'Use IMAGE 1 as the person AND background; keep face, hair, body shape, pose, camera, lighting IDENTICAL.',
+    'Replace ONLY the ' + region + ' with the garment from IMAGE 2.',
+    'Reproduce the garment EXACTLY: fabric, color, weave, buttons, collar/pockets, and ALL prints/logos/emblems (e.g., Jordan flag) at the correct location and scale — do not redraw or simplify.',
+    'Do NOT stack clothing; remove the original clothing in that region.',
+    regionHints(region),
+    'Natural fit and drape with correct perspective; realistic wrinkles, seams, and shadows.',
+    'Single photo — no borders, no comparisons, no extra people.'
   ].join(' ');
+
   const negative =
     (negativePrompt ? negativePrompt + ', ' : '') +
-    'split screen, side-by-side, collage, before and after, duplicate person, twins, floating clothing, sticker overlay, text, watermark, border, wrong background, extra arms, extra hands';
+    'split screen, side-by-side, collage, before and after, duplicate person, twins, floating clothing, overlayed sticker, text, watermark, border, wrong background, mismatched pose, blur, smudged print, washed-out colors, extra arms, extra hands';
+
   return { prompt, negative };
 }
 
@@ -53,18 +70,13 @@ async function startReplicate({ token, image1, image2, prompt, negative, seed, a
     headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       input: {
-        // Why: بعض الإصدارات تسمي الحقول بطريقتين؛ نمرر الاسمين لضمان التوافق.
-        image_1: image1,
-        input_image_1: image1,
-        image_2: image2,
-        input_image_2: image2,
-
-        prompt,
-        negative_prompt: negative,
-
-        num_outputs: 1,                         // Why: صورة واحدة، لا كولاج.
-        aspect_ratio: aspectRatio || 'match_image_1', // Why: طابق نسبة صورة الموديل.
-        seed: typeof seed === 'number' ? seed : 42,
+        // Why: بعض الإصدارات تقبل تسميتين
+        image_1: image1, input_image_1: image1,
+        image_2: image2, input_image_2: image2,
+        prompt, negative_prompt: negative,
+        num_outputs: 1,                   // Why: نتيجة واحدة لتفادي الكولاج
+        aspect_ratio: aspectRatio || 'match_image_1', // Why: طابق نسبة صورة الموديل
+        seed: typeof seed === 'number' ? seed : 42,   // Why: ثبات
         output_format: outputFormat || 'jpg',
         safety_tolerance: typeof safetyTolerance === 'number' ? safetyTolerance : 2
       }
@@ -77,7 +89,7 @@ async function startReplicate({ token, image1, image2, prompt, negative, seed, a
       data?.error?.message ||
       data?.error ||
       (res.status === 401 ? 'Invalid REPLICATE_API_TOKEN.' :
-       res.status === 400 ? 'Bad input. Check public image URLs.' :
+       res.status === 400 ? 'Bad input. Check that both image URLs are public images.' :
        'Failed to start prediction');
     const err = new Error(friendly);
     err.detail = data;
@@ -86,13 +98,12 @@ async function startReplicate({ token, image1, image2, prompt, negative, seed, a
   return data.urls.get; // status URL
 }
 
-async function waitForResult({ statusUrl, token }) {
-  // Why: ننتظر النتيجة بمهلة منطقية.
+async function pollResult({ statusUrl, token }) {
+  // Why: انتظار منضبط مع مهلة
   const t0 = Date.now();
   while (Date.now() - t0 < POLL_MAX_MS) {
     const r = await fetch(statusUrl, { headers: { Authorization: `Token ${token}` } });
     const s = await r.json();
-
     if (s?.status === 'succeeded') {
       const out = Array.isArray(s.output) ? s.output[0] : s.output;
       return { output: out, raw: s };
@@ -117,28 +128,26 @@ export default async function handler(req, res) {
   const {
     modelUrl,
     clothUrl,
-    pieceType,                 // upper | lower | dress
+    pieceType,              // upper | lower | dress
     prompt: userPrompt,
     negativePrompt,
     user_email,
-
-    // optional tuning
+    // optional
     aspect_ratio,
     seed,
     output_format,
-    safety_tolerance
+    safety_tolerance,
+    debug                    // Why: لعرض البرومبت في الرد عند الحاجة
   } = req.body || {};
 
-  // Required fields
+  // Required
   const missing = [];
   if (!modelUrl)   missing.push('modelUrl');
   if (!clothUrl)   missing.push('clothUrl');
   if (!pieceType)  missing.push('pieceType');
   if (!userPrompt) missing.push('prompt');
   if (!user_email) missing.push('user_email');
-  if (missing.length) {
-    return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
-  }
+  if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
 
   // Auth + credits
   const supabase = createPagesServerClient({ req, res });
@@ -157,9 +166,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Absolute, public, image
-    const img1 = toAbsoluteUrl(modelUrl, req);
-    const img2 = toAbsoluteUrl(clothUrl, req);
+    // Absolute + public
+    const img1 = absUrl(modelUrl, req);
+    const img2 = absUrl(clothUrl, req);
     await assertPublicImage(img1);
     await assertPublicImage(img2);
 
@@ -179,12 +188,12 @@ export default async function handler(req, res) {
       safetyTolerance: safety_tolerance
     });
 
-    const { output } = await waitForResult({ statusUrl, token: REPLICATE_TOKEN });
+    const { output, raw } = await pollResult({ statusUrl, token: REPLICATE_TOKEN });
     if (!output) throw new Error('Empty output from Replicate');
 
-    // Spend 1 credit for non-Pro
+    // Spend credit if not Pro
     if (userData.plan !== 'Pro') {
-      try { await supabase.rpc('decrement_credit', { user_email }); } catch { /* ignore */ }
+      try { await supabase.rpc('decrement_credit', { user_email }); } catch {}
     }
 
     return res.status(200).json({
@@ -192,10 +201,10 @@ export default async function handler(req, res) {
       image: output,
       model: 'flux-kontext-apps/multi-image-kontext-max',
       pieceType,
-      used_images: [img1, img2]
+      used_images: [img1, img2],
+      ...(debug ? { debug: { prompt, negative, raw } } : {})
     });
   } catch (err) {
-    // Why: إظهار سبب الفشل لتشخيص أسرع.
     return res.status(500).json({
       error: err?.message || 'Try-on failed',
       detail: err?.detail
