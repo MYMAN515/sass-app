@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, ShieldCheck, Zap, BadgeCheck, ArrowRight,
   HelpCircle, ChevronDown, Check, X, Star,
-  Users, Wallet, Database, Film, Gauge, Layers, Infinity as InfinityIcon, Globe
+  Users, Database, Film, Gauge, Globe
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Layout from '@/components/Layout';
@@ -226,11 +226,12 @@ export default function PricingPage() {
     const plan = BASE_PLANS.find((p) => p.key === selectedPlan);
     const baseMonthlyUSD = plan?.monthlyUSD ?? 0;
     const billedUSD = billing === 'monthly' ? baseMonthlyUSD : baseMonthlyUSD * 0.8; // per month equivalent
-    // Add-ons
-    const seatAddonUSD = ADDONS.find(a => a.key === 'seat')!.priceUSD * Math.max(0, seatCount);
-    const storageUSD   = addonKeys.storage  ? ADDONS.find(a => a.key === 'storage')!.priceUSD  : 0;
-    const videoUSD     = addonKeys.video    ? ADDONS.find(a => a.key === 'video')!.priceUSD    : 0;
-    const priorityUSD  = addonKeys.priority ? ADDONS.find(a => a.key === 'priority')!.priceUSD : 0;
+
+    // ✅ JS-safe lookups (no TS non-null assertion)
+    const seatAddonUSD = ((ADDONS.find(a => a.key === 'seat')?.priceUSD ?? 0) * Math.max(0, seatCount));
+    const storageUSD   = addonKeys.storage  ? (ADDONS.find(a => a.key === 'storage')?.priceUSD  ?? 0) : 0;
+    const videoUSD     = addonKeys.video    ? (ADDONS.find(a => a.key === 'video')?.priceUSD    ?? 0) : 0;
+    const priorityUSD  = addonKeys.priority ? (ADDONS.find(a => a.key === 'priority')?.priceUSD ?? 0) : 0;
 
     const monthlyTotalUSD = billedUSD + seatAddonUSD + storageUSD + videoUSD + priorityUSD;
     const currencyLabel = CURRENCIES[currency]?.label || 'USD $';
@@ -257,7 +258,7 @@ export default function PricingPage() {
             />
           </div>
 
-          <div className="mx-auto max-w-7xl px-6 pt-24 pb-10 text-center">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 pt-24 pb-10 text-center">
             <motion.h1
               className="text-4xl md:text-5xl font-extrabold tracking-tight"
               initial={{ opacity: 0, y: 24 }}
@@ -266,7 +267,7 @@ export default function PricingPage() {
             >
               Pricing that scales with your brand
             </motion.h1>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-600 dark:text-zinc-300">
+            <p className="mx-auto mt-4 max-w-2xl text-base sm:text-lg text-zinc-600 dark:text-zinc-300">
               Start free. Upgrade when you’re ready. Cancel anytime. Zero hassle.
             </p>
 
@@ -291,7 +292,7 @@ export default function PricingPage() {
         </section>
 
         {/* Plans */}
-        <section className="mx-auto max-w-7xl px-6 pb-12">
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 pb-12">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3 xl:grid-cols-4">
             {plans
               .filter(p => ['free','starter','pro','business'].includes(p.key))
@@ -307,7 +308,7 @@ export default function PricingPage() {
         </section>
 
         {/* Pay-as-you-go */}
-        <section className="mx-auto max-w-7xl px-6 py-8">
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
           <motion.h2
             className="text-center text-2xl md:text-3xl font-bold"
             initial={{ opacity: 0, y: 8 }}
@@ -344,7 +345,7 @@ export default function PricingPage() {
         </section>
 
         {/* Add-ons + Estimator */}
-        <section className="mx-auto max-w-7xl px-6 py-10">
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 py-10">
           <motion.h2
             className="text-center text-2xl md:text-3xl font-bold"
             initial={{ opacity: 0, y: 8 }}
@@ -368,7 +369,9 @@ export default function PricingPage() {
                   </div>
                   <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">Per additional seat</p>
                   <div className="mt-3 flex items-center justify-between gap-3">
-                    <span className="text-sm font-semibold">{formatMoney(ADDONS.find(a=>a.key==='seat')!.priceUSD, currency)}/seat</span>
+                    <span className="text-sm font-semibold">
+                      {formatMoney(ADDONS.find(a=>a.key==='seat')?.priceUSD ?? 0, currency)}/seat
+                    </span>
                     <div className="inline-flex items-center rounded-lg border border-white/15 bg-white/50 p-1 backdrop-blur dark:bg-white/10">
                       <button
                         className="px-2 py-1 text-sm"
@@ -419,7 +422,9 @@ export default function PricingPage() {
             <div className="rounded-2xl border border-white/10 bg-white/60 p-5 backdrop-blur dark:bg-white/5">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">Estimate your monthly cost</div>
-                <div className="text-xs text-zinc-500 flex items-center gap-2"><Globe className="h-3.5 w-3.5" /> {CURRENCIES[currency].label}</div>
+                <div className="text-xs text-zinc-500 flex items-center gap-2">
+                  <Globe className="h-3.5 w-3.5" /> {CURRENCIES[currency].label}
+                </div>
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -474,7 +479,7 @@ export default function PricingPage() {
         </section>
 
         {/* Comparison */}
-        <section className="mx-auto max-w-7xl px-6 py-12">
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 py-12">
           <motion.h2
             className="text-center text-2xl md:text-3xl font-bold"
             initial={{ opacity: 0, y: 8 }}
@@ -531,7 +536,7 @@ export default function PricingPage() {
         </section>
 
         {/* FAQs */}
-        <section className="mx-auto max-w-6xl px-6 py-12">
+        <section className="mx-auto max-w-6xl px-4 sm:px-6 py-12">
           <motion.h2
             className="text-center text-2xl md:text-3xl font-bold"
             initial={{ opacity: 0, y: 8 }}
