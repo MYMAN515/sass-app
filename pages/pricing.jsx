@@ -5,19 +5,44 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, ShieldCheck, Zap, BadgeCheck, ArrowRight,
-  HelpCircle, ChevronDown, Check, X, Star
+  HelpCircle, ChevronDown, Check, X, Star,
+  Users, Wallet, Database, Film, Gauge, Layers, Infinity as InfinityIcon, Globe
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Layout from '@/components/Layout';
 import Link from 'next/link';
 
-const PLANS = [
+/* =========================
+   Currency + Helpers
+========================= */
+
+// Simple FX approximations for UI only (not for billing/Stripe)
+const CURRENCIES = {
+  USD: { label: 'USD $', rate: 1, symbol: '$' },
+  AED: { label: 'AED د.إ', rate: 3.67, symbol: 'د.إ' },
+  MYR: { label: 'MYR RM', rate: 4.6, symbol: 'RM' },
+};
+
+function formatMoney(amountUSD, currency = 'USD') {
+  const { rate, symbol } = CURRENCIES[currency] || CURRENCIES.USD;
+  const value = amountUSD == null ? null : amountUSD * rate;
+  if (value == null) return 'Custom';
+  const fixed = value < 1000 ? value.toFixed(0) : Math.round(value).toLocaleString();
+  return `${symbol}${fixed}`;
+}
+
+/* =========================
+   Plans & Pay-as-you-go
+========================= */
+
+const BASE_PLANS = [
   {
     key: 'free',
     name: 'Free',
     tagline: 'Start testing in minutes',
-    priceMonthly: 0,
-    priceYearly: 0,
+    monthlyUSD: 0,
+    popular: false,
+    icon: '⭐',
     features: [
       '5 credits / month',
       'Basic image enhancement',
@@ -25,61 +50,144 @@ const PLANS = [
       'Community support',
     ],
     cta: 'Start for Free',
-    icon: '⭐',
+  },
+  {
+    key: 'starter',
+    name: 'Starter',
+    tagline: 'For solo creators',
+    monthlyUSD: 10,
     popular: false,
+    icon: '🌱',
+    features: [
+      '200 credits / month',
+      'Enhancement HD (up to 2k)',
+      'Try-on (standard)',
+      'Basic queue',
+      'Email support',
+    ],
+    cta: 'Choose Starter',
   },
   {
     key: 'pro',
     name: 'Pro',
     tagline: 'For growing brands',
-    priceMonthly: 20,
-    priceYearly: 16,
+    monthlyUSD: 20,
+    popular: true,
+    highlight: 'Best Value',
+    icon: '🚀',
     features: [
       'Unlimited* credits',
-      'Advanced enhancement (HD)',
+      'Advanced enhancement (up to 4k)',
       'AI try-on (premium)',
       'Priority rendering',
       'Email support',
+      'Batch processing',
+      'API access',
     ],
     note: '*Fair use applies',
     cta: 'Upgrade to Pro',
-    icon: '🚀',
-    popular: true,
-    highlight: 'Best Value',
+  },
+  {
+    key: 'business',
+    name: 'Business',
+    tagline: 'Teams & workflows',
+    monthlyUSD: 49,
+    popular: false,
+    icon: '🏢',
+    features: [
+      'Unlimited* credits',
+      '4k + Upscale 2×/4×',
+      'Premium try-on + model swap',
+      'Priority+ queue',
+      'Team seats included (3)',
+      'Brand kit & shared library',
+      'API + Webhooks',
+    ],
+    note: '*Fair use applies',
+    cta: 'Choose Business',
+  },
+  {
+    key: 'agency',
+    name: 'Agency',
+    tagline: 'High-volume & clients',
+    monthlyUSD: 99,
+    popular: false,
+    icon: '👑',
+    features: [
+      'Unlimited* credits',
+      '4k/8k pipelines + Upscale',
+      'Short videos from results',
+      'Priority Max queue',
+      'Client workspaces',
+      'SLA response targets',
+      'Dedicated manager (email)',
+    ],
+    note: '*Fair use applies',
+    cta: 'Choose Agency',
   },
   {
     key: 'enterprise',
     name: 'Enterprise',
     tagline: 'Scale with confidence',
-    priceMonthly: null,
-    priceYearly: null,
+    monthlyUSD: null, // custom
+    popular: false,
+    icon: '💼',
     features: [
       'Unlimited team seats',
       'Custom models & SLAs',
+      'SAML SSO & SOC 2 reports',
+      'VPC/On-prem options',
       'Dedicated account manager',
-      'SAML SSO & SOC2 reports',
-      'Premium support',
+      'Premium 24/7 support',
     ],
     cta: 'Contact Sales',
-    icon: '💼',
-    popular: false,
   },
 ];
 
+// PAYG credit packs (one-time top-ups)
+const PAYG_PACKS = [
+  { key: 'p200',  name: 'Starter Pack',    credits: 200,  priceUSD: 9 },
+  { key: 'p500',  name: 'Creator Pack',    credits: 500,  priceUSD: 19 },
+  { key: 'p1500', name: 'Growth Pack',     credits: 1500, priceUSD: 49 },
+  { key: 'p5000', name: 'Scale Pack',      credits: 5000, priceUSD: 129 },
+];
+
+// Add-ons (monthly)
+const ADDONS = [
+  { key: 'seat',     name: 'Extra Team Seat', desc: 'Per additional seat',         priceUSD: 8,   icon: <Users className="h-4 w-4" /> },
+  { key: 'storage',  name: 'Extra Storage 100GB', desc: 'Expand asset library',    priceUSD: 5,   icon: <Database className="h-4 w-4" /> },
+  { key: 'video',    name: 'Video Minutes +100', desc: 'Short videos from results',priceUSD: 10,  icon: <Film className="h-4 w-4" /> },
+  { key: 'priority', name: 'Priority Booster',    desc: 'Skip queues more often',  priceUSD: 15,  icon: <Gauge className="h-4 w-4" /> },
+];
+
+/* =========================
+   FAQ
+========================= */
 const FAQS = [
   {
     q: 'How do credits work?',
-    a: 'Each generation consumes credits based on resolution and features. Pro includes virtually unlimited usage under fair use; spikes may require enterprise terms.',
+    a: 'Each generation consumes credits based on resolution and features. Pro/Business/Agency include effectively unlimited usage under a fair-use policy. Heavy spikes may require Enterprise terms.',
   },
   { q: 'Can I cancel anytime?', a: 'Yes. Your plan remains active until the end of the billing period. No hidden fees.' },
-  { q: 'Do you offer refunds?', a: 'We offer a 7-day money-back guarantee if the product fails to deliver as promised. Just contact support with your order details.' },
-  { q: 'Is my data secure?', a: 'Yes. Data is encrypted at rest and in transit. Temporary files auto-expire. Enterprise can request custom retention.' },
-  { q: 'What’s included in Pro vs Free?', a: 'Pro unlocks advanced enhancement quality, premium try-on, priority queues, and email support. See the comparison below.' },
+  { q: 'Do you offer refunds?', a: 'We offer a 7-day money-back guarantee if the product fails to deliver as promised. Contact support with your order details.' },
+  { q: 'Is my data secure?', a: 'Data is encrypted at rest and in transit. Temporary files auto-expire. Enterprise can request custom retention, SSO, and SOC 2 reports.' },
+  { q: 'What’s the fair use policy?', a: 'Unlimited means no hard cap for normal usage. We monitor abuse and extreme spikes. For sustained high volume, we recommend Agency or Enterprise.' },
+  { q: 'Do you offer discounts?', a: 'Yes: students/NGOs eligible for 20% off with verification. Annual billing saves 20% vs monthly.' },
 ];
 
+/* =========================
+   Component
+========================= */
+
 export default function PricingPage() {
-  const [billing, setBilling] = useState('monthly');
+  const [billing, setBilling] = useState('monthly'); // monthly | yearly
+  const [currency, setCurrency] = useState('USD');   // USD | AED | MYR
   const [isDark, setIsDark] = useState(false);
+
+  // Estimator state
+  const [selectedPlan, setSelectedPlan] = useState('pro');
+  const [seatCount, setSeatCount] = useState(1); // extra seats beyond included
+  const [addonKeys, setAddonKeys] = useState({ storage: false, video: false, priority: false });
 
   useEffect(() => {
     const observe = () => setIsDark(document.documentElement.classList.contains('dark'));
@@ -90,9 +198,46 @@ export default function PricingPage() {
   }, []);
 
   const savingsLabel = useMemo(() => 'Save 20% (2 months free)', []);
+
   const bgClass = isDark
     ? 'bg-[#0b0519] text-white'
     : 'bg-gradient-to-b from-[#f3f4ff] to-[#fff0f6] text-zinc-900';
+
+  // Derived plans with displayed pricing (monthly vs yearly)
+  const plans = useMemo(() => {
+    return BASE_PLANS.map((p) => {
+      const monthlyUSD = p.monthlyUSD;
+      const yearlyUSD = monthlyUSD == null ? null : Math.round(monthlyUSD * 12 * 0.8); // 20% off annual
+      return {
+        ...p,
+        displayUSD: billing === 'monthly' ? monthlyUSD : yearlyUSD,
+        subLabel:
+          p.key === 'enterprise'
+            ? 'Tailored to your org'
+            : billing === 'yearly' && monthlyUSD != null
+            ? `Billed annually — ${formatMoney(yearlyUSD, currency)}/yr`
+            : '/month',
+      };
+    });
+  }, [billing, currency]);
+
+  // Estimator calc
+  const estimator = useMemo(() => {
+    const plan = BASE_PLANS.find((p) => p.key === selectedPlan);
+    const baseMonthlyUSD = plan?.monthlyUSD ?? 0;
+    const billedUSD = billing === 'monthly' ? baseMonthlyUSD : baseMonthlyUSD * 0.8; // per month equivalent
+    // Add-ons
+    const seatAddonUSD = ADDONS.find(a => a.key === 'seat')!.priceUSD * Math.max(0, seatCount);
+    const storageUSD   = addonKeys.storage  ? ADDONS.find(a => a.key === 'storage')!.priceUSD  : 0;
+    const videoUSD     = addonKeys.video    ? ADDONS.find(a => a.key === 'video')!.priceUSD    : 0;
+    const priorityUSD  = addonKeys.priority ? ADDONS.find(a => a.key === 'priority')!.priceUSD : 0;
+
+    const monthlyTotalUSD = billedUSD + seatAddonUSD + storageUSD + videoUSD + priorityUSD;
+    const currencyLabel = CURRENCIES[currency]?.label || 'USD $';
+    const perMonth = formatMoney(monthlyTotalUSD, currency);
+    const perYear  = formatMoney(monthlyTotalUSD * 12, currency);
+    return { perMonth, perYear, currencyLabel, baseMonthlyUSD: billedUSD };
+  }, [selectedPlan, billing, seatCount, addonKeys, currency]);
 
   return (
     <Layout title="Pricing">
@@ -112,7 +257,7 @@ export default function PricingPage() {
             />
           </div>
 
-          <div className="mx-auto max-w-6xl px-6 pt-24 pb-10 text-center">
+          <div className="mx-auto max-w-7xl px-6 pt-24 pb-10 text-center">
             <motion.h1
               className="text-4xl md:text-5xl font-extrabold tracking-tight"
               initial={{ opacity: 0, y: 24 }}
@@ -127,13 +272,14 @@ export default function PricingPage() {
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs">
               <Badge icon={<ShieldCheck className="h-4 w-4" />} text="7-day money-back guarantee" />
-              <Badge icon={<Zap className="h-4 w-4" />} text="Fast priority queues (Pro)" />
+              <Badge icon={<Zap className="h-4 w-4" />} text="Fast priority queues (Pro+)" />
               <Badge icon={<BadgeCheck className="h-4 w-4" />} text="Secure & GDPR-aware" />
             </div>
 
-            {/* Toggle Billing */}
-            <div className="mt-8 flex items-center justify-center">
+            {/* Toggles */}
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <BillingToggle billing={billing} onChange={setBilling} savings={savingsLabel} />
+              <CurrencyToggle currency={currency} onChange={setCurrency} />
             </div>
 
             {/* Reviews + Verified logos */}
@@ -145,17 +291,190 @@ export default function PricingPage() {
         </section>
 
         {/* Plans */}
-        <section className="mx-auto max-w-6xl px-6 pb-12">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {PLANS.map((plan, idx) => (
-              <PlanCard key={plan.key} plan={plan} billing={billing} delay={idx * 0.06} />
-            ))}
+        <section className="mx-auto max-w-7xl px-6 pb-12">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3 xl:grid-cols-4">
+            {plans
+              .filter(p => ['free','starter','pro','business'].includes(p.key))
+              .map((plan, idx) => (
+                <PlanCard key={plan.key} plan={plan} billing={billing} currency={currency} delay={idx * 0.06} />
+              ))}
+            {/* Agency */}
+            <PlanCard key="agency" plan={plans.find(p=>p.key==='agency')} billing={billing} currency={currency} delay={0.3} />
+            {/* Enterprise */}
+            <PlanCard key="enterprise" plan={plans.find(p=>p.key==='enterprise')} billing={billing} currency={currency} delay={0.36} />
           </div>
           <MobileStickyCta />
         </section>
 
+        {/* Pay-as-you-go */}
+        <section className="mx-auto max-w-7xl px-6 py-8">
+          <motion.h2
+            className="text-center text-2xl md:text-3xl font-bold"
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.5 }}
+          >
+            Need more credits now? Pay-as-you-go packs
+          </motion.h2>
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {PAYG_PACKS.map((p, i) => (
+              <motion.div
+                key={p.key}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.4, delay: i * 0.05 }}
+                className="rounded-2xl border border-white/10 bg-white/60 p-5 text-center shadow backdrop-blur dark:bg-white/5"
+              >
+                <div className="text-sm font-semibold text-zinc-600 dark:text-zinc-300">{p.name}</div>
+                <div className="mt-2 text-3xl font-extrabold">{formatMoney(p.priceUSD, currency)}</div>
+                <div className="mt-1 text-xs text-zinc-500">{p.credits.toLocaleString()} credits</div>
+                <div className="mt-4">
+                  <Button className="w-full rounded-xl px-4 py-2 text-sm font-semibold bg-white text-zinc-900 dark:bg-white/10 dark:text-white">
+                    Buy Pack
+                  </Button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+          <div className="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+            One-time purchase • Credits never expire • Applied instantly to your account
+          </div>
+        </section>
+
+        {/* Add-ons + Estimator */}
+        <section className="mx-auto max-w-7xl px-6 py-10">
+          <motion.h2
+            className="text-center text-2xl md:text-3xl font-bold"
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.5 }}
+          >
+            Add-ons & Simple Estimator
+          </motion.h2>
+
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Add-ons */}
+            <div className="rounded-2xl border border-white/10 bg-white/50 p-5 backdrop-blur dark:bg-white/5">
+              <div className="text-sm font-semibold mb-3">Monthly add-ons</div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Seat selector */}
+                <div className="rounded-xl border border-white/10 bg-white/70 p-4 dark:bg-white/10">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-fuchsia-400" />
+                    <div className="font-semibold text-sm">Extra Team Seats</div>
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">Per additional seat</p>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold">{formatMoney(ADDONS.find(a=>a.key==='seat')!.priceUSD, currency)}/seat</span>
+                    <div className="inline-flex items-center rounded-lg border border-white/15 bg-white/50 p-1 backdrop-blur dark:bg-white/10">
+                      <button
+                        className="px-2 py-1 text-sm"
+                        onClick={() => setSeatCount((v) => Math.max(0, v - 1))}
+                        aria-label="Decrease seats"
+                      >−</button>
+                      <span className="px-3 py-1 text-sm min-w-[2ch] text-center">{seatCount}</span>
+                      <button
+                        className="px-2 py-1 text-sm"
+                        onClick={() => setSeatCount((v) => Math.min(99, v + 1))}
+                        aria-label="Increase seats"
+                      >+</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Toggle add-ons */}
+                {ADDONS.filter(a => a.key !== 'seat').map((a) => (
+                  <label
+                    key={a.key}
+                    className="cursor-pointer rounded-xl border border-white/10 bg-white/70 p-4 dark:bg-white/10 flex items-start gap-3"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={addonKeys[a.key] || false}
+                      onChange={(e) => setAddonKeys((s) => ({ ...s, [a.key]: e.target.checked }))}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {a.icon}
+                          <div className="font-semibold text-sm">{a.name}</div>
+                        </div>
+                        <div className="text-sm font-semibold">{formatMoney(a.priceUSD, currency)}/mo</div>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{a.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+                * Add-ons are billed with your subscription. Change or cancel anytime.
+              </div>
+            </div>
+
+            {/* Estimator */}
+            <div className="rounded-2xl border border-white/10 bg-white/60 p-5 backdrop-blur dark:bg-white/5">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">Estimate your monthly cost</div>
+                <div className="text-xs text-zinc-500 flex items-center gap-2"><Globe className="h-3.5 w-3.5" /> {CURRENCIES[currency].label}</div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="text-xs">
+                  <div className="mb-1 text-zinc-600 dark:text-zinc-300">Plan</div>
+                  <select
+                    value={selectedPlan}
+                    onChange={(e) => setSelectedPlan(e.target.value)}
+                    className="w-full rounded-lg border border-white/15 bg-white/80 px-3 py-2 text-sm dark:bg-white/10"
+                  >
+                    {BASE_PLANS.filter(p=>p.monthlyUSD!=null).map((p) => (
+                      <option key={p.key} value={p.key}>{p.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs">
+                  <div className="mb-1 text-zinc-600 dark:text-zinc-300">Billing</div>
+                  <select
+                    value={billing}
+                    onChange={(e) => setBilling(e.target.value)}
+                    className="w-full rounded-lg border border-white/15 bg-white/80 px-3 py-2 text-sm dark:bg-white/10"
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly (save 20%)</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/70 p-4 text-sm dark:bg-white/10">
+                <div className="flex items-center justify-between">
+                  <span>Estimated total <span className="text-xs text-zinc-500">(incl. add-ons)</span></span>
+                  <span className="font-extrabold">{estimator.perMonth} /mo</span>
+                </div>
+                <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+                  Or {estimator.perYear} per year (billed annually)
+                </div>
+                <div className="mt-4">
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-fuchsia-600 hover:to-indigo-600"
+                  >
+                    Continue to Checkout <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+
+              <div className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+                Estimates are for reference; actual billing uses your provider currency at checkout.
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Comparison */}
-        <section className="mx-auto max-w-6xl px-6 py-12">
+        <section className="mx-auto max-w-7xl px-6 py-12">
           <motion.h2
             className="text-center text-2xl md:text-3xl font-bold"
             initial={{ opacity: 0, y: 8 }}
@@ -166,35 +485,49 @@ export default function PricingPage() {
             What’s included — at a glance
           </motion.h2>
           <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-white/40 p-1 backdrop-blur dark:bg-white/5">
-            <table className="min-w-[720px] w-full text-sm">
+            <table className="min-w-[900px] w-full text-sm">
               <thead>
                 <tr className="text-left">
                   <th className="px-4 py-3">Feature</th>
                   <th className="px-4 py-3">Free</th>
+                  <th className="px-4 py-3">Starter</th>
                   <th className="px-4 py-3">Pro</th>
+                  <th className="px-4 py-3">Business</th>
+                  <th className="px-4 py-3">Agency</th>
                   <th className="px-4 py-3">Enterprise</th>
                 </tr>
               </thead>
               <tbody className="[&>tr:nth-child(even)]:bg-white/30 dark:[&>tr:nth-child(even)]:bg-white/5">
                 {[
-                  ['Credits', '5 / mo', 'Unlimited*', 'Unlimited'],
-                  ['Image Enhancement', 'Basic', 'Advanced (HD)', 'Custom Pipeline'],
-                  ['AI Try-On', 'Standard', 'Premium', 'Custom Models'],
-                  ['Priority Rendering', <Xmark key="x1" />, <Checkmark key="c1" />, <Checkmark key="c2" />],
-                  ['Support', 'Community', 'Email', 'Dedicated (SLA)'],
-                  ['Security', 'Std. Encryption', 'Std. Encryption', 'SAML SSO, SOC2'],
-                ].map(([label, free, pro, ent], i) => (
+                  ['Credits', '5/mo', '200/mo', 'Unlimited*', 'Unlimited*', 'Unlimited*', 'Unlimited'],
+                  ['Max Resolution', '1080p', '2k', '4k', '4k + Upscale', '8k + Upscale', 'Custom'],
+                  ['AI Try-On', 'Standard', 'Standard', 'Premium', 'Premium', 'Premium+', 'Custom'],
+                  ['Model Swap', <Xmark />, <Xmark />, <Checkmark />, <Checkmark />, <Checkmark />, <Checkmark />],
+                  ['Short Videos', <Xmark />, <Xmark />, <Checkmark />, <Checkmark />, <Checkmark />, <Checkmark />],
+                  ['Batch Processing', <Xmark />, <Xmark />, <Checkmark />, <Checkmark />, <Checkmark />, <Checkmark />],
+                  ['API Access', <Xmark />, <Xmark />, <Checkmark />, <Checkmark />, <Checkmark />, <Checkmark />],
+                  ['Webhooks', <Xmark />, <Xmark />, <Xmark />, <Checkmark />, <Checkmark />, <Checkmark />],
+                  ['Brand Kit', <Xmark />, <Xmark />, <Checkmark />, <Checkmark />, <Checkmark />, <Checkmark />],
+                  ['Team Seats Included', '—', '—', '—', '3', '5', 'Unlimited'],
+                  ['Support', 'Community', 'Email', 'Email', 'Priority email', 'Priority+', 'Premium 24/7'],
+                  ['Security', 'Std. Encryption', 'Std. Encryption', 'Std. Encryption', 'SSO (add-on)', 'SSO (add-on)', 'SAML SSO, SOC2'],
+                ].map(([label, free, starter, pro, biz, ag, ent], i) => (
                   <tr key={i} className="border-t border-white/10">
                     <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">{label}</td>
                     <td className="px-4 py-3">{typeof free === 'string' ? free : free}</td>
+                    <td className="px-4 py-3">{typeof starter === 'string' ? starter : starter}</td>
                     <td className="px-4 py-3">{typeof pro === 'string' ? pro : pro}</td>
+                    <td className="px-4 py-3">{typeof biz === 'string' ? biz : biz}</td>
+                    <td className="px-4 py-3">{typeof ag === 'string' ? ag : ag}</td>
                     <td className="px-4 py-3">{typeof ent === 'string' ? ent : ent}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">*Fair use policy applies.</div>
+          <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            *Fair use policy applies. See SLA for Business/Agency/Enterprise.
+          </div>
         </section>
 
         {/* FAQs */}
@@ -231,13 +564,20 @@ export default function PricingPage() {
               Upgrade now <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
+
+          {/* Legal notes */}
+          <div className="mx-auto mt-6 max-w-3xl text-center text-[11px] text-zinc-500 dark:text-zinc-400">
+            Prices shown are indicative for {CURRENCIES[currency].label}. Final charges may vary at checkout. Unlimited usage is subject to fair-use policy and anti-abuse safeguards.
+          </div>
         </section>
       </main>
     </Layout>
   );
 }
 
-/* ---------------- Components ---------------- */
+/* =========================
+   UI Components
+========================= */
 
 function BillingToggle({ billing, onChange, savings }) {
   return (
@@ -266,15 +606,37 @@ function BillingToggle({ billing, onChange, savings }) {
   );
 }
 
+function CurrencyToggle({ currency, onChange }) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/50 p-1 backdrop-blur dark:bg-white/5">
+      {Object.keys(CURRENCIES).map((c) => (
+        <button
+          key={c}
+          onClick={() => onChange(c)}
+          className={[
+            'relative rounded-xl px-3 py-2 text-xs font-semibold transition',
+            currency === c ? 'text-white' : 'text-white/70 hover:text-white'
+          ].join(' ')}
+          aria-pressed={currency === c}
+        >
+          {CURRENCIES[c].label}
+          {currency === c && (
+            <motion.span layoutId="currency-pill" className="absolute inset-0 -z-10 rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 shadow-[0_10px_30px_-10px_rgba(37,99,235,.45)]" />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ReviewsStrip() {
-  // لماذا: تعزيز الثقة قبل رؤية الأسعار.
   return (
     <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/40 px-4 py-3 text-sm backdrop-blur dark:bg-white/5">
       <div className="flex items-center gap-1">
         {Array.from({ length: 5 }).map((_, i) => (
           <Star
             key={i}
-            className={`h-4 w-4 ${i < 4 ? 'text-amber-400' : 'text-amber-400/70'}`}
+            className={`h-4 w-4 ${i < 5 ? 'text-amber-400' : 'text-amber-400/70'}`}
             fill="currentColor"
           />
         ))}
@@ -292,19 +654,12 @@ function ReviewsStrip() {
 }
 
 function VerifiedBrands() {
-  // لماذا: إثبات اجتماعي “Verified by brands”
   const brands = [
-    { name: 'Zara', mono: true },
-    { name: 'ASOS', mono: true },
-    { name: 'Farfetch', mono: true },
-    { name: 'Shopify Plus', mono: true },
-    { name: 'Noon', mono: true },
+    { name: 'Zara' }, { name: 'ASOS' }, { name: 'Farfetch' }, { name: 'Shopify Plus' }, { name: 'Noon' },
   ];
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-2 text-xs font-semibold text-white/80 text-center">
-        Verified by brands
-      </div>
+      <div className="mb-2 text-xs font-semibold text-white/80 text-center">Verified by brands</div>
       <div className="grid grid-cols-3 place-items-center gap-3 sm:grid-cols-5">
         {brands.map((b) => (
           <BrandMark key={b.name} label={b.name} />
@@ -326,24 +681,10 @@ function BrandMark({ label }) {
   );
 }
 
-function PlanCard({ plan, billing, delay = 0 }) {
-  const isPro = plan.key === 'pro';
-  const price =
-    plan.priceMonthly == null
-      ? null
-      : billing === 'monthly'
-      ? plan.priceMonthly
-      : plan.priceYearly;
-
-  const priceLabel =
-    price == null ? 'Custom' : `$${price}${billing === 'yearly' && plan.priceMonthly ? ' /mo' : ''}`;
-
-  const subLabel =
-    plan.key === 'enterprise'
-      ? 'Tailored to your org'
-      : billing === 'yearly' && plan.priceMonthly
-      ? `Billed annually — $${(plan.priceMonthly * 12 * 0.8).toFixed(0)}/yr`
-      : '/month';
+function PlanCard({ plan, billing, currency, delay = 0 }) {
+  if (!plan) return null;
+  const { displayUSD, monthlyUSD } = plan;
+  const priceLabel = displayUSD == null ? 'Custom' : `${formatMoney(displayUSD, currency)}${billing === 'yearly' && monthlyUSD != null ? ' /mo' : ''}`;
 
   return (
     <motion.div
@@ -354,7 +695,7 @@ function PlanCard({ plan, billing, delay = 0 }) {
       className={[
         'relative flex h-full flex-col justify-between rounded-3xl border p-8 text-center shadow-xl transition-all',
         'border-white/10 bg-white/50 backdrop-blur dark:bg-white/5',
-        isPro ? 'ring-2 ring-fuchsia-500/40' : '',
+        plan.popular ? 'ring-2 ring-fuchsia-500/40' : '',
       ].join(' ')}
     >
       {plan.popular && (
@@ -372,7 +713,7 @@ function PlanCard({ plan, billing, delay = 0 }) {
 
         <div className="mt-5">
           <div className="text-4xl font-extrabold tracking-tight">{priceLabel}</div>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400">{subLabel}</div>
+          <div className="text-xs text-zinc-500 dark:text-zinc-400">{plan.subLabel}</div>
         </div>
 
         <ul className="mt-6 space-y-3 text-sm">
@@ -393,7 +734,7 @@ function PlanCard({ plan, billing, delay = 0 }) {
         <Button
           className={[
             'w-full rounded-xl px-4 py-2 text-base font-semibold shadow-md transition-transform',
-            isPro
+            plan.popular
               ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-indigo-600 text-white'
               : 'bg-white text-zinc-900 hover:scale-[1.02] dark:bg-white/10 dark:text-white',
           ].join(' ')}
