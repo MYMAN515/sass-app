@@ -35,14 +35,6 @@ const pickFirstUrl = (obj) => {
   return '';
 };
 
-const absUrl = (path) => {
-  if (!path) return '';
-  if (/^https?:\/\//.test(path)) return path;
-  if (typeof window === 'undefined') return path;
-  const { origin } = window.location;
-  return `${origin}${path.startsWith('/') ? '' : '/'}${path}`;
-};
-
 /* -------------------------------------------------------
    Presets (images live in /public)
 ------------------------------------------------------- */
@@ -109,7 +101,19 @@ const ENHANCE_PRESETS = [
   }
 ];
 
-// NOTE: لم نعد نستخدم TRYON_PRESETS لأن النظام صار Model Library فقط.
+/** مكتبة المودلز (أضفت عينات؛ زد العدد لاحقاً ل٣٠-٤٠) */
+const MODELS = [
+  { id: 'm01', name: 'Ava — Studio Front', pose: 'front', url: '/models/m01.webp' },
+  { id: 'm02', name: 'Maya — Side Pose', pose: 'side', url: '/models/m02.webp' },
+  { id: 'm03', name: 'Lina — Half Body', pose: 'half', url: '/models/m03.webp' },
+  { id: 'm04', name: 'Zoe — Studio 3/4', pose: '34', url: '/models/m04.webp' },
+  { id: 'm05', name: 'Noah — Casual Front', pose: 'front', url: '/models/m05.webp' },
+  { id: 'm06', name: 'Omar — Studio Side', pose: 'side', url: '/models/m06.webp' },
+  { id: 'm07', name: 'Yara — Full Body', pose: 'full', url: '/models/m07.webp' },
+  { id: 'm08', name: 'Sara — 3/4 Smile', pose: '34', url: '/models/m08.webp' },
+  { id: 'm09', name: 'Jude — Front Studio', pose: 'front', url: '/models/m09.webp' },
+  { id: 'm10', name: 'Ali — Casual Half', pose: 'half', url: '/models/m10.webp' },
+];
 
 /* -------------------------------------------------------
    Toast system with progress
@@ -191,7 +195,8 @@ export default function Dashboard() {
   const [tool, setTool]   = useState('enhance');     // active tool per group
   const [plan, setPlan]   = useState('Free');
 
-  // single-file work area (for RemoveBG/Enhance)
+  // single-file work area
+  // ملاحظة: في Try-On هذا الملف = صورة الملابس (مو صورة الشخص)
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
   const [imageData, setImageData] = useState(''); // for removeBG dataURL
@@ -203,6 +208,10 @@ export default function Dashboard() {
   const [local1, setLocal1] = useState('');
   const [local2, setLocal2] = useState('');
   const [swapPrompt, setSwapPrompt] = useState('');
+
+  // Try-On specific
+  const [selectedModel, setSelectedModel] = useState(null); // { id, name, url }
+  const [showPieceType, setShowPieceType] = useState(false);
 
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
   const [busy, setBusy] = useState(false);
@@ -225,35 +234,9 @@ export default function Dashboard() {
   const [shadow, setShadow] = useState(true);
   const [patternOpacity, setPatternOpacity] = useState(0.06);
 
-  // enhance preset (optional)
+  // enhance modal
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [showEnhance, setShowEnhance] = useState(false);
-
-  // ======== Try-On (Model Library mode) ========
-  // مكتبة مودلز ثابتة (webp) – تقدر تغيّر العدد برفع صور في /public/models
-  const [models] = useState(() =>
-    Array.from({ length: 36 }, (_, i) => ({
-      id: `m${String(i+1).padStart(2,'0')}`,
-      src: `/models/m${String(i+1).padStart(2,'0')}.webp`,
-      pose: ['front','threequarter','side','back'][i % 4],
-      scene: ['studio','lifestyle','outdoor'][i % 3],
-      gender: ['female','male','unisex'][i % 3],
-      fit: ['streetwear','casual','formal','sports'][i % 4],
-      name: `Model ${i+1}`
-    }))
-  );
-  const [selectedModelId, setSelectedModelId] = useState(null);
-  const selectedModelUrl = useMemo(
-    () => models.find(m => m.id === selectedModelId)?.src || '',
-    [models, selectedModelId]
-  );
-
-  const [garmentFile, setGarmentFile] = useState(null);
-  const [garmentLocal, setGarmentLocal] = useState('');
-  const garmentInputRef = useRef(null);
-
-  // نوع القطعة: upper | lower | dress | outer
-  const [category, setCategory] = useState('upper');
 
   const dropRef = useRef(null);
   const inputRef = useRef(null);
@@ -282,7 +265,7 @@ export default function Dashboard() {
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
-  /* ---------- drag & drop / paste (single file area for removeBG/enhance) ---------- */
+  /* ---------- drag & drop / paste (single file area) ---------- */
   useEffect(() => {
     const el = dropRef.current; if (!el) return;
     const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-slate-400'); };
@@ -299,7 +282,7 @@ export default function Dashboard() {
       el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop);
       window.removeEventListener('paste', onPaste);
     };
-  }, []);
+  }, [tool]);
 
   const onPick = async (f) => {
     setFile(f);
@@ -351,6 +334,26 @@ export default function Dashboard() {
     return data.publicUrl;
   }, [supabase, user]);
 
+  /* ---------- prompt builders ---------- */
+  const buildEnhancePrompt = (f) =>
+    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
+      .filter(Boolean).join(', ');
+
+  const buildTryOnPrompt = (pieceType) => {
+    const typeLine =
+      pieceType === 'upper' ? 'Apply the uploaded garment as an UPPER-BODY top (shirt/tee/jacket).'
+    : pieceType === 'lower' ? 'Apply the uploaded garment as a LOWER-BODY item (pants/jeans/skirt).'
+    : pieceType === 'dress' ? 'Apply the uploaded garment as a FULL one-piece DRESS.'
+    : 'Apply the uploaded garment naturally.';
+    return [
+      typeLine,
+      'Keep the original model EXACTLY the same: identity, skin tone, hair, hands, pose, camera, lighting.',
+      'Preserve the ORIGINAL BACKGROUND without changes.',
+      'Fit and drape the cloth realistically on the body; avoid clipping or artifacts.',
+      'No extra accessories, no cropping, no text overlays.',
+    ].join(' ');
+  };
+
   /* ---------- runners ---------- */
   const runRemoveBg = useCallback(async () => {
     if (!file) return setErr('Pick an image first.');
@@ -374,10 +377,6 @@ export default function Dashboard() {
       t.update({ msg: 'Remove BG failed', type: 'error' }); setTimeout(() => t.close(), 1500);
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, imageData, localUrl, toasts]);
-
-  const buildEnhancePrompt = (f) =>
-    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
-      .filter(Boolean).join(', ');
 
   const runEnhance = useCallback(async (selections) => {
     if (!file) return setErr('Pick an image first.');
@@ -403,46 +402,42 @@ export default function Dashboard() {
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, uploadToStorage, plan, user, localUrl, toasts]);
 
-  // ======== NEW: Try-On without prompts / background change ========
-  const runTryOn = useCallback(async () => {
-    if (!selectedModelUrl) return setErr('اختر مودل من المكتبة أولًا.');
-    if (!garmentFile) return setErr('ارفع صورة قطعة اللبس (PNG مفضل).');
-
+  const runTryOn = useCallback(async (pieceType) => {
+    if (!selectedModel?.url) return setErr('Pick a model first.');
+    if (!file) return setErr('Upload a clothing image first.');
     setBusy(true); setErr(''); setPhase('processing');
-
-    // 1) ارفع قطعة اللبس إلى التخزين
-    const clothUrl = await uploadToStorage(garmentFile);
-
-    // 2) جهّز رابط المودل كـ absolute (لأنه من /public)
-    const modelUrl = absUrl(selectedModelUrl);
-
-    const t = toasts.push('Running Try-On…', { progress: 12 });
-    let adv = 12; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
+    const prompt = buildTryOnPrompt(pieceType);
+    const t = toasts.push('Generating try-on…', { progress: 10 });
+    let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
 
     try {
-      const r = await fetch('/api/tryon-vton', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      // ارفع صورة الملابس فقط — صورة المودل من مكتبتك URL عام
+      const clothUrl = await uploadToStorage(file);
+
+      const r = await fetch('/api/tryon', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          modelUrl,
+          modelUrl: selectedModel.url,
           clothUrl,
-          category, // upper | lower | dress | outer
-          // لا نرسل أي برومبت ولا تغييرات بالخلفية
-          preserve: { pose: true, identity: true, skin: true, background: true }
+          prompt,
+          negativePrompt: 'lowres, bad hands, deformed, extra limbs, wrong background, different pose, different face, text, watermark',
+          plan,
+          user_email: user.email
         })
       });
+
       const j = await r.json(); setApiResponse(j);
       if (!r.ok) throw new Error(j?.error || 'try-on failed');
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
 
+      const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
       setResultUrl(out);
-      setHistory(h => [{ tool:'Try-On (VTON)', inputThumb: modelUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-      setPhase('ready'); t.update({ progress: 100, msg: 'Try-On done ✓' }); setTimeout(() => t.close(), 700);
+      setHistory(h => [{ tool:'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
+      setPhase('ready'); t.update({ progress: 100, msg: 'Try-On ✓' }); setTimeout(() => t.close(), 700);
     } catch (e) {
       console.error(e); setPhase('error'); setErr('Failed to process.');
       t.update({ msg: 'Try-On failed', type: 'error' }); setTimeout(() => t.close(), 1500);
     } finally { clearInterval(iv); setBusy(false); }
-  }, [selectedModelUrl, garmentFile, uploadToStorage, category, toasts]);
+  }, [file, selectedModel, uploadToStorage, plan, user, toasts]);
 
   const runModelSwap = useCallback(async () => {
     if (!file1 || !file2) return setErr('Pick both images.');
@@ -473,11 +468,6 @@ export default function Dashboard() {
     setFile(null); setLocalUrl(''); setResultUrl('');
     setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
     setErr(''); setPhase('idle'); setApiResponse(null); setCompare(false);
-
-    // Try-On specific
-    setSelectedModelId(null);
-    setGarmentFile(null); setGarmentLocal('');
-    setCategory('upper');
   };
 
   const handleRun = () => {
@@ -485,19 +475,15 @@ export default function Dashboard() {
       if (tool === 'removeBg') return runRemoveBg();
       if (tool === 'enhance')  return setShowEnhance(true);
     } else {
-      if (tool === 'tryon')     return runTryOn();
+      if (tool === 'tryon') {
+        if (!selectedModel?.url) { setErr('Pick a model from the grid first.'); return; }
+        if (!file) { setErr('Upload a clothing image.'); return; }
+        setShowPieceType(true); // pop-on لاختيار نوع القطعة
+        return;
+      }
       if (tool === 'modelSwap') return runModelSwap();
     }
   };
-
-  // ذكي لتعطيل زر Run حسب الأداة
-  const canRun = useMemo(() => {
-    if (tool === 'modelSwap') return !!(file1 && file2) && !busy;
-    if (tool === 'tryon') return !!(selectedModelUrl && garmentFile) && !busy;
-    return !!file && !busy; // removeBg / enhance
-  }, [tool, file, busy, file1, file2, selectedModelUrl, garmentFile]);
-
-  const baseThumb = tool === 'tryon' ? selectedModelUrl : localUrl;
 
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
@@ -583,15 +569,20 @@ export default function Dashboard() {
 
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
-          {/* Presets / Intro row */}
+          {/* Presets / Model Gallery */}
           <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white/90 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
+                  {group === 'product' ? 'Quick Presets' : 'Pick a Model'}
+                </h1>
                 <p className="text-slate-600 text-xs sm:text-sm">
-                  For Enhance use presets below. For Try-On: pick a model + upload garment — no prompts, original background stays.
+                  {group === 'product'
+                    ? <>Pick a preset or open <span className="font-semibold">Customize</span>.</>
+                    : <>Choose a model pose. Then upload your garment and hit <span className="font-semibold">Run</span>.</>}
                 </p>
               </div>
+
               {group === 'product' ? (
                 <button
                   onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
@@ -600,7 +591,16 @@ export default function Dashboard() {
                   ✨ Customize Enhance
                 </button>
               ) : (
-                <div className="text-xs text-slate-600">Try-On uses Model Library (no presets)</div>
+                <div className="flex items-center gap-2">
+                  {selectedModel ? (
+                    <button
+                      onClick={() => setSelectedModel(null)}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
+                    >
+                      ✖ Clear selection
+                    </button>
+                  ) : null}
+                </div>
               )}
             </div>
 
@@ -622,8 +622,16 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="mt-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
-                  اختر مودل ثم ارفع قطعة اللبس وحدد نوعها (Upper / Lower / Dress). الخلفية والوضعية والملامح تبقى نفسها 100%.
+                <div className="mb-2 text-[12px] font-semibold text-slate-700">Models</div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {MODELS.map((m) => (
+                    <ModelCard
+                      key={m.id}
+                      model={m}
+                      active={selectedModel?.id === m.id}
+                      onSelect={() => setSelectedModel(m)}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -659,8 +667,47 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Work area */}
-              {tool === 'modelSwap' ? (
+              {/* Drop areas */}
+              {tool !== 'modelSwap' ? (
+                <div
+                  ref={dropRef}
+                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+                  onClick={() => inputRef.current?.click()}
+                  title="Drag & drop / Click / Paste (Ctrl+V)"
+                >
+                  <input
+                    ref={inputRef}
+                    type="file" accept="image/*" className="hidden"
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
+                  />
+                  {!localUrl && !resultUrl ? (
+                    <div className="text-center text-slate-500 text-sm">
+                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-slate-200">⬆</div>
+                      {tool === 'tryon'
+                        ? 'Upload a clothing image (PNG/JPG). Transparent PNG preferred.'
+                        : 'Drag & drop an image here, click to choose, or paste (Ctrl+V)'}
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
+                      {compare && localUrl && resultUrl ? (
+                        <div className="relative max-w-full max-h-[70vh]">
+                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+                          <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
+                               className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
+                        </div>
+                      ) : (
+                        <img
+                          src={resultUrl || localUrl}
+                          alt="preview"
+                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                          draggable={false}
+                          loading="lazy"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <div className="m-3 sm:m-4 md:m-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Image 1 */}
@@ -689,112 +736,13 @@ export default function Dashboard() {
                     />
                   </div>
                 </div>
-              ) : tool === 'tryon' ? (
-                // ======== Try-On: Model Library + Garment upload ========
-                <div className="m-3 sm:m-4 md:m-5 grid gap-4">
-                  {/* اختيار المودل + نوع القطعة */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs text-slate-600">Pick a model</div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <select className="rounded-lg border px-2 py-1" onChange={e=>setCategory(e.target.value)} value={category}>
-                          <option value="upper">Upper</option>
-                          <option value="lower">Lower</option>
-                          <option value="dress">Dress</option>
-                          <option value="outer">Outer</option>
-                        </select>
-                      </div>
-                    </div>
-                    <ModelLibrary
-                      items={models}
-                      selectedId={selectedModelId}
-                      onSelect={setSelectedModelId}
-                    />
-                  </div>
-
-                  {/* رفع قطعة اللبس */}
-                  <div>
-                    <div className="text-xs text-slate-600 mb-2">Upload garment (PNG شفاف مفضل)</div>
-                    <div
-                      className="min-h-[160px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                      onClick={() => garmentInputRef.current?.click()}
-                    >
-                      <input
-                        ref={garmentInputRef}
-                        type="file" accept="image/*" className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) { setGarmentFile(f); setGarmentLocal(URL.createObjectURL(f)); }
-                        }}
-                      />
-                      {!garmentLocal ? (
-                        <div className="text-center text-slate-500 text-sm">
-                          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-slate-200">⬆</div>
-                          Click to upload garment
-                        </div>
-                      ) : (
-                        <img src={garmentLocal} alt="garment" className="max-w-full max-h-[36vh] object-contain rounded-xl" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* معاينة */}
-                  <div className="rounded-xl border p-3 bg-slate-50">
-                    <div className="text-xs text-slate-500 mb-2">Preview</div>
-                    <div className="relative grid place-items-center min-h-[200px]">
-                      <img
-                        src={resultUrl || selectedModelUrl}
-                        alt="preview"
-                        className="max-w-full max-h-[60vh] object-contain rounded-xl"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                // removeBg / enhance work area (صندوق واحد)
-                <div
-                  ref={dropRef}
-                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                  onClick={() => inputRef.current?.click()}
-                  title="Drag & drop / Click / Paste (Ctrl+V)"
-                >
-                  <input
-                    ref={inputRef}
-                    type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
-                  />
-                  {!localUrl && !resultUrl ? (
-                    <div className="text-center text-slate-500 text-sm">
-                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-slate-200">⬆</div>
-                      Drag & drop an image here, click to choose, or paste (Ctrl+V)
-                    </div>
-                  ) : (
-                    <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
-                      {compare && baseThumb && resultUrl ? (
-                        <div className="relative max-w-full max-h-[70vh]">
-                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
-                          <img src={baseThumb} alt="before" style={{opacity: compareOpacity/100}}
-                               className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
-                        </div>
-                      ) : (
-                        <img
-                          src={resultUrl || baseThumb}
-                          alt="preview"
-                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
-                          draggable={false}
-                          loading="lazy"
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
               )}
 
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
                 <button
                   onClick={handleRun}
-                  disabled={!canRun}
+                  disabled={(tool !== 'modelSwap' && (tool === 'tryon' ? !file || !selectedModel : !file)) || (tool === 'modelSwap' && (!file1 || !file2)) || busy}
                   className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                 >
                   {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On')}</>)}
@@ -820,7 +768,7 @@ export default function Dashboard() {
                     >
                       ↗ Open
                     </a>
-                    {baseThumb && (
+                    {localUrl && (
                       <>
                         <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2">
                           <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
@@ -879,11 +827,47 @@ export default function Dashboard() {
             </section>
 
             {/* Inspector */}
-            <aside className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
+            <aside className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:pb-5">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold text-slate-900">Inspector</div>
                 <span className="text-xs text-slate-500">Tool: {tool}</span>
               </div>
+
+              {/* Try-On summary */}
+              {tool === 'tryon' && (
+                <div className="space-y-3 mt-3 text-xs">
+                  <div className="rounded-lg border p-3">
+                    <div className="text-slate-600 mb-1">Selected Model</div>
+                    {selectedModel ? (
+                      <div className="flex items-center gap-2">
+                        <img src={selectedModel.url} alt={selectedModel.name} className="w-10 h-10 rounded-md object-cover border" />
+                        <div>
+                          <div className="font-semibold text-slate-900">{selectedModel.name}</div>
+                          <div className="text-[11px] text-slate-500">Pose: {selectedModel.pose}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-slate-400">— Pick a model above —</div>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-slate-600 mb-1">Clothing</div>
+                    {localUrl ? (
+                      <img src={localUrl} alt="cloth" className="w-full max-h-48 object-contain rounded-md border bg-slate-50" />
+                    ) : (
+                      <div className="text-slate-400">— Upload a clothing image —</div>
+                    )}
+                  </div>
+
+                  {resultUrl && (
+                    <div className="rounded-lg border p-3">
+                      <div className="text-slate-600 mb-2">Result</div>
+                      <img src={resultUrl} alt="final" className="w-full max-h-64 object-contain rounded-md border bg-slate-50" />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {tool === 'removeBg' && (
                 <div className="space-y-3 mt-3">
@@ -908,7 +892,7 @@ export default function Dashboard() {
                   <div className="mt-3">
                     <div className="text-xs text-slate-500 mb-2">Final Preview</div>
                     <div style={frameStyle} className="relative rounded-xl overflow-hidden border border-slate-200">
-                      <div className="relative w-full min-h=[140px] sm:min-h-[160px] grid place-items-center">
+                      <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
                         {resultUrl ? (
                           <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
                         ) : (
@@ -930,12 +914,6 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-
-              {tool === 'tryon' && (
-                <div className="text-xs text-slate-600 mt-3">
-                  Pick a model and upload garment. Background, pose and identity are preserved.
                 </div>
               )}
 
@@ -962,9 +940,7 @@ export default function Dashboard() {
                     <button key={i} onClick={() => setResultUrl(h.outputUrl)}
                       className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-50">
                       <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
-                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
-                        {h.tool} • {new Date(h.ts).toLocaleTimeString()}
-                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">{h.tool} • {new Date(h.ts).toLocaleTimeString()}</div>
                     </button>
                   ))}
                 </div>
@@ -985,6 +961,18 @@ export default function Dashboard() {
                 initial={pendingEnhancePreset || undefined}
                 onChange={()=>{}}
                 onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
+              />
+            </div>
+          </motion.div>
+        )}
+        {showPieceType && (
+          <motion.div className="fixed inset-0 z-[110] grid place-items-center"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="absolute inset-0 bg-black/55" onClick={()=>setShowPieceType(false)} />
+            <div className="relative w-full max-w-md mx-3">
+              <PieceTypeModal
+                onCancel={() => setShowPieceType(false)}
+                onConfirm={(type) => { setShowPieceType(false); runTryOn(type); }}
               />
             </div>
           </motion.div>
@@ -1023,53 +1011,6 @@ function FileDrop({ label, file, localUrl, onPick, inputRef }) {
   );
 }
 
-function ModelLibrary({ items, selectedId, onSelect }) {
-  const [limit, setLimit] = useState(12);
-  const loaderRef = useRef(null);
-
-  useEffect(() => {
-    const io = new IntersectionObserver((ents) => {
-      if (ents[0].isIntersecting) setLimit(l => Math.min(items.length, l + 12));
-    }, { rootMargin: '200px' });
-    if (loaderRef.current) io.observe(loaderRef.current);
-    return () => io.disconnect();
-  }, [items.length]);
-
-  return (
-    <div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-        {items.slice(0, limit).map(m => {
-          const active = m.id === selectedId;
-          return (
-            <button
-              key={m.id}
-              onClick={() => onSelect(m.id)}
-              className={[
-                'group relative rounded-xl overflow-hidden border transition',
-                active ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200 hover:border-slate-300'
-              ].join(' ')}
-              title={m.name}
-            >
-              <img
-                src={m.src}
-                alt={m.name}
-                loading="lazy"
-                className="w-full aspect-[3/4] object-cover"
-                onError={(e) => { e.currentTarget.src = '/model-placeholder.webp'; }}
-              />
-              <span className="absolute bottom-1 left-1 rounded-md bg-black/40 text-[10px] text-white px-1">
-                {m.pose}
-              </span>
-              {active && <span className="absolute top-1 right-1 text-[10px] bg-white/90 px-1 rounded">Selected</span>}
-            </button>
-          );
-        })}
-      </div>
-      <div ref={loaderRef} className="h-8 grid place-items-center text-xs text-slate-500">Loading…</div>
-    </div>
-  );
-}
-
 function PresetCard({ title, subtitle, onClick, preview, tag }) {
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -1100,6 +1041,30 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
       <div className="p-3">
         <div className="font-semibold">{title}</div>
         <div className="text-xs text-slate-500">{subtitle}</div>
+      </div>
+    </button>
+  );
+}
+
+function ModelCard({ model, active, onSelect }) {
+  return (
+    <button
+      onClick={onSelect}
+      className={[
+        'group relative rounded-2xl overflow-hidden border bg-white shadow-sm transition',
+        active ? 'border-indigo-400 ring-2 ring-indigo-300' : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+      ].join(' ')}
+      title={model.name}
+    >
+      <div className="relative w-full aspect-[4/5] bg-slate-100">
+        <img src={model.url} alt={model.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+        <div className="absolute top-2 left-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
+          {active ? 'Selected' : 'Use model'}
+        </div>
+      </div>
+      <div className="p-3">
+        <div className="font-semibold truncate">{model.name}</div>
+        <div className="text-[11px] text-slate-500">Pose: {model.pose}</div>
       </div>
     </button>
   );
@@ -1179,14 +1144,51 @@ function ModeTabs({ mode, setMode }) {
   );
 }
 
+function PieceTypeModal({ onCancel, onConfirm }) {
+  const [active, setActive] = useState('upper'); // default
+  const options = [
+    { id: 'upper', label: 'Upper (T-shirt/Shirt/Jacket)' },
+    { id: 'lower', label: 'Lower (Pants/Jeans/Skirt)'   },
+    { id: 'dress', label: 'Full Dress (One-piece)'      },
+  ];
+  return (
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border space-y-3">
+      <div className="text-sm font-semibold">Choose clothing type</div>
+      <div className="grid grid-cols-1 gap-2">
+        {options.map(o => (
+          <button
+            key={o.id}
+            onClick={()=>setActive(o.id)}
+            className={[
+              'w-full text-left rounded-xl border px-3 py-2 text-sm transition',
+              active === o.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
+            ].join(' ')}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={onCancel}>Cancel</button>
+        <button
+          className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs"
+          onClick={()=>onConfirm(active)}
+        >
+          Continue
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ----- Icons (SVG) ----- */
 function SparkleIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor"/></svg>);}
 function BoxIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor"/></svg>);}
 function PersonIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor"/></svg>);}
-function ScissorsIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor"/></svg>);}
+function ScissorsIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor"/>);}
 function RocketIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor"/><circle cx="15" cy="9" r="1.5" fill="#fff"/></svg>);}
-function SwapIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor"/></svg>);}
-function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/></svg>);}
+function SwapIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor"/>);}
+function PlayIcon(props){return(<svg viewBox="0 0 24 24" className={props.className||''}><path d="M8 5v14l11-7z" fill="currentColor"/>);}
 
 /* -------------------------------------------------------
    Export helpers
@@ -1202,12 +1204,11 @@ async function exportPng(url) {
 }
 
 async function exportRemoveBg(url) {
-  // already transparent cutout; just forward to exportPng for simplicity
   await exportPng(url);
 }
 
 /* -------------------------------------------------------
-   Simple customizer (Enhance only)
+   Simple customizers
 ------------------------------------------------------- */
 function EnhanceCustomizer({ initial, onChange, onComplete }) {
   return (
