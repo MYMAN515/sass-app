@@ -35,6 +35,14 @@ const pickFirstUrl = (obj) => {
   return '';
 };
 
+const absUrl = (path) => {
+  if (!path) return '';
+  if (/^https?:\/\//.test(path)) return path;
+  if (typeof window === 'undefined') return path;
+  const { origin } = window.location;
+  return `${origin}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 /* -------------------------------------------------------
    Presets (images live in /public)
 ------------------------------------------------------- */
@@ -101,40 +109,7 @@ const ENHANCE_PRESETS = [
   }
 ];
 
-const TRYON_PRESETS = [
-  {
-    id: 'streetwear',
-    title: 'Streetwear',
-    subtitle: 'Urban • moody',
-    tag: 'Model',
-    config: { style: 'streetwear fit', setting: 'urban alley, textured wall', lighting: 'overcast soft', mood: 'cool, editorial' },
-    preview: '/streetwear.webp'
-  },
-  {
-    id: 'ecom-mannequin',
-    title: 'E-Com Mannequin',
-    subtitle: 'Plain white',
-    tag: 'Catalog',
-    config: { style: 'ecommerce mannequin front', setting: 'white cyclorama', lighting: 'soft studio', mood: 'catalog clean' },
-    preview: '/ecom-mannequin.webp'
-  },
-  {
-    id: 'lifestyle',
-    title: 'Lifestyle',
-    subtitle: 'Sunlit room',
-    tag: 'Natural',
-    config: { style: 'lifestyle casual', setting: 'sunlit apartment, wood floor', lighting: 'window soft', mood: 'fresh & bright' },
-    preview: '/lifestyle.webp'
-  },
-  {
-    id: 'outdoor',
-    title: 'Outdoor',
-    subtitle: 'Park • daylight',
-    tag: 'Daylight',
-    config: { style: 'outdoor casual', setting: 'green park, path & trees', lighting: 'midday diffuse', mood: 'open & vibrant' },
-    preview: '/outdoor.webp'
-  }
-];
+// NOTE: لم نعد نستخدم TRYON_PRESETS لأن النظام صار Model Library فقط.
 
 /* -------------------------------------------------------
    Toast system with progress
@@ -216,7 +191,7 @@ export default function Dashboard() {
   const [tool, setTool]   = useState('enhance');     // active tool per group
   const [plan, setPlan]   = useState('Free');
 
-  // single-file work area (for RemoveBG/Enhance/TryOn)
+  // single-file work area (for RemoveBG/Enhance)
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
   const [imageData, setImageData] = useState(''); // for removeBG dataURL
@@ -254,9 +229,31 @@ export default function Dashboard() {
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [showEnhance, setShowEnhance] = useState(false);
 
-  // try-on preset (optional)
-  const [pendingTryOnPreset, setPendingTryOnPreset] = useState(null);
-  const [showTryOn, setShowTryOn] = useState(false);
+  // ======== Try-On (Model Library mode) ========
+  // مكتبة مودلز ثابتة (webp) – تقدر تغيّر العدد برفع صور في /public/models
+  const [models] = useState(() =>
+    Array.from({ length: 36 }, (_, i) => ({
+      id: `m${String(i+1).padStart(2,'0')}`,
+      src: `/models/m${String(i+1).padStart(2,'0')}.webp`,
+      pose: ['front','threequarter','side','back'][i % 4],
+      scene: ['studio','lifestyle','outdoor'][i % 3],
+      gender: ['female','male','unisex'][i % 3],
+      fit: ['streetwear','casual','formal','sports'][i % 4],
+      name: `Model ${i+1}`
+    }))
+  );
+  const [selectedModelId, setSelectedModelId] = useState(null);
+  const selectedModelUrl = useMemo(
+    () => models.find(m => m.id === selectedModelId)?.src || '',
+    [models, selectedModelId]
+  );
+
+  const [garmentFile, setGarmentFile] = useState(null);
+  const [garmentLocal, setGarmentLocal] = useState('');
+  const garmentInputRef = useRef(null);
+
+  // نوع القطعة: upper | lower | dress | outer
+  const [category, setCategory] = useState('upper');
 
   const dropRef = useRef(null);
   const inputRef = useRef(null);
@@ -285,7 +282,7 @@ export default function Dashboard() {
     return () => { mounted = false; };
   }, [user, router, supabase]);
 
-  /* ---------- drag & drop / paste (single file area) ---------- */
+  /* ---------- drag & drop / paste (single file area for removeBG/enhance) ---------- */
   useEffect(() => {
     const el = dropRef.current; if (!el) return;
     const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-slate-400'); };
@@ -406,30 +403,46 @@ export default function Dashboard() {
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, uploadToStorage, plan, user, localUrl, toasts]);
 
-  const runTryOn = useCallback(async (selections) => {
-    if (!file) return setErr('Pick a person image first.');
+  // ======== NEW: Try-On without prompts / background change ========
+  const runTryOn = useCallback(async () => {
+    if (!selectedModelUrl) return setErr('اختر مودل من المكتبة أولًا.');
+    if (!garmentFile) return setErr('ارفع صورة قطعة اللبس (PNG مفضل).');
+
     setBusy(true); setErr(''); setPhase('processing');
-    const imageUrl = await uploadToStorage(file);
-    const prompt = `dynamic: ${JSON.stringify(selections)}`;
-    const negativePrompt = 'lowres, artifacts, deformed';
-    const t = toasts.push('Running Try-On…', { progress: 10 });
-    let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
+
+    // 1) ارفع قطعة اللبس إلى التخزين
+    const clothUrl = await uploadToStorage(garmentFile);
+
+    // 2) جهّز رابط المودل كـ absolute (لأنه من /public)
+    const modelUrl = absUrl(selectedModelUrl);
+
+    const t = toasts.push('Running Try-On…', { progress: 12 });
+    let adv = 12; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
+
     try {
-      const r = await fetch('/api/tryon', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, prompt, negativePrompt, plan, user_email: user.email })
+      const r = await fetch('/api/tryon-vton', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelUrl,
+          clothUrl,
+          category, // upper | lower | dress | outer
+          // لا نرسل أي برومبت ولا تغييرات بالخلفية
+          preserve: { pose: true, identity: true, skin: true, background: true }
+        })
       });
       const j = await r.json(); setApiResponse(j);
-      if (!r.ok) throw new Error(j?.error || 'tryon failed');
+      if (!r.ok) throw new Error(j?.error || 'try-on failed');
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
+
       setResultUrl(out);
-      setHistory(h => [{ tool:'Try-On', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
+      setHistory(h => [{ tool:'Try-On (VTON)', inputThumb: modelUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
       setPhase('ready'); t.update({ progress: 100, msg: 'Try-On done ✓' }); setTimeout(() => t.close(), 700);
     } catch (e) {
       console.error(e); setPhase('error'); setErr('Failed to process.');
       t.update({ msg: 'Try-On failed', type: 'error' }); setTimeout(() => t.close(), 1500);
     } finally { clearInterval(iv); setBusy(false); }
-  }, [file, uploadToStorage, plan, user, localUrl, toasts]);
+  }, [selectedModelUrl, garmentFile, uploadToStorage, category, toasts]);
 
   const runModelSwap = useCallback(async () => {
     if (!file1 || !file2) return setErr('Pick both images.');
@@ -460,6 +473,11 @@ export default function Dashboard() {
     setFile(null); setLocalUrl(''); setResultUrl('');
     setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
     setErr(''); setPhase('idle'); setApiResponse(null); setCompare(false);
+
+    // Try-On specific
+    setSelectedModelId(null);
+    setGarmentFile(null); setGarmentLocal('');
+    setCategory('upper');
   };
 
   const handleRun = () => {
@@ -467,10 +485,19 @@ export default function Dashboard() {
       if (tool === 'removeBg') return runRemoveBg();
       if (tool === 'enhance')  return setShowEnhance(true);
     } else {
-      if (tool === 'tryon')     return setShowTryOn(true);
+      if (tool === 'tryon')     return runTryOn();
       if (tool === 'modelSwap') return runModelSwap();
     }
   };
+
+  // ذكي لتعطيل زر Run حسب الأداة
+  const canRun = useMemo(() => {
+    if (tool === 'modelSwap') return !!(file1 && file2) && !busy;
+    if (tool === 'tryon') return !!(selectedModelUrl && garmentFile) && !busy;
+    return !!file && !busy; // removeBg / enhance
+  }, [tool, file, busy, file1, file2, selectedModelUrl, garmentFile]);
+
+  const baseThumb = tool === 'tryon' ? selectedModelUrl : localUrl;
 
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
@@ -556,13 +583,13 @@ export default function Dashboard() {
 
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
-          {/* Presets row */}
+          {/* Presets / Intro row */}
           <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white/90 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Quick Presets</h1>
                 <p className="text-slate-600 text-xs sm:text-sm">
-                  Pick a preset or open <span className="font-semibold">Customize</span>.
+                  For Enhance use presets below. For Try-On: pick a model + upload garment — no prompts, original background stays.
                 </p>
               </div>
               {group === 'product' ? (
@@ -573,12 +600,7 @@ export default function Dashboard() {
                   ✨ Customize Enhance
                 </button>
               ) : (
-                <button
-                  onClick={() => { setTool('tryon'); setPendingTryOnPreset(null); setShowTryOn(true); }}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
-                >
-                  🧍 Customize Try-On
-                </button>
+                <div className="text-xs text-slate-600">Try-On uses Model Library (no presets)</div>
               )}
             </div>
 
@@ -600,18 +622,8 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700">Try-On</div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {TRYON_PRESETS.map((p) => (
-                    <PresetCard
-                      key={p.id}
-                      title={p.title}
-                      subtitle={p.subtitle}
-                      preview={p.preview}
-                      tag={p.tag}
-                      onClick={() => { setTool('tryon'); setPendingTryOnPreset(p.config); setShowTryOn(true); }}
-                    />
-                  ))}
+                <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                  اختر مودل ثم ارفع قطعة اللبس وحدد نوعها (Upper / Lower / Dress). الخلفية والوضعية والملامح تبقى نفسها 100%.
                 </div>
               </div>
             )}
@@ -647,45 +659,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Drop areas */}
-              {tool !== 'modelSwap' ? (
-                <div
-                  ref={dropRef}
-                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                  onClick={() => inputRef.current?.click()}
-                  title="Drag & drop / Click / Paste (Ctrl+V)"
-                >
-                  <input
-                    ref={inputRef}
-                    type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
-                  />
-                  {!localUrl && !resultUrl ? (
-                    <div className="text-center text-slate-500 text-sm">
-                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-slate-200">⬆</div>
-                      Drag & drop an image here, click to choose, or paste (Ctrl+V)
-                    </div>
-                  ) : (
-                    <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
-                      {compare && localUrl && resultUrl ? (
-                        <div className="relative max-w-full max-h-[70vh]">
-                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
-                          <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
-                               className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
-                        </div>
-                      ) : (
-                        <img
-                          src={resultUrl || localUrl}
-                          alt="preview"
-                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
-                          draggable={false}
-                          loading="lazy"
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
+              {/* Work area */}
+              {tool === 'modelSwap' ? (
                 <div className="m-3 sm:m-4 md:m-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Image 1 */}
@@ -714,13 +689,112 @@ export default function Dashboard() {
                     />
                   </div>
                 </div>
+              ) : tool === 'tryon' ? (
+                // ======== Try-On: Model Library + Garment upload ========
+                <div className="m-3 sm:m-4 md:m-5 grid gap-4">
+                  {/* اختيار المودل + نوع القطعة */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-slate-600">Pick a model</div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <select className="rounded-lg border px-2 py-1" onChange={e=>setCategory(e.target.value)} value={category}>
+                          <option value="upper">Upper</option>
+                          <option value="lower">Lower</option>
+                          <option value="dress">Dress</option>
+                          <option value="outer">Outer</option>
+                        </select>
+                      </div>
+                    </div>
+                    <ModelLibrary
+                      items={models}
+                      selectedId={selectedModelId}
+                      onSelect={setSelectedModelId}
+                    />
+                  </div>
+
+                  {/* رفع قطعة اللبس */}
+                  <div>
+                    <div className="text-xs text-slate-600 mb-2">Upload garment (PNG شفاف مفضل)</div>
+                    <div
+                      className="min-h-[160px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+                      onClick={() => garmentInputRef.current?.click()}
+                    >
+                      <input
+                        ref={garmentInputRef}
+                        type="file" accept="image/*" className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) { setGarmentFile(f); setGarmentLocal(URL.createObjectURL(f)); }
+                        }}
+                      />
+                      {!garmentLocal ? (
+                        <div className="text-center text-slate-500 text-sm">
+                          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-slate-200">⬆</div>
+                          Click to upload garment
+                        </div>
+                      ) : (
+                        <img src={garmentLocal} alt="garment" className="max-w-full max-h-[36vh] object-contain rounded-xl" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* معاينة */}
+                  <div className="rounded-xl border p-3 bg-slate-50">
+                    <div className="text-xs text-slate-500 mb-2">Preview</div>
+                    <div className="relative grid place-items-center min-h-[200px]">
+                      <img
+                        src={resultUrl || selectedModelUrl}
+                        alt="preview"
+                        className="max-w-full max-h-[60vh] object-contain rounded-xl"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // removeBg / enhance work area (صندوق واحد)
+                <div
+                  ref={dropRef}
+                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+                  onClick={() => inputRef.current?.click()}
+                  title="Drag & drop / Click / Paste (Ctrl+V)"
+                >
+                  <input
+                    ref={inputRef}
+                    type="file" accept="image/*" className="hidden"
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
+                  />
+                  {!localUrl && !resultUrl ? (
+                    <div className="text-center text-slate-500 text-sm">
+                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-slate-200">⬆</div>
+                      Drag & drop an image here, click to choose, or paste (Ctrl+V)
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
+                      {compare && baseThumb && resultUrl ? (
+                        <div className="relative max-w-full max-h-[70vh]">
+                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+                          <img src={baseThumb} alt="before" style={{opacity: compareOpacity/100}}
+                               className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
+                        </div>
+                      ) : (
+                        <img
+                          src={resultUrl || baseThumb}
+                          alt="preview"
+                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                          draggable={false}
+                          loading="lazy"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
                 <button
                   onClick={handleRun}
-                  disabled={(tool !== 'modelSwap' && !file) || (tool === 'modelSwap' && (!file1 || !file2)) || busy}
+                  disabled={!canRun}
                   className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                 >
                   {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On')}</>)}
@@ -746,7 +820,7 @@ export default function Dashboard() {
                     >
                       ↗ Open
                     </a>
-                    {localUrl && (
+                    {baseThumb && (
                       <>
                         <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2">
                           <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
@@ -834,7 +908,7 @@ export default function Dashboard() {
                   <div className="mt-3">
                     <div className="text-xs text-slate-500 mb-2">Final Preview</div>
                     <div style={frameStyle} className="relative rounded-xl overflow-hidden border border-slate-200">
-                      <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
+                      <div className="relative w-full min-h=[140px] sm:min-h-[160px] grid place-items-center">
                         {resultUrl ? (
                           <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
                         ) : (
@@ -846,7 +920,7 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {(tool === 'enhance' || tool === 'tryon') && (
+              {tool === 'enhance' && (
                 <div className="space-y-2 text-xs text-slate-600 mt-3">
                   <div>Choose a preset above or press <span className="font-semibold">Run/Customize</span>.</div>
                   {resultUrl && (
@@ -856,6 +930,12 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {tool === 'tryon' && (
+                <div className="text-xs text-slate-600 mt-3">
+                  Pick a model and upload garment. Background, pose and identity are preserved.
                 </div>
               )}
 
@@ -882,7 +962,9 @@ export default function Dashboard() {
                     <button key={i} onClick={() => setResultUrl(h.outputUrl)}
                       className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-50">
                       <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
-                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">{h.tool} • {new Date(h.ts).toLocaleTimeString()}</div>
+                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
+                        {h.tool} • {new Date(h.ts).toLocaleTimeString()}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -903,19 +985,6 @@ export default function Dashboard() {
                 initial={pendingEnhancePreset || undefined}
                 onChange={()=>{}}
                 onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
-              />
-            </div>
-          </motion.div>
-        )}
-        {showTryOn && (
-          <motion.div className="fixed inset-0 z-[100] grid place-items-center"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-black/55" onClick={()=>setShowTryOn(false)} />
-            <div className="relative w-full max-w-3xl mx-3">
-              <TryOnCustomizer
-                initial={pendingTryOnPreset || undefined}
-                onChange={()=>{}}
-                onComplete={(form) => { setShowTryOn(false); setPendingTryOnPreset(null); runTryOn(form); }}
               />
             </div>
           </motion.div>
@@ -950,6 +1019,53 @@ function FileDrop({ label, file, localUrl, onPick, inputRef }) {
       ) : (
         <img src={localUrl} alt={label} className="max-w-full max-h-[45vh] object-contain rounded-xl" />
       )}
+    </div>
+  );
+}
+
+function ModelLibrary({ items, selectedId, onSelect }) {
+  const [limit, setLimit] = useState(12);
+  const loaderRef = useRef(null);
+
+  useEffect(() => {
+    const io = new IntersectionObserver((ents) => {
+      if (ents[0].isIntersecting) setLimit(l => Math.min(items.length, l + 12));
+    }, { rootMargin: '200px' });
+    if (loaderRef.current) io.observe(loaderRef.current);
+    return () => io.disconnect();
+  }, [items.length]);
+
+  return (
+    <div>
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+        {items.slice(0, limit).map(m => {
+          const active = m.id === selectedId;
+          return (
+            <button
+              key={m.id}
+              onClick={() => onSelect(m.id)}
+              className={[
+                'group relative rounded-xl overflow-hidden border transition',
+                active ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200 hover:border-slate-300'
+              ].join(' ')}
+              title={m.name}
+            >
+              <img
+                src={m.src}
+                alt={m.name}
+                loading="lazy"
+                className="w-full aspect-[3/4] object-cover"
+                onError={(e) => { e.currentTarget.src = '/model-placeholder.webp'; }}
+              />
+              <span className="absolute bottom-1 left-1 rounded-md bg-black/40 text-[10px] text-white px-1">
+                {m.pose}
+              </span>
+              {active && <span className="absolute top-1 right-1 text-[10px] bg-white/90 px-1 rounded">Selected</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div ref={loaderRef} className="h-8 grid place-items-center text-xs text-slate-500">Loading…</div>
     </div>
   );
 }
@@ -1091,7 +1207,7 @@ async function exportRemoveBg(url) {
 }
 
 /* -------------------------------------------------------
-   Simple customizers (replace with your full UIs if you want)
+   Simple customizer (Enhance only)
 ------------------------------------------------------- */
 function EnhanceCustomizer({ initial, onChange, onComplete }) {
   return (
@@ -1113,26 +1229,6 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         <label className="space-y-1">
           <span className="text-slate-600">Colors</span>
           <input defaultValue={initial?.colorStyle || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="neutral whites, subtle grays" />
-        </label>
-      </div>
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={()=>onComplete(initial || {})}>Run</button>
-      </div>
-    </div>
-  );
-}
-function TryOnCustomizer({ initial, onChange, onComplete }) {
-  return (
-    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
-      <div className="text-sm font-semibold">Try-On Settings</div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-        <label className="space-y-1">
-          <span className="text-slate-600">Style</span>
-          <input defaultValue={initial?.style || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="streetwear fit" />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600">Setting</span>
-          <input defaultValue={initial?.setting || ''} onChange={()=>{}} className="w-full rounded-lg border px-2 py-1" placeholder="urban alley" />
         </label>
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
