@@ -345,14 +345,18 @@ export default function Dashboard() {
       .filter(Boolean).join(', ');
 
 const buildTryOnPrompt = (pieceType) => {
-  const base = `Two-image try-on. Keep IMAGE 1 person and background identical. Use the garment from IMAGE 2 exactly (fabric, color, pattern, buttons, logos) with correct scale and seams. Single photorealistic image. No text or collage.`;
-  if (pieceType !== 'upper') return base + ' Replace only the specified region.';
+  const region =
+    pieceType === 'upper' ? 'the TOP' :
+    pieceType === 'lower' ? 'the BOTTOM' :
+    'the FULL OUTFIT';
+
   return [
-    base,
-    'Replace ONLY the TOP.',
-    'If IMAGE 2 has LONG sleeves: CREATE sleeves and fully cover both arms to the wrists; no arm skin visible; remove any short-sleeve edges from IMAGE 1.',
-    'If IMAGE 2 has SHORT sleeves: keep arms exposed below the sleeve edge.',
-    'Align shoulder seams, armholes and cuffs; sleeves follow arm bend naturally; remove any remnants of the original shirt.',
+    'IMAGE 1 = person + background. IMAGE 2 = garment.',
+    `Put the garment from IMAGE 2 on ${region} of the person in IMAGE 1.`,
+    'Copy it EXACTLY: fabric, color, pattern, prints/logos, collar, pockets, buttons, stitching, and SLEEVE LENGTH.',
+    'If any part is missing or occluded, COMPLETE it (create long sleeves to the wrists if the garment has long sleeves).',
+    'Do NOT change the person, pose, hands, or background. Natural fit and shadows.',
+    'One single photorealistic image. No text / watermark / collage.'
   ].join(' ');
 };
 
