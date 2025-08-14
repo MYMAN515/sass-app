@@ -344,36 +344,16 @@ export default function Dashboard() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
-// استبدل دالة buildTryOnPrompt الحالية بهذه
 const buildTryOnPrompt = (pieceType) => {
-  const scope =
-    pieceType === 'upper'
-      ? 'Replace ONLY the UPPER-BODY clothing with the garment from IMAGE 2.'
-      : pieceType === 'lower'
-      ? 'Replace ONLY the LOWER-BODY clothing (pants/skirt) with the garment from IMAGE 2.'
-      : 'Replace the FULL OUTFIT with the garment from IMAGE 2 as a single-piece dress.';
-
-  // تركيز خاص على الأكمام في حالة القطعة العلوية
-  const sleeveBlock =
-    pieceType === 'upper'
-      ? `CRITICAL SLEEVES RULES:
-- Derive sleeve LENGTH, shape and cuff style directly from IMAGE 2. COPY IT EXACTLY.
-- If IMAGE 1 arms are bare but the garment in IMAGE 2 has LONG SLEEVES: SYNTHESIZE sleeves and fully cover both arms down to the wrists; hide all visible arm skin under fabric; no traces of the old short sleeves.
-- If IMAGE 2 sleeves are SHORT: keep the arms exposed below the sleeve edge; do not extend.
-- Align shoulder seams and armholes accurately; match sleeve width, taper and cuff position; keep placket alignment and collar shape from the garment.`
-      : '';
-
+  const base = `Two-image try-on. Keep IMAGE 1 person and background identical. Use the garment from IMAGE 2 exactly (fabric, color, pattern, buttons, logos) with correct scale and seams. Single photorealistic image. No text or collage.`;
+  if (pieceType !== 'upper') return base + ' Replace only the specified region.';
   return [
-    'TASK: Two-image virtual try-on (IMAGE 1 = person+background, IMAGE 2 = garment). Produce one photorealistic result.',
-    'Keep IMAGE 1 IDENTICAL: same face, hair, body shape, pose, camera and BACKGROUND. Do not crop or reframe.',
-    scope,
-    'Use the garment from IMAGE 2 EXACTLY: fabric, color, weave, pattern, prints/logos, pockets, collar, buttons and stitching with the same position and scale.',
-    sleeveBlock,
-    'FIT & GEOMETRY: correct scaling and perspective; shoulder seams sit in the right place; sleeves follow arm bend and foreshortening; sleeve hem perpendicular to arm axis; realistic drape, wrinkles and seams.',
-    'OCCLUSION: sleeves go around arms naturally; DO NOT cover hands unless the garment does; remove any remnants of the original clothing; do not stack layers.',
-    'LIGHTING: match scene lighting and shadows; keep skin tone and background unchanged.',
-    'OUTPUT: a single sharp photorealistic image. No text, no watermark, no split-screen, no collage.'
-  ].filter(Boolean).join('\n');
+    base,
+    'Replace ONLY the TOP.',
+    'If IMAGE 2 has LONG sleeves: CREATE sleeves and fully cover both arms to the wrists; no arm skin visible; remove any short-sleeve edges from IMAGE 1.',
+    'If IMAGE 2 has SHORT sleeves: keep arms exposed below the sleeve edge.',
+    'Align shoulder seams, armholes and cuffs; sleeves follow arm bend naturally; remove any remnants of the original shirt.',
+  ].join(' ');
 };
 
 
