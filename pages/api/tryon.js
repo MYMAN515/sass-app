@@ -1,4 +1,3 @@
-// /pages/api/tryon.js
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = { api: { bodyParser: true } };
@@ -7,20 +6,25 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Only POST allowed' });
 
   const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
-
-  // نفس المدخلات + أضف personUrl (صورة المودل) و garmentUrl (صورة الملابس)
-  const { image1, image2,prompt, plan, user_email } = req.body;
+  // ضع الهـاش الخاص بنسخة flux-vton هنا أو في env باسم TRYON_VERSION_ID
+  const TRYON_VERSION_ID ='a02643ce418c0e12bad371c4adbfaec0dd1cb34b034ef37650ef205f92ad6199';
 
   if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing Replicate token' });
+  if (!TRYON_VERSION_ID) return res.status(500).json({ error: 'Missing TRYON_VERSION_ID env' });
 
-  // نحتاج صورتين: المودل + الملابس (نقبل garmentUrl أو imageUrl كمرادف)
-  if (!image1 || !image2 || !prompt || !user_email) {
+  // من الفرونت: image1 = الشخص، image2 = الملابس، pieceType = upper|lower|dress
+  const { image1, image2, pieceType, user_email } = req.body;
+
+  if (!image1 || !image2 || !user_email) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   // جلسة Supabase
   const supabase = createPagesServerClient({ req, res });
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
   if (!session || sessionError) return res.status(401).json({ error: 'Unauthorized' });
 
   // بيانات المستخدم
@@ -34,8 +38,11 @@ export default async function handler(req, res) {
   if (userData.plan !== 'Pro' && userData.credits <= 0)
     return res.status(403).json({ error: 'No credits left' });
 
-  // نفس استدعاء enhance بالضبط: /v1/predictions + version فقط (بدون model)
-  // NOTE: غيّر أسماء الحقول هنا لو موديلك يتطلب تسميات مختلفة.
+  // تحويل pieceType إلى part حسب الموديل
+  const partMap = { upper: 'upper_body', lower: 'lower_body', dress: 'full_body' };
+  const part = partMap[(pieceType || '').toLowerCase()] || 'upper_body';
+
+  // استدعاء Replicate: /v1/predictions + version (بدون model)
   const start = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -43,15 +50,11 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      version: "flux-kontext-apps/multi-image-kontext-max",          // ← أهم فرق: نسخة موديل الـ Try-On
+      version: TRYON_VERSION_ID,
       input: {
-        // شائع في كثير من موديلات الـ Try-On:
-        // معظم موديلات الـ Try-On تستخدم هذين الاسمين:
-        input_image_1: image1, // صورة الشخص/المودل
-        input_image_2: image2, // صورة الملابس
-        prompt,
-        output_format: 'jpg',
-        safety_tolerance: 0,
+        image: image1,      // صورة الشخص
+        garment: image2,    // صورة القطعة
+        part,               // upper_body | lower_body | full_body
       },
     }),
   });
@@ -65,7 +68,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // نفس الـ polling
+  // Poll على نفس أسلوب enhance
   const statusUrl = startData.urls.get;
   let output = null;
 
@@ -76,20 +79,26 @@ export default async function handler(req, res) {
     const statusData = await statusRes.json();
 
     if (statusData.status === 'succeeded') {
-      output = statusData.output;
+      output = statusData.output; // حسب السكيمة: string URI
       break;
     }
     if (statusData.status === 'failed') {
       return res.status(500).json({ error: statusData?.error || 'Image generation failed' });
     }
+
     await new Promise((r) => setTimeout(r, 1500));
   }
 
   if (!output) return res.status(500).json({ error: 'Image generation timed out' });
 
-  const generatedImage = Array.isArray(output) ? output[0] : output;
+  const generatedImage =
+    typeof output === 'string'
+      ? output
+      : Array.isArray(output)
+      ? output[0]
+      : output?.url || output;
 
-  // نفس خصم الكردت
+  // خصم كريدت لغير الـ Pro
   if (userData.plan !== 'Pro') {
     await supabase.rpc('decrement_credit', { user_email });
   }
