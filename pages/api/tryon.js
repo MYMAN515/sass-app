@@ -49,7 +49,7 @@ export default async function handler(req, res) {
         // معظم موديلات الـ Try-On تستخدم هذين الاسمين:
         input_image_1: image1, // صورة الشخص/المودل
         input_image_2: image2, // صورة الملابس
-        prompt : "Make the model wear the cloth , make it fit and look exatilcy as the cloth photo , make 4 virions of the photo",
+        prompt,
         output_format: 'jpg',
         safety_tolerance: 0,
       },
