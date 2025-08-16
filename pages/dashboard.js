@@ -448,7 +448,7 @@ const runTryOn = useCallback(async () => {
       body: JSON.stringify({
         image1: modelUrlAbs,       // IMAGE 1
         image2: clothUrl,          // IMAGE 2
-        prompt,                    // نص الـTry-On
+        pieceType,                    // نص الـTry-On
         plan,
         user_email: user.email
       })
