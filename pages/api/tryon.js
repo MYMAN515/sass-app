@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 
   // نفس المدخلات + أضف personUrl (صورة المودل) و garmentUrl (صورة الملابس)
-  const { image1, image2, plan, user_email } = req.body;
+  const { image1, image2,prompt, plan, user_email } = req.body;
 
   if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing Replicate token' });
 
