@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 
   // نفس المدخلات + أضف personUrl (صورة المودل) و garmentUrl (صورة الملابس)
-  const { image1, image2, prompt, plan, user_email } = req.body;
+  const { image1, image2, plan, user_email } = req.body;
 
   if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing Replicate token' });
 
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
         // معظم موديلات الـ Try-On تستخدم هذين الاسمين:
         input_image_1: image1, // صورة الشخص/المودل
         input_image_2: image2, // صورة الملابس
-        prompt,
+        prompt : "Make the model wear the cloth , make it fit and look exatilcy as the cloth photo",
         output_format: 'jpg',
         safety_tolerance: 2,
       },
