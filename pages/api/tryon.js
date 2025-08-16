@@ -60,7 +60,7 @@ export default async function handler(req, res) {
   // ------- Poll أدق لمدة دقيقة -------
   const statusUrl = startData.urls.get;
   const startedAt = Date.now();
-  const maxWaitMs = 60_000;            // ⏱️ دقيقة واحدة بالضبط
+  const maxWaitMs = 90_000;            // ⏱️ دقيقة واحدة بالضبط
   let intervalMs = 1200;               // يبدأ 1.2s
   const maxIntervalMs = 4000;
 
