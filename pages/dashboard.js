@@ -351,12 +351,7 @@ const buildTryOnPrompt = (pieceType) => {
     'the FULL OUTFIT';
 
   return [
-    'IMAGE 1 = person + background. IMAGE 2 = garment.',
-    `Put the garment from IMAGE 2 on ${region} of the person in IMAGE 1.`,
-    'Copy it EXACTLY: fabric, color, pattern, prints/logos, collar, pockets, buttons, stitching, and SLEEVE LENGTH.',
-    'If any part is missing or occluded, COMPLETE it (create long sleeves to the wrists if the garment has long sleeves).',
-    'Do NOT change the person, pose, hands, or background. Natural fit and shadows.',
-    'One single photorealistic image. No text / watermark / collage.'
+    `Make the model wear the cloth , make it fit and look exatilcy as the cloth photo , make 2 virions of the photo with same cloth in the another pic ,Put the cloth  on ${region} of the person `
   ].join(' ');
 };
 
