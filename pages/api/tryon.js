@@ -9,13 +9,12 @@ export default async function handler(req, res) {
   const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 
   // نفس المدخلات + أضف personUrl (صورة المودل) و garmentUrl (صورة الملابس)
-  const { imageUrl, garmentUrl, personUrl, prompt, plan, user_email } = req.body;
+  const { image1, image2, prompt, plan, user_email } = req.body;
 
   if (!REPLICATE_TOKEN) return res.status(500).json({ error: 'Missing Replicate token' });
 
   // نحتاج صورتين: المودل + الملابس (نقبل garmentUrl أو imageUrl كمرادف)
-  const cloth = garmentUrl || imageUrl;
-  if (!personUrl || !cloth || !prompt || !user_email) {
+  if (!image1 || !image2 || !prompt || !user_email) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -47,8 +46,9 @@ export default async function handler(req, res) {
       version: "flux-kontext-apps/multi-image-kontext-max",          // ← أهم فرق: نسخة موديل الـ Try-On
       input: {
         // شائع في كثير من موديلات الـ Try-On:
-        input_image_1: personUrl,         // صورة الشخص/المودل
-        input_image_2: cloth,             // صورة القطعة/الملابس
+        // معظم موديلات الـ Try-On تستخدم هذين الاسمين:
+        input_image_1: image1, // صورة الشخص/المودل
+        input_image_2: image2, // صورة الملابس
         prompt,
         output_format: 'jpg',
         safety_tolerance: 2,
