@@ -41,35 +41,7 @@ export default function Page() {
   )
 }
 
-/* -------------------------- UI — HEADER -------------------------- */
-function Header() {
-  return (
-    <header className="sticky top-0 z-40 border-b border-zinc-100/60 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-      <div
-        className="
-          flex w-full items-center justify-between gap-3 px-4 py-3 md:py-4
-        "
-      >
-        {/* Nav links — visible on all sizes; scrollable on narrow widths */}
-        <nav
-          className="
-            flex flex-1 items-center gap-4 lg:gap-6 text-sm text-zinc-700
-            overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none]
-            [&::-webkit-scrollbar]:hidden
-          "
-        >
-          <a href="#features" className="hover:text-zinc-900 leading-none">Features</a>
-          <a href="#how" className="hover:text-zinc-900 leading-none">How it works</a>
-          <a href="#security" className="hover:text-zinc-900 leading-none">Security</a>
-          <a href="#faq" className="hover:text-zinc-900 leading-none">FAQ</a>
-        </nav>
 
-        {/* No CTAs here per request */}
-        <div className="h-6 w-6 shrink-0" aria-hidden />
-      </div>
-    </header>
-  )
-}
 
 /* --------------------------- UI — HERO --------------------------- */
 function Hero() {
