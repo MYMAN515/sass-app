@@ -6,23 +6,23 @@ import Link from "next/link";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 
 /**
- * TryOne Cloud Studio — Cute/Weird Pastel B2B Landing (RTL)
- * — Light theme, Off‑White background, high‑contrast Ink text.
- * — Mobile-first, accessible, gently animated (respects reduced-motion).
- * — Sections: Header/Nav, Hero (Before/After + Upload), Trust Bar, How it Works,
- *   ROI Dial, Use Cases Tabs, Features Grid, Pricing Sticker Book,
- *   Integrations & Security, FAQ with mini-demos, Final CTA.
+ * TryOne Cloud Studio — Cute/Weird Pastel B2B Landing (LTR, English)
+ * Light theme, Off‑White background, high‑contrast Ink text.
+ * Mobile-first, accessible, gently animated (respects reduced-motion).
+ * Sections: Header/Nav, Hero (Before/After + Upload), Trust Bar, How it Works,
+ * ROI Dial, Use Cases Tabs, Features Grid, Pricing Sticker Book,
+ * Integrations & Security, FAQ with mini-demos, Final CTA.
  *
- * Notes:
- * - TailwindCSS required.
- * - Fonts recommended (global): Cairo/IBM Plex Sans Arabic for Arabic, Inter for Latin.
- * - All visuals are inline SVG/gradients; no external images.
- * - RTL by default; adjust container `dir` if your app sets LTR globally.
+ * Requirements covered:
+ * - Visual before/after slider with upload or sample pick, tap-to-swap on mobile.
+ * - Clear value above the fold + subtle hint to scroll.
+ * - Pastel palette (Lavender, Sky, Mint, Peach, Butter) on Off‑White background.
+ * - AA contrast targets for small text; focus states; no pure-black UI.
  */
 
 export default function TryOneLandingPage() {
   return (
-    <main dir="rtl" className="relative min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+    <main dir="ltr" className="relative min-h-screen bg-[var(--bg)] text-[var(--ink)]">
       <GlobalStyles />
       <Header />
       <Hero />
@@ -50,19 +50,19 @@ function Header() {
           <span className="text-sm font-bold tracking-tight">TryOne Cloud Studio</span>
         </div>
         <nav className="hidden items-center gap-4 text-sm sm:flex">
-          <a href="#how" className="hover:opacity-80">كيف يشتغل؟</a>
-          <a href="#roi" className="hover:opacity-80">العائد</a>
-          <a href="#features" className="hover:opacity-80">المميزات</a>
-          <a href="#pricing" className="hover:opacity-80">الأسعار</a>
-          <a href="#faq" className="hover:opacity-80">الأسئلة</a>
+          <a href="#how" className="hover:opacity-80">How it works</a>
+          <a href="#roi" className="hover:opacity-80">ROI</a>
+          <a href="#features" className="hover:opacity-80">Features</a>
+          <a href="#pricing" className="hover:opacity-80">Pricing</a>
+          <a href="#faq" className="hover:opacity-80">FAQ</a>
         </nav>
         <div className="flex items-center gap-2">
           <Link
             href="/dashboard"
             className="rounded-2xl bg-[var(--lav)] px-4 py-2 text-sm font-bold text-[var(--ink)] shadow-[0_8px_24px_rgba(200,182,255,.35)] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lav)]"
-            aria-label="جرّب الآن"
+            aria-label="Try now"
           >
-            جرّب الآن
+            Try now
           </Link>
         </div>
       </div>
@@ -94,29 +94,29 @@ function Hero() {
     <section className="relative mx-auto max-w-7xl px-4 pt-8 sm:px-6">
       <div className="grid items-center gap-8 md:grid-cols-2">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(31,41,55,.08)] bg-white/70 px-3 py-1 text-[11px] font-semibold">Try‑On في 3 ثواني</div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(31,41,55,.08)] bg-white/70 px-3 py-1 text-[11px] font-semibold">Try‑On in 3 seconds</div>
           <h1 className="mt-3 text-balance text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl">
-            منتجك… <span className="underline decoration-[var(--lav)] decoration-4 underline-offset-4">يلبس نفسه!</span>
+            Your product… <span className="underline decoration-[var(--lav)] decoration-4 underline-offset-4">wears itself!</span>
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-7 sm:text-base">
-            جرّب <strong>Try‑On & Enhance</strong> لمنتجاتك خلال ثوانٍ — صور واقعية بدون جلسات تصوير. منصة للمتاجر والوكالات.
+            Try <strong>Try‑On & Enhance</strong> for your catalog in seconds — photoreal results without photo shoots. Built for stores and agencies.
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <a href="#demo" className="inline-flex items-center justify-center rounded-xl bg-[var(--sky)] px-5 py-3 text-sm font-semibold text-[var(--ink)] shadow-[0_10px_24px_rgba(191,230,255,.45)] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sky)]">
-              جرّب صورة عيّنة
-              <span className="mr-1" aria-hidden>↗</span>
+              Try a sample image
+              <span className="ml-1" aria-hidden>↗</span>
             </a>
-            <Link href="/signup" className="inline-flex items-center justify-center rounded-xl border border-[color:rgba(31,41,55,.08)] bg-white/70 px-5 py-3 text-sm font-semibold transition hover:bg-white">
-              ابدأ مجاناً
+            <Link href="/login" className="inline-flex items-center justify-center rounded-xl border border-[color:rgba(31,41,55,.08)] bg-white/70 px-5 py-3 text-sm font-semibold transition hover:bg-white">
+              Start free
             </Link>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-            <Badge>بدون كرت ائتمان</Badge>
-            <Badge>تصدير عالي الدقة</Badge>
+            <Badge>No credit card</Badge>
+            <Badge>High‑res export</Badge>
             <Badge>API & SSO</Badge>
           </div>
           <div className="mt-4 text-xs opacity-80">
-            خفّض وقت الإخراج حتى <strong>×10</strong> ووفّر تكلفة التصوير حتى <strong>−70%</strong>.
+            Cut time up to <strong>×10</strong> and reduce shoot costs up to <strong>−70%</strong>.
           </div>
         </div>
 
@@ -138,7 +138,7 @@ function Hero() {
       {/* hint to scroll */}
       <div className="mt-8 grid place-items-center">
         <div className="flex items-center gap-2 text-xs opacity-70">
-          <span>فيه أشياء مهمّة تحت</span>
+          <span>There’s more below</span>
           <span aria-hidden>↓</span>
         </div>
       </div>
@@ -158,17 +158,15 @@ function Badge({ children }: { children: React.ReactNode }) {
 function HeroStudio() {
   const [before, setBefore] = useState<string | null>(null);
   const [after, setAfter] = useState<string | null>(null);
-  const [pos, setPos] = useState(58); // reveal % for after image
+  const [pos, setPos] = useState(58);
   const prefersReducedMotion = useReducedMotion();
   const isMobile = useIsMobile();
 
-  // handle tap-to-swap on mobile
   const onTapSwap = () => {
     if (!isMobile) return;
     setPos((p) => (p > 50 ? 0 : 100));
   };
 
-  // simple enhancement simulation: we reuse same image but brighten/contrast on the after side
   const AfterLayer = () => (
     <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }} aria-hidden>
       <ImageOrIllustration src={after ?? before} enhanced />
@@ -188,9 +186,9 @@ function HeroStudio() {
         {/* slider handle */}
         <motion.button
           type="button"
-          aria-label="حرّك للمقارنة"
+          aria-label="Drag to compare"
           className="absolute top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full border border-[color:rgba(31,41,55,.12)] bg-white text-sm font-bold shadow-md"
-          style={{ right: `${100 - pos}%`, transform: "translate(50%,-50%)" }}
+          style={{ left: `${pos}%`, transform: "translate(-50%,-50%)" }}
           initial={false}
           animate={prefersReducedMotion ? { scale: 1 } : { scale: [1, 1.06, 1] }}
           transition={{ duration: 1.8, repeat: prefersReducedMotion ? 0 : Infinity }}
@@ -210,8 +208,8 @@ function HeroStudio() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] opacity-80">
-        <span className="rounded-full bg-[var(--mint)]/60 px-2 py-0.5">Tap بالموبايل للتبديل</span>
-        <span className="rounded-full bg-[var(--peach)]/60 px-2 py-0.5">أو اسحب السلايدر</span>
+        <span className="rounded-full bg-[var(--mint)]/60 px-2 py-0.5">Tap on mobile to swap</span>
+        <span className="rounded-full bg-[var(--peach)]/60 px-2 py-0.5">Or drag the slider</span>
       </div>
     </div>
   );
@@ -245,7 +243,7 @@ function ImageOrIllustration({ src, enhanced = false }: { src: string | null | u
   return (
     <img
       src={src}
-      alt="معاينة المنتج"
+      alt="Product preview"
       className={`absolute inset-0 h-full w-full object-cover ${enhanced ? "contrast-[1.2] brightness-[1.1] saturate-[1.05]" : "blur-[.2px]"}`}
       draggable={false}
     />
@@ -271,15 +269,15 @@ function DropUpload({ onChange }: { onChange: (dataUrl: string) => void }) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="inline-flex items-center gap-2 rounded-xl border border-[color:rgba(31,41,55,.08)] bg-white px-3 py-2 text-xs">
         <button onClick={onPick} className="rounded-lg bg-[var(--butter)] px-3 py-1 font-semibold shadow-sm transition hover:brightness-105">
-          ارفع صورة
+          Upload image
         </button>
-        <span className="opacity-70">أو اختر عينة ↓</span>
+        <span className="opacity-70">or pick a sample ↓</span>
         <SamplePicker onSelect={onChange} />
       </div>
-      <div className="text-[11px] opacity-70">ينبّهك بنبضة لطيفة عند الاكتمال</div>
+      <div className="text-[11px] opacity-70">A gentle pulse indicates completion</div>
       <input
         ref={inputRef}
         type="file"
@@ -300,7 +298,7 @@ function DropUpload({ onChange }: { onChange: (dataUrl: string) => void }) {
             className="rounded-full bg-[var(--mint)] px-3 py-1 text-[11px] font-semibold"
             aria-live="polite"
           >
-            جاري المعالجة…
+            Processing…
           </motion.div>
         )}
       </AnimatePresence>
@@ -309,7 +307,6 @@ function DropUpload({ onChange }: { onChange: (dataUrl: string) => void }) {
 }
 
 function SamplePicker({ onSelect }: { onSelect: (url: string) => void }) {
-  // three SVG samples rendered to data URLs lazily
   const samples = useMemo(() => [sampleSVG(1), sampleSVG(2), sampleSVG(3)], []);
   return (
     <div className="flex items-center gap-1">
@@ -317,8 +314,8 @@ function SamplePicker({ onSelect }: { onSelect: (url: string) => void }) {
         <button
           key={i}
           onClick={() => onSelect(s)}
-          aria-label={`اختر عينة ${i + 1}`}
-          title="اختر عينة"
+          aria-label={`Pick sample ${i + 1}`}
+          title="Pick sample"
           className="h-8 w-8 overflow-hidden rounded-lg border border-[color:rgba(31,41,55,.08)] bg-white"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -365,9 +362,9 @@ function useIsMobile() {
 function TrustBar() {
   const prefersReducedMotion = useReducedMotion();
   const metrics = [
-    { k: "×10", t: "سرعة الإخراج" },
-    { k: "−70%", t: "تكلفة أقل" },
-    { k: "100k+", t: "SKUs معالجة" },
+    { k: "×10", t: "Speed to output" },
+    { k: "−70%", t: "Lower cost" },
+    { k: "100k+", t: "SKUs processed" },
   ];
   const logos = ["Shopify", "Woo", "BigCommerce", "Bynder", "Akeneo", "S3"];
   return (
@@ -403,12 +400,12 @@ function TrustBar() {
 function HowItWorks() {
   return (
     <section id="how" className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <h2 className="mb-4 text-2xl font-extrabold">كيف يشتغل؟</h2>
+      <h2 className="mb-4 text-2xl font-extrabold">How it works</h2>
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { t: "ارفع المنتج", d: "صور المنتج أو ملفات FLAT/Packshot", c: "#FFF4C2" },
-          { t: "اختر موديل/ستايل", d: "قوالب موديل وتوزيع إضاءة متسق", c: "#CFF6E4" },
-          { t: "جاهز للنشر", d: "مخرجات متسقة لكل القنوات", c: "#FFDCCB" },
+          { t: "Upload product", d: "Product photos or flats/packshots", c: "#FFF4C2" },
+          { t: "Pick model/style", d: "Model presets & consistent lighting", c: "#CFF6E4" },
+          { t: "Ready to publish", d: "Consistent outputs for every channel", c: "#FFDCCB" },
         ].map((card, i) => (
           <ComicPanel key={i} {...card} index={i} />
         ))}
@@ -474,7 +471,7 @@ function ROICalculator() {
   }, [skus, mins, cost]);
 
   const ai = useMemo(() => {
-    const seconds = skus * 3; // 3s per try-on
+    const seconds = skus * 3; // ~3s per try-on
     const minutes = Math.ceil(seconds / 60) + 5; // overhead
     const costPerSku = Math.max(1, Math.round(cost * 0.3));
     const costTotal = skus * costPerSku;
@@ -489,21 +486,21 @@ function ROICalculator() {
     <section id="roi" className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
       <div className="grid items-center gap-6 md:grid-cols-2">
         <div className="rounded-2xl border border-[color:rgba(31,41,55,.08)] bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-extrabold">حاسبة ROI</h3>
+          <h3 className="text-lg font-extrabold">ROI Calculator</h3>
           <div className="mt-4 grid gap-4">
-            <Slider label="عدد المنتجات" value={skus} min={10} max={5000} step={10} onChange={setSkus} />
-            <Slider label="وقت التصوير (دقيقة/منتج)" value={mins} min={2} max={60} step={1} onChange={setMins} />
-            <Slider label="تكلفة التصوير (للمنتج)" value={cost} min={5} max={200} step={1} onChange={setCost} prefix="$" />
+            <Slider label="Number of products" value={skus} min={10} max={5000} step={10} onChange={setSkus} />
+            <Slider label="Shoot time (min/item)" value={mins} min={2} max={60} step={1} onChange={setMins} />
+            <Slider label="Photo cost (per item)" value={cost} min={5} max={200} step={1} onChange={setCost} prefix="$" />
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3 text-center text-sm">
             <div className="rounded-xl bg-[var(--butter)]/60 p-3">
-              <div className="text-xs opacity-70">تقليدي</div>
-              <div className="font-bold">{traditional.minutes.toLocaleString()} د</div>
+              <div className="text-xs opacity-70">Traditional</div>
+              <div className="font-bold">{traditional.minutes.toLocaleString()} min</div>
               <div className="font-bold">${traditional.costTotal.toLocaleString()}</div>
             </div>
             <div className="rounded-xl bg-[var(--mint)]/60 p-3">
               <div className="text-xs opacity-70">AI Studio</div>
-              <div className="font-bold">{ai.minutes.toLocaleString()} د</div>
+              <div className="font-bold">{ai.minutes.toLocaleString()} min</div>
               <div className="font-bold">${ai.costTotal.toLocaleString()}</div>
             </div>
           </div>
@@ -511,7 +508,7 @@ function ROICalculator() {
         <div className="grid place-items-center">
           <Gauge percent={avgSave} />
           <div className="mt-3 text-center text-sm">
-            توفير متوسّط <strong>{avgSave}%</strong> (وقت + تكلفة)
+            Average savings <strong>{avgSave}%</strong> (time + cost)
           </div>
         </div>
       </div>
@@ -544,8 +541,8 @@ function Slider({ label, value, min, max, step, onChange, prefix }: { label: str
 
 function Gauge({ percent }: { percent: number }) {
   const p = Math.max(0, Math.min(100, percent));
-  const r = 120; // radius
-  const c = Math.PI * r; // half circle length (we'll render 180deg)
+  const r = 120;
+  const c = Math.PI * r;
   const dash = (p / 100) * c;
   return (
     <svg viewBox="0 0 300 180" className="w-[min(92vw,28rem)]">
@@ -559,14 +556,13 @@ function Gauge({ percent }: { percent: number }) {
         <path d={arcPath(r)} fill="none" stroke="#E5E7EB" strokeWidth={18} strokeLinecap="round" />
         <path d={arcPath(r)} fill="none" stroke="url(#gg)" strokeDasharray={`${dash} ${c}`} strokeWidth={18} strokeLinecap="round" />
         <text x="0" y="-20" textAnchor="middle" className="fill-[var(--ink)] text-3xl font-extrabold">{p}%</text>
-        <text x="0" y="0" textAnchor="middle" className="fill-[var(--ink)] text-sm opacity-70">توفير</text>
+        <text x="0" y="0" textAnchor="middle" className="fill-[var(--ink)] text-sm opacity-70">Savings</text>
       </g>
     </svg>
   );
 }
 
 function arcPath(r: number) {
-  // semicircle from left to right
   const start = `${-r},0`;
   const end = `${r},0`;
   return `M ${start} A ${r} ${r} 0 0 1 ${end}`;
@@ -575,10 +571,10 @@ function arcPath(r: number) {
 /* ------------------------------ Use Cases Tabs ---------------------------- */
 function UseCases() {
   const tabs = [
-    { k: "Retail", c: "var(--butter)", benefits: ["تنميط الإضاءة", "موديلات ثابتة", "تخفيض المرتجعات"] },
-    { k: "Marketplaces", c: "var(--sky)", benefits: ["مطابقة متطلبات القنوات", "قصّ تلقائي", "مقاسات متّسقة"] },
-    { k: "Agencies", c: "var(--lav)", benefits: ["تعاون الفريق", "قوالب علامة", "تسليم بالجملة"] },
-    { k: "SMB", c: "var(--mint)", benefits: ["سهولة البدء", "تكلفة منخفضة", "نتائج سريعة"] },
+    { k: "Retail", c: "var(--butter)", benefits: ["Lighting normalization", "Consistent models", "Lower returns"] },
+    { k: "Marketplaces", c: "var(--sky)", benefits: ["Channel requirements compliance", "Auto cutout", "Consistent sizing"] },
+    { k: "Agencies", c: "var(--lav)", benefits: ["Team collaboration", "Brand templates", "Bulk delivery"] },
+    { k: "SMB", c: "var(--mint)", benefits: ["Easy start", "Low cost", "Fast results"] },
   ] as const;
   const [active, setActive] = useState(0);
   return (
@@ -602,7 +598,7 @@ function UseCases() {
           <BeforeAfterMini />
         </div>
         <ul className="grid gap-2 text-sm">
-          <li className="opacity-70">وش يفيدك فعلاً:</li>
+          <li className="opacity-70">What you actually get:</li>
           {tabs[active].benefits.map((b) => (
             <li key={b} className="flex items-center gap-2">
               <span aria-hidden>✔</span>
@@ -649,13 +645,13 @@ function FeaturesGrid() {
   ];
   return (
     <section id="features" className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <h3 className="mb-4 text-2xl font-extrabold">مميزات كأنها ملصقات مخبرية</h3>
+      <h3 className="mb-4 text-2xl font-extrabold">Features that feel like lab stickers</h3>
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {items.map((it) => (
           <div key={it.t} className="group relative overflow-hidden rounded-2xl border border-[color:rgba(31,41,55,.08)] bg-white p-4 shadow-sm transition hover:shadow-md">
             <div className="text-3xl" aria-hidden>{it.e}</div>
             <div className="mt-2 text-sm font-bold">{it.t}</div>
-            <div className="text-xs opacity-70">حلول واقعية بدون جلسات تصوير</div>
+            <div className="text-xs opacity-70">Photoreal outputs without photo shoots</div>
             <div className="pointer-events-none absolute inset-x-3 bottom-3 hidden rounded-xl border border-dashed border-[color:rgba(31,41,55,.18)] bg-[var(--mint)]/40 px-2 py-1 text-[11px] text-[var(--ink)] shadow-sm group-hover:block">
               Setting Snapshot: {it.snap}
             </div>
@@ -669,9 +665,9 @@ function FeaturesGrid() {
 /* --------------------------------- Pricing -------------------------------- */
 function Pricing() {
   const plans = [
-    { name: "Starter", price: "$0", tag: "🚀", perks: ["100 صورة/شهر", "علامة مائية خفيفة", "تصدير Web"], bg: "var(--butter)" },
-    { name: "Team", price: "$199", tag: "🎯", perks: ["2k صورة/شهر", "بلا علامة", "API/SSO"], bg: "var(--lav)" },
-    { name: "Enterprise", price: "تواصل", tag: "🏢", perks: ["غير محدود", "SLA & SSO", "أمن متقدم"], bg: "var(--mint)" },
+    { name: "Starter", price: "$0", tag: "🚀", perks: ["100 images/mo", "Light watermark", "Web export"], bg: "var(--butter)" },
+    { name: "Team", price: "$199", tag: "🎯", perks: ["2k images/mo", "No watermark", "API/SSO"], bg: "var(--lav)" },
+    { name: "Enterprise", price: "Contact", tag: "🏢", perks: ["Unlimited", "SLA & SSO", "Advanced security"], bg: "var(--mint)" },
   ];
   return (
     <section id="pricing" className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -690,13 +686,13 @@ function Pricing() {
               ))}
             </ul>
             <div className="px-5 pb-5">
-              <Link href="/contact" className="inline-flex items-center justify-center rounded-xl border border-[color:rgba(31,41,55,.18)] bg-white px-4 py-2 text-sm font-bold hover:bg-[var(--mint)]/40">اطلب خطة شركتك</Link>
+              <Link href="/pricing" className="inline-flex items-center justify-center rounded-xl border border-[color:rgba(31,41,55,.18)] bg-white px-4 py-2 text-sm font-bold hover:bg-[var(--mint)]/40">Request a company plan</Link>
             </div>
           </div>
         ))}
       </div>
       <div className="mt-4 rounded-2xl border border-[color:rgba(31,41,55,.08)] bg-white p-4 text-sm">
-        ما الذي تدفعه فعلاً؟ — التصوير التقليدي: معدات + استوديو + أشخاص + وقت. الذكاء الاصطناعي: اشتراك + دقائق معالجة.
+        What are you actually paying for? — Traditional: gear + studio + people + time. AI: subscription + processing minutes.
       </div>
     </section>
   );
@@ -712,19 +708,19 @@ function IntegrationsSecurity() {
           <h4 className="text-lg font-extrabold">Integrations</h4>
           <div className="mt-3 flex flex-wrap gap-2 text-sm">
             {ints.map((i) => (
-              <span key={i} className="rounded-full border border-[color:rgba(31,41,55,.12)] bg-white px-3 py-1" title="كيف يندمج معنا؟">
+              <span key={i} className="rounded-full border border-[color:rgba(31,41,55,.12)] bg-white px-3 py-1" title="How does it integrate?">
                 {i}
               </span>
             ))}
           </div>
         </div>
         <div className="rounded-2xl border border-[color:rgba(31,41,55,.08)] bg-white p-5 shadow-sm">
-          <h4 className="text-lg font-extrabold">الأمان والخصوصية</h4>
+          <h4 className="text-lg font-extrabold">Security & Privacy</h4>
           <ul className="mt-3 grid gap-2 text-sm">
-            <li>🔒 بياناتك مُشفّرة أثناء النقل والتخزين.</li>
-            <li>🛡️ عزل حسابات صارم وصلاحيات دقيقة (RBAC).</li>
-            <li>🧹 حذف عند الطلب واحتفاظ محدود.</li>
-            <li>📜 سجلات تدقيق واكتشاف شذوذ.</li>
+            <li>🔒 Data encrypted in transit and at rest.</li>
+            <li>🛡️ Strict tenant isolation & fine-grained RBAC.</li>
+            <li>🧹 Deletion on request & limited retention.</li>
+            <li>📜 Audit trails & anomaly detection.</li>
           </ul>
         </div>
       </div>
@@ -735,14 +731,14 @@ function IntegrationsSecurity() {
 /* ----------------------------------- FAQ ---------------------------------- */
 function FAQ() {
   const items = [
-    { q: "هل يحتاج تدريب مخصص؟", a: "لا. ارفع صورك وابدأ — قوالب جاهزة وموديلات متعددة.", k: "🧵" },
-    { q: "ما دقة الصور المخرجة؟", a: "حتى 4K+ للقنوات الرئيسية، مع قصّ وتظبيط تلقائي.", k: "🧩" },
-    { q: "هل يدعم دفعات كبيرة؟", a: "نعم. معالجة جماعية + API + Webhooks للتسليم.", k: "📦" },
-    { q: "ماذا عن حقوق الخصوصية؟", a: "الصور تُستخدم فقط للمعالجة ثم تُحذف حسب سياسة الحساب.", k: "🔐" },
+    { q: "Do I need custom training?", a: "No. Upload your images and start — presets and multiple models included.", k: "🧵" },
+    { q: "What export resolution?", a: "Up to 4K+ for major channels, with auto cutout and normalization.", k: "🧩" },
+    { q: "Does it handle large batches?", a: "Yes. Bulk processing + API + Webhooks for delivery.", k: "📦" },
+    { q: "What about privacy rights?", a: "Used only for processing and removed per your account policy.", k: "🔐" },
   ];
   return (
     <section id="faq" className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <h3 className="mb-4 text-2xl font-extrabold">أسئلة شائعة</h3>
+      <h3 className="mb-4 text-2xl font-extrabold">FAQ</h3>
       <div className="grid gap-3 md:grid-cols-2">
         {items.map((it, i) => (
           <details key={i} className="group rounded-2xl border border-[color:rgba(31,41,55,.08)] bg-white p-4 open:shadow-sm">
@@ -753,7 +749,7 @@ function FAQ() {
             <div className="mt-3 grid gap-2 text-sm">
               <div className="min-h-20 rounded-xl bg-[var(--sky)]/40 p-3 text-[11px] opacity-80">Mini‑Demo GIF Placeholder</div>
               <p>{it.a}</p>
-              <a href="#demo" className="text-sm font-semibold underline underline-offset-4">شاهد العينة</a>
+              <a href="#dashboard" className="text-sm font-semibold underline underline-offset-4">See sample</a>
             </div>
           </details>
         ))}
@@ -769,11 +765,10 @@ function FinalCTA() {
       <div className="relative overflow-hidden rounded-3xl border border-[color:rgba(31,41,55,.08)] bg-white p-6">
         <div className="grid items-center gap-6 md:grid-cols-[1.2fr_.8fr]">
           <div>
-            <div className="text-2xl font-extrabold">جاهز تبدأ التجربة الآن؟</div>
-            <p className="mt-2 text-sm opacity-80">بدون كرت ائتمان. ارفع صورة وجرب Try‑On مباشرة.</p>
+            <div className="text-2xl font-extrabold">Ready to start now?</div>
+            <p className="mt-2 text-sm opacity-80">No credit card. Upload an image and try Try‑On instantly.</p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Link href="/signup" className="rounded-2xl bg-[var(--peach)] px-5 py-3 text-sm font-bold text-[var(--ink)] shadow-[0_10px_24px_rgba(255,220,203,.45)] transition hover:brightness-110">ابدأ التجربة الآن</Link>
-              <Link href="/quality-guide.pdf" className="rounded-2xl border border-[color:rgba(31,41,55,.18)] bg-white px-5 py-3 text-sm font-bold">حمّل دليل الجودة</Link>
+              <Link href="/login" className="rounded-2xl bg-[var(--peach)] px-5 py-3 text-sm font-bold text-[var(--ink)] shadow-[0_10px_24px_rgba(255,220,203,.45)] transition hover:brightness-110">Start the trial</Link>
             </div>
           </div>
           <div className="relative h-48 w-full">
@@ -808,9 +803,9 @@ function MobileStickyCTA() {
       <Link
         href="/signup"
         className="fixed inset-x-4 bottom-4 z-50 flex items-center justify-center rounded-2xl bg-[var(--lav)] px-5 py-3 text-sm font-bold text-[var(--ink)] shadow-xl transition hover:brightness-110"
-        aria-label="جرّب الآن"
+        aria-label="Try now"
       >
-        جرّب الآن
+        Try now
       </Link>
     </div>
   );
@@ -824,8 +819,7 @@ function GlobalStyles() {
         --bg:#FCFCFF; --ink:#1F2937; --lav:#C8B6FF; --sky:#BFE6FF; --mint:#CFF6E4; --peach:#FFDCCB; --butter:#FFF4C2;
       }
       html{ color-scheme: only light; }
-      body{ font-family: Cairo, "IBM Plex Sans Arabic", Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
-      /* accessible focus */
+      body{ font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
       :focus-visible{ outline: 2px solid var(--lav); outline-offset: 2px; }
     `}</style>
   );
