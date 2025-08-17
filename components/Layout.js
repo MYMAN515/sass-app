@@ -1,25 +1,22 @@
 // /components/Layout.js
-import { AnimatePresence, motion } from 'framer-motion';
+'use client';
+
 import Navbar from './Navbar';
 import Footer from './Footer';
-import { useRouter } from 'next/router';
 
-export default function Layout({ children }) {
-  const router = useRouter();
-
+export default function Layout({ children, withContainer = true }) {
   return (
-    <AnimatePresence mode="wait">
-        <Navbar />
-        <motion.main
-          key={router.asPath}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.3 }}
-        >
-          {children}
-        </motion.main>
-        <Footer />
-    </AnimatePresence>
+    <>
+      <Navbar />
+      <main
+        id="content"
+        className={withContainer
+          ? 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6'
+          : ''}
+      >
+        {children}
+      </main>
+      <Footer />
+    </>
   );
 }
