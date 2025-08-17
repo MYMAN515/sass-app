@@ -1,9 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
+import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
 /* -------------------------------------------------------
    Small helpers
@@ -112,7 +113,7 @@ const ARCHETYPES = [
 ];
 
 /* -------------------------------------------------------
-   Toast system with progress
+   Toast system with progress — mint/lemon styling
 ------------------------------------------------------- */
 function useToasts() {
   const [items, setItems] = useState([]);
@@ -140,16 +141,16 @@ function ToastHost({ items, onClose }) {
             initial={{ y: 16, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 16, opacity: 0, scale: 0.98 }}
-            className="rounded-xl border border-slate-200 bg-white shadow-lg p-3"
+            className="rounded-xl border border-zinc-200 bg-white/90 backdrop-blur p-3 shadow-[0_10px_30px_-10px_rgba(16,185,129,.18)]"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-slate-800">{t.msg}</div>
-              <button className="text-xs text-slate-500 hover:text-slate-800" onClick={() => onClose(t.id)}>✕</button>
+              <div className="text-sm text-zinc-800">{t.msg}</div>
+              <button className="text-xs text-zinc-500 hover:text-zinc-800" onClick={() => onClose(t.id)}>✕</button>
             </div>
             {typeof t.progress === 'number' && (
-              <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+              <div className="mt-2 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
                 <div
-                  className="h-full bg-slate-900 transition-all"
+                  className="h-full bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] transition-all"
                   style={{ width: `${Math.min(Math.max(t.progress, 0), 100)}%` }}
                 />
               </div>
@@ -187,17 +188,16 @@ export default function Dashboard() {
 
   /* ---------- app state ---------- */
   const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState('product');     // product | people
-  const [tool, setTool]   = useState('enhance');     // active tool per group
+  const [group, setGroup] = useState('product');
+  const [tool, setTool]   = useState('enhance');
   const [plan, setPlan]   = useState('Free');
 
   // single-file work area
-  // في Try-On هذا الملف = صورة الملابس فقط
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState(''); // for removeBG dataURL
+  const [imageData, setImageData] = useState('');
   const [resultUrl, setResultUrl] = useState('');
-  const [variants, setVariants] = useState([]); // لعرض جميع المخرجات
+  const [variants, setVariants] = useState([]);
 
   // model swap (two images)
   const [file1, setFile1] = useState(null);
@@ -207,12 +207,11 @@ export default function Dashboard() {
   const [swapPrompt, setSwapPrompt] = useState('');
 
   // Try-On specific (stepper)
-  const [selectedArch, setSelectedArch] = useState(null); // { id, label, spec, ar }
-  const [pieceType, setPieceType] = useState(null); // 'upper'|'lower'|'dress'
-  const [tryonStep, setTryonStep] = useState('cloth'); // 'cloth' -> 'piece' -> 'archetype'
+  const [selectedArch, setSelectedArch] = useState(null);
+  const [pieceType, setPieceType] = useState(null);
+  const [tryonStep, setTryonStep] = useState('cloth');
   const [showPieceType, setShowPieceType] = useState(false);
 
-  // Try-On options (Kontext controls)
   const [tryonOptions, setTryonOptions] = useState({
     aspect_ratio: '3:4',
     num_images: 1,
@@ -227,21 +226,6 @@ export default function Dashboard() {
   const [err, setErr] = useState('');
   const [history, setHistory] = useState([]);
 
-  // compare overlay
-  const [compare, setCompare] = useState(false);
-  const [compareOpacity, setCompareOpacity] = useState(50);
-
-  // remove/bg frame
-  const [bgMode, setBgMode] = useState('color');   // color | gradient | pattern
-  const [color, setColor] = useState('#ffffff');
-  const [color2, setColor2] = useState('#f1f5f9');
-  const [angle, setAngle] = useState(35);
-  const [radius, setRadius] = useState(18);
-  const [padding, setPadding] = useState(20);
-  const [shadow, setShadow] = useState(true);
-  const [patternOpacity, setPatternOpacity] = useState(0.06);
-
-  // enhance modal
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [showEnhance, setShowEnhance] = useState(false);
 
@@ -265,7 +249,7 @@ export default function Dashboard() {
           .single();
         if (!mounted) return;
         setPlan(data?.plan || 'Free');
-      } catch {/* ignore */}
+      } catch {/* ignore */ }
 
       setLoading(false);
     })();
@@ -275,8 +259,8 @@ export default function Dashboard() {
   /* ---------- drag & drop / paste (single file area) ---------- */
   useEffect(() => {
     const el = dropRef.current; if (!el) return;
-    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-slate-400'); };
-    const leave = () => el.classList.remove('ring-2','ring-slate-400');
+    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-emerald-300'); };
+    const leave = () => el.classList.remove('ring-2','ring-emerald-300');
     const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
     el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
 
@@ -299,40 +283,48 @@ export default function Dashboard() {
     setErr(''); setPhase('idle');
     if (tool === 'removeBg') setImageData(await fileToDataURL(f));
 
-    // Try-On flow: بعد رفع الملابس نفتح اختيار النوع
     if (tool === 'tryon') {
       setTryonStep('piece');
       setShowPieceType(true);
     }
   };
 
-  /* ---------- computed styles ---------- */
-  const frameStyle = useMemo(() => {
+  /* ----- Remove BG inspector state ----- */
+  const [bgMode, setBgMode] = useState('color');
+  const [primaryColor, setColor] = useState('#ffffff');
+  const [secondaryColor, setColor2] = useState('#f1f5f9');
+  const [angle, setAngle] = useState(35);
+  const [radius, setRadius] = useState(18);
+  const [padding, setPadding] = useState(20);
+  const [shadow, setShadow] = useState(true);
+  const [patternOpacity, setPatternOpacity] = useState(0.06);
+
+  const frameStyleComputed = useMemo(() => {
     let bgStyle;
     if (bgMode === 'color') {
-      bgStyle = { background: color };
+      bgStyle = { background: primaryColor };
     } else if (bgMode === 'gradient') {
-      bgStyle = { background: `linear-gradient(${angle}deg, ${color}, ${color2})` };
+      bgStyle = { background: `linear-gradient(${angle}deg, ${primaryColor}, ${secondaryColor})` };
     } else {
       const svg = encodeURIComponent(
         `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'>
           <defs><pattern id='p' width='24' height='24' patternUnits='userSpaceOnUse'>
             <path d='M0 12h24M12 0v24' stroke='${hexToRGBA('#000000', patternOpacity)}' stroke-width='1' opacity='0.2'/>
           </pattern></defs>
-          <rect width='100%' height='100%' fill='${color}'/>
+          <rect width='100%' height='100%' fill='${primaryColor}'/>
           <rect width='100%' height='100%' fill='url(#p)'/>
         </svg>`
       );
-      bgStyle = { backgroundColor: color, backgroundImage: `url("data:image/svg+xml;utf8,${svg}")`, backgroundSize: '24px 24px' };
+      bgStyle = { backgroundColor: primaryColor, backgroundImage: `url("data:image/svg+xml;utf8,${svg}")`, backgroundSize: '24px 24px' };
     }
     return {
       ...bgStyle,
       borderRadius: `${radius}px`,
       padding: `${padding}px`,
-      boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.12), 0 6px 18px rgba(0,0,0,.06)' : 'none',
+      boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.10), 0 6px 18px rgba(0,0,0,.06)' : 'none',
       transition: 'all .25s ease'
     };
-  }, [bgMode, color, color2, angle, radius, padding, shadow, patternOpacity]);
+  }, [bgMode, primaryColor, secondaryColor, angle, radius, padding, shadow, patternOpacity]);
 
   /* ---------- storage ---------- */
   const uploadToStorage = useCallback(async (f) => {
@@ -420,7 +412,6 @@ export default function Dashboard() {
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, uploadToStorage, plan, user, localUrl, toasts]);
 
-  // ===== Replacement: runTryOn (Kontext Max — single image) =====
   const runTryOn = useCallback(async () => {
     if (!file)              { setErr('Please upload a clothing image first.'); return; }
     if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
@@ -430,18 +421,14 @@ export default function Dashboard() {
     setErr('');
     setPhase('processing');
 
-    const toast = toasts.push('Generating try‑on…', { progress: 10 });
+    const toast = toasts.push('Generating try-on…', { progress: 10 });
     let progress = 10;
     const iv = setInterval(() => { progress = Math.min(progress + 6, 88); toast.update({ progress }); }, 500);
 
     try {
-      // رفع صورة القطعة
       const clothUrl = await uploadToStorage(file);
-
-      // إعداد البرومبت
       const prompt = buildKontextPrompt({ pieceType, archetypeSpec: selectedArch.spec, hints: tryonOptions.hints });
 
-      // تحضير Seed (في حال lock)
       let seedToUse = tryonOptions.seedLock
         ? (typeof tryonOptions.seed === 'number' ? tryonOptions.seed : Math.floor(Math.random() * 1e9))
         : undefined;
@@ -449,7 +436,6 @@ export default function Dashboard() {
         setTryonOptions((s) => ({ ...s, seed: seedToUse }));
       }
 
-      // استدعاء API
       const r = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -478,16 +464,16 @@ export default function Dashboard() {
       const all = j?.variants && Array.isArray(j.variants) ? j.variants : [main];
       setResultUrl(main);
       setVariants(all);
-      setHistory(h => [ { tool: 'Try‑On', inputThumb: localUrl, outputUrl: main, ts: Date.now() }, ...h ].slice(0, 24));
+      setHistory(h => [ { tool: 'Try-On', inputThumb: localUrl, outputUrl: main, ts: Date.now() }, ...h ].slice(0, 24));
 
       setPhase('ready');
-      toast.update({ progress: 100, msg: 'Try‑On ✓' });
+      toast.update({ progress: 100, msg: 'Try-On ✓' });
       setTimeout(() => toast.close(), 700);
     } catch (e) {
       console.error(e);
       setPhase('error');
       setErr(e?.message || 'Processing failed.');
-      toast.update({ msg: `Try‑On failed: ${e?.message || 'Error'}`, type: 'error' });
+      toast.update({ msg: `Try-On failed: ${e?.message || 'Error'}`, type: 'error' });
       setTimeout(() => toast.close(), 1500);
     } finally {
       clearInterval(iv);
@@ -524,13 +510,11 @@ export default function Dashboard() {
     setFile(null); setLocalUrl(''); setResultUrl(''); setVariants([]);
     setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
     setErr(''); setPhase('idle'); setCompare(false);
-    // reset tryon
-    setSelectedArch(null); setPieceType(null); setTryonStep(tool==='tryon' ? 'cloth' : 'cloth');
+    setSelectedArch(null); setPieceType(null); setTryonStep('cloth');
   };
 
   const switchTool = (nextId) => {
     setTool(nextId);
-    // reset everything relevant on tool switch
     setResultUrl(''); setVariants([]); setErr(''); setPhase('idle'); setCompare(false);
     setFile(null); setLocalUrl('');
     setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
@@ -550,8 +534,8 @@ export default function Dashboard() {
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
     return (
-      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-slate-50 to-slate-100 text-slate-600">
-        <div className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 border shadow-sm text-sm">Loading…</div>
+      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-[#F3FFF8] to-[#FFFCE8] text-zinc-700">
+        <div className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 border border-zinc-200 shadow-sm text-sm">Loading…</div>
       </main>
     );
   }
@@ -563,24 +547,53 @@ export default function Dashboard() {
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
 
-  // Helpers for options
   const setOption = (k, v) => setTryonOptions((s) => ({ ...s, [k]: v }));
 
+  /* ----- Compare overlay ----- */
+  const [compare, setCompare] = useState(false);
+  const [compareOpacity, setCompareOpacity] = useState(50);
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900">
-      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
+    <main className="min-h-screen bg-gradient-to-b from-[#F3FFF8] via-[#FFFCE8] to-white text-zinc-900">
+      {/* subtle auras */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#D8FFEA] blur-3xl" />
+        <div className="absolute top-24 -right-24 h-72 w-72 rounded-full bg-[#FFF7B3] blur-3xl" />
+      </div>
+
+      {/* Page header (with Home) */}
+      <div className="mx-auto max-w-7xl px-3 md:px-6 pt-4 md:pt-6">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-white transition"
+          >
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            Home
+          </Link>
+
+          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 text-xs">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-zinc-900 border border-zinc-200 font-bold">
+              {initials}
+            </span>
+            <span className="hidden sm:block">{user.user_metadata?.name || user.email}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 pb-6">
         {/* Sidebar */}
-        <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-3 md:top-4 self-start h-fit">
-          <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
-            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
+        <aside className="rounded-2xl border border-zinc-200 bg-white/80 backdrop-blur shadow-sm sticky top-20 self-start h-fit">
+          <div className="px-4 py-4 flex items-center gap-3 border-b border-zinc-200">
+            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-[#B9F7D6] to-[#FFF39C] text-zinc-900 shadow">
               <SparkleIcon className="w-4 h-4" />
             </div>
-            <div className="font-semibold tracking-tight">AI Studio</div>
+            <div className="font-semibold tracking-tight">Studio</div>
           </div>
 
           <div className="px-3 py-3">
-            <div className="text-xs font-semibold text-slate-500 mb-1">Workspace</div>
-            <div className="inline-flex rounded-full border border-slate-300 bg-white p-1">
+            <div className="text-[11px] font-semibold text-zinc-500 mb-1">Workspace</div>
+            <div className="inline-flex rounded-full border border-zinc-300 bg-white p-1">
               {GROUPS.map((g) => {
                 const Active = group === g.id;
                 const Icon = g.icon;
@@ -589,7 +602,7 @@ export default function Dashboard() {
                     key={g.id}
                     onClick={() => { setGroup(g.id); switchTool(g.id === 'product' ? 'enhance' : 'tryon'); }}
                     className={[`inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition`,
-                      Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 hover:bg-slate-100'].join(' ')}
+                      Active ? 'bg-zinc-900 text-white shadow' : 'text-zinc-700 hover:bg-zinc-100'].join(' ')}
                   >
                     <Icon className="size-4" /> {g.label}
                   </button>
@@ -599,7 +612,7 @@ export default function Dashboard() {
           </div>
 
           <div className="px-3 pb-3">
-            <div className="text-xs font-semibold text-slate-500 mb-1">Tools</div>
+            <div className="text-[11px] font-semibold text-zinc-500 mb-1">Tools</div>
             <div className="space-y-1">
               {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((t) => {
                 const Active = tool === t.id;
@@ -610,11 +623,11 @@ export default function Dashboard() {
                     onClick={() => switchTool(t.id)}
                     className={[
                       'w-full group flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition',
-                      Active ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                             : 'text-slate-700 hover:bg-slate-100 border border-transparent'
+                      Active ? 'bg-[#F3FFF8] text-emerald-700 border border-emerald-200'
+                             : 'text-zinc-700 hover:bg-zinc-100 border border-transparent'
                     ].join(' ')}
                   >
-                    <Icon className={['size-4', Active ? 'text-indigo-600' : 'text-slate-500 group-hover:text-slate-700'].join(' ')} />
+                    <Icon className={['size-4', Active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-zinc-700'].join(' ')} />
                     <span className="truncate">{t.label}</span>
                   </button>
                 );
@@ -622,11 +635,12 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="px-4 py-3 border-t border-slate-200">
+          <div className="px-4 py-3 border-t border-zinc-200">
             <div className="flex items-center gap-3">
-              <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">{initials}</div>
+              <div className="grid place-items-center size-10 rounded-full bg-white text-zinc-900 border border-zinc-200 font-bold">{initials}</div>
               <div className="text-sm">
-                <div className="font-medium leading-tight">{user.user_metadata?.name || user.email}</div>
+                <div className="font-medium leading-tight truncate max-w-[160px]">{user.user_metadata?.name || user.email}</div>
+                <div className="text-[11px] text-emerald-700 mt-0.5">Plan: {plan}</div>
               </div>
             </div>
           </div>
@@ -635,13 +649,13 @@ export default function Dashboard() {
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
           {/* Presets / Try-On Flow */}
-          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white/90 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
+          <div className="rounded-2xl md:rounded-3xl border border-zinc-200 bg-white/80 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
                   {group === 'product' ? 'Quick Presets' : (tool === 'tryon' ? 'Try-On Flow' : 'Model Swap')}
                 </h1>
-                <p className="text-slate-600 text-xs sm:text-sm">
+                <p className="text-zinc-600 text-xs sm:text-sm">
                   {group === 'product'
                     ? <>Pick a preset or open <span className="font-semibold">Customize</span>.</>
                     : tool === 'tryon'
@@ -653,7 +667,7 @@ export default function Dashboard() {
               {group === 'product' ? (
                 <button
                   onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
+                  className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-zinc-50"
                 >
                   ✨ Customize Enhance
                 </button>
@@ -661,7 +675,7 @@ export default function Dashboard() {
                 pieceType ? (
                   <button
                     onClick={() => setShowPieceType(true)}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
+                    className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-zinc-50"
                   >
                     Change clothing type
                   </button>
@@ -671,7 +685,7 @@ export default function Dashboard() {
 
             {group === 'product' ? (
               <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
+                <div className="mb-2 text-[12px] font-semibold text-zinc-700">Enhance</div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {ENHANCE_PRESETS.map((p) => (
                     <PresetCard
@@ -687,13 +701,11 @@ export default function Dashboard() {
               </div>
             ) : tool === 'tryon' ? (
               <div className="mt-4">
-                {/* Stepper */}
                 <TryOnStepper step={tryonStep} pieceType={pieceType} archetypePicked={!!selectedArch} />
 
-                {/* Only show archetypes AFTER pieceType is chosen (step === 'archetype') */}
                 {tryonStep === 'archetype' ? (
                   <div className="mt-3">
-                    <div className="mb-2 text-[12px] font-semibold text-slate-700">Model Archetypes <span className="ml-1 text-[10px] text-slate-500">Illustrative only</span></div>
+                    <div className="mb-2 text-[12px] font-semibold text-zinc-700">Model Archetypes <span className="ml-1 text-[10px] text-zinc-500">Illustrative only</span></div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       {ARCHETYPES.map((a) => (
                         <ArchetypeCard
@@ -706,15 +718,15 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-3 rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-600 bg-slate-50">
+                  <div className="mt-3 rounded-xl border border-dashed border-zinc-300 p-4 text-xs text-zinc-600 bg-white/70">
                     Upload clothing first, then choose type. Archetypes will appear next.
                   </div>
                 )}
               </div>
             ) : (
               <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700">Model Swap</div>
-                <div className="text-xs text-slate-600">Upload two images below and write a short instruction.</div>
+                <div className="mb-2 text-[12px] font-semibold text-zinc-700">Model Swap</div>
+                <div className="text-xs text-zinc-600">Upload two images below and write a short instruction.</div>
               </div>
             )}
           </div>
@@ -722,9 +734,9 @@ export default function Dashboard() {
           {/* Workbench */}
           <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_360px]">
             {/* Canvas Panel */}
-            <section className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm relative">
+            <section className="rounded-2xl md:rounded-3xl border border-zinc-200 bg-white/80 backdrop-blur relative shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
-                <div className="inline-flex rounded-full border border-slate-300 bg-white p-1">
+                <div className="inline-flex rounded-full border border-zinc-300 bg-white p-1">
                   {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((it) => {
                     const Active = tool === it.id;
                     const Icon = it.icon;
@@ -734,7 +746,7 @@ export default function Dashboard() {
                         onClick={() => switchTool(it.id)}
                         className={[
                           'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                          Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 hover:bg-slate-100'
+                          Active ? 'bg-zinc-900 text-white shadow' : 'text-zinc-700 hover:bg-zinc-100'
                         ].join(' ')}
                       >
                         <Icon className="size-4" />
@@ -745,7 +757,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StepBadge phase={phase} />
-                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50">Reset</button>
+                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50">Reset</button>
                 </div>
               </div>
 
@@ -753,7 +765,7 @@ export default function Dashboard() {
               {tool !== 'modelSwap' ? (
                 <div
                   ref={dropRef}
-                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-zinc-300/80 bg-white/70 hover:bg-white transition cursor-pointer"
                   onClick={() => inputRef.current?.click()}
                   title="Drag & drop / Click / Paste (Ctrl+V)"
                 >
@@ -763,8 +775,8 @@ export default function Dashboard() {
                     onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
                   />
                   {!localUrl && !resultUrl ? (
-                    <div className="text-center text-slate-500 text-sm">
-                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-slate-200">⬆</div>
+                    <div className="text-center text-zinc-500 text-sm">
+                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-zinc-200">⬆</div>
                       {tool === 'tryon'
                         ? 'Upload a clothing image (PNG/JPG). Transparent PNG preferred.'
                         : 'Drag & drop an image here, click to choose, or paste (Ctrl+V)'}
@@ -773,7 +785,7 @@ export default function Dashboard() {
                     <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
                       {compare && localUrl && resultUrl ? (
                         <div className="relative max-w-full max-h-[70vh]">
-                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+                          <img src={resultUrl} alt="after" className="max-w/full max-h-[70vh] object-contain rounded-xl" />
                           <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
                                className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
                         </div>
@@ -792,7 +804,6 @@ export default function Dashboard() {
               ) : (
                 <div className="m-3 sm:m-4 md:m-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Image 1 */}
                     <FileDrop
                       label="Image 1"
                       file={file1}
@@ -800,7 +811,6 @@ export default function Dashboard() {
                       onPick={async (f) => { setFile1(f); setLocal1(URL.createObjectURL(f)); setResultUrl(''); setPhase('idle'); }}
                       inputRef={inputRef1}
                     />
-                    {/* Image 2 */}
                     <FileDrop
                       label="Image 2"
                       file={file2}
@@ -810,19 +820,18 @@ export default function Dashboard() {
                     />
                   </div>
                   <div className="mt-3">
-                    <label className="text-xs text-slate-600">Prompt</label>
+                    <label className="text-xs text-zinc-600">Prompt</label>
                     <input
                       value={swapPrompt} onChange={(e)=>setSwapPrompt(e.target.value)}
                       placeholder="Describe how to combine or arrange the two images…"
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                      className="mt-1 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm"
                     />
                   </div>
 
-                  {/* Result preview for model swap */}
                   {resultUrl && (
                     <div className="mt-4">
-                      <div className="text-xs text-slate-600 mb-2">Result</div>
-                      <div className="w-full rounded-xl border bg-slate-50 p-2 grid place-items-center">
+                      <div className="text-xs text-zinc-600 mb-2">Result</div>
+                      <div className="w-full rounded-xl border bg-white/70 p-2 grid place-items-center">
                         <img src={resultUrl} alt="result" className="max-w-full max-h-[60vh] object-contain rounded-lg" />
                       </div>
                     </div>
@@ -841,28 +850,28 @@ export default function Dashboard() {
                       !file
                     )
                   }
-                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-[0_10px_24px_rgba(0,0,0,.14)] transition disabled:opacity-50"
                 >
-                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try‑On')}</>)}
+                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On')}</>)}
                 </button>
 
                 {resultUrl && (
                   <>
                     <button
                       onClick={() => exportPng(resultUrl)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
                     >
                       ⬇ Download PNG
                     </button>
                     <a
                       href={resultUrl} target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50"
                     >
                       ↗ Open
                     </a>
                     <button
                       onClick={() => { navigator.clipboard.writeText(resultUrl).catch(()=>{}); }}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50"
                     >
                       🔗 Copy URL
                     </button>
@@ -876,7 +885,7 @@ export default function Dashboard() {
                         {compare && (
                           <div className="flex items-center gap-2">
                             <input type="range" min={0} max={100} value={compareOpacity}
-                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} />
+                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} className="accent-emerald-500" />
                             <span className="text-xs w-8 text-right">{compareOpacity}%</span>
                           </div>
                         )}
@@ -902,49 +911,49 @@ export default function Dashboard() {
             </section>
 
             {/* Inspector */}
-            <aside className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:pb-5">
+            <aside className="rounded-2xl md:rounded-3xl border border-zinc-200 bg-white/80 backdrop-blur p-4 md:pb-5 shadow-sm">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900">Inspector</div>
-                <span className="text-xs text-slate-500">Tool: {tool}</span>
+                <div className="text-sm font-semibold text-zinc-900">Inspector</div>
+                <span className="text-xs text-zinc-500">Tool: {tool}</span>
               </div>
 
               {/* Try-On inspector */}
               {tool === 'tryon' && (
                 <div className="space-y-3 mt-3 text-xs">
                   <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Clothing</div>
+                    <div className="text-zinc-600 mb-1">Clothing</div>
                     {localUrl ? (
-                      <img src={localUrl} alt="cloth" className="w-full max-h-48 object-contain rounded-md border bg-slate-50" />
+                      <img src={localUrl} alt="cloth" className="w-full max-h-48 object-contain rounded-md border bg-white/70" />
                     ) : (
-                      <div className="text-slate-400">— Upload a clothing image —</div>
+                      <div className="text-zinc-400">— Upload a clothing image —</div>
                     )}
                   </div>
 
                   <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Type</div>
+                    <div className="text-zinc-600 mb-1">Type</div>
                     <div className="flex items-center justify-between">
-                      <div className="text-slate-800">{pieceType ? pieceType : '—'}</div>
+                      <div className="text-zinc-800">{pieceType ? pieceType : '—'}</div>
                       <button className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => setShowPieceType(true)}>Change</button>
                     </div>
                   </div>
 
                   <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Selected Archetype</div>
+                    <div className="text-zinc-600 mb-1">Selected Archetype</div>
                     {selectedArch ? (
                       <div className="flex items-center gap-2">
                         <ArchetypeChip label={selectedArch.label} />
                       </div>
                     ) : (
-                      <div className="text-slate-400">— Pick an archetype above —</div>
+                      <div className="text-zinc-400">— Pick an archetype above —</div>
                     )}
                   </div>
 
                   <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-2">Try‑On Options</div>
+                    <div className="text-zinc-600 mb-2">Try-On Options</div>
 
                     <Field label="Aspect Ratio">
                       <select
-                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
                         value={tryonOptions.aspect_ratio}
                         onChange={(e)=>setOption('aspect_ratio', e.target.value)}
                       >
@@ -955,7 +964,7 @@ export default function Dashboard() {
                     <Field label="Variants">
                       <div className="flex items-center gap-2">
                         <input type="range" min={1} max={3} value={tryonOptions.num_images}
-                          onChange={(e)=>setOption('num_images', Number(e.target.value))} className="w-full accent-indigo-600" />
+                          onChange={(e)=>setOption('num_images', Number(e.target.value))} className="w-full accent-emerald-500" />
                         <span className="w-6 text-right">{tryonOptions.num_images}</span>
                       </div>
                     </Field>
@@ -964,7 +973,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2">
                         <input type="checkbox" checked={tryonOptions.seedLock} onChange={(e)=>setOption('seedLock', e.target.checked)} />
                         {tryonOptions.seedLock && (
-                          <input type="number" className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                          <input type="number" className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
                             value={tryonOptions.seed ?? ''}
                             onChange={(e)=>setOption('seed', e.target.value === '' ? null : Number(e.target.value))}
                             placeholder="auto" />
@@ -973,15 +982,15 @@ export default function Dashboard() {
                     </Field>
 
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-slate-700">Advanced</summary>
+                      <summary className="cursor-pointer text-zinc-700">Advanced</summary>
                       <div className="mt-2 space-y-2">
                         <Field label="Guidance">
-                          <input type="number" step="0.1" min={1} max={12} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                          <input type="number" step="0.1" min={1} max={12} className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
                             value={tryonOptions.guidance_scale}
                             onChange={(e)=>setOption('guidance_scale', Number(e.target.value))} />
                         </Field>
                         <Field label="Safety">
-                          <input type="number" min={1} max={6} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                          <input type="number" min={1} max={6} className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
                             value={tryonOptions.safety_tolerance}
                             onChange={(e)=>setOption('safety_tolerance', Number(e.target.value))} />
                         </Field>
@@ -989,54 +998,13 @@ export default function Dashboard() {
                     </details>
                   </div>
 
-                  <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-2">Fit Hints</div>
-                    <div className="grid grid-cols-1 gap-2">
-                      <Field label="Sleeves">
-                        <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
-                          value={tryonOptions?.hints?.sleeve || ''}
-                          onChange={(e)=>setOption('hints', { ...(tryonOptions.hints||{}), sleeve: e.target.value || null })}
-                        >
-                          <option value="">—</option>
-                          <option value="short">Short</option>
-                          <option value="long">Long</option>
-                          <option value="none">Sleeveless</option>
-                        </select>
-                      </Field>
-                      <Field label="Neckline">
-                        <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
-                          value={tryonOptions?.hints?.neckline || ''}
-                          onChange={(e)=>setOption('hints', { ...(tryonOptions.hints||{}), neckline: e.target.value || null })}
-                        >
-                          <option value="">—</option>
-                          <option value="v-neck">V‑neck</option>
-                          <option value="crew">Crew</option>
-                          <option value="collared">Collared</option>
-                        </select>
-                      </Field>
-                      <Field label="Length">
-                        <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
-                          value={tryonOptions?.hints?.length || ''}
-                          onChange={(e)=>setOption('hints', { ...(tryonOptions.hints||{}), length: e.target.value || null })}
-                        >
-                          <option value="">—</option>
-                          <option value="waist">Waist</option>
-                          <option value="hip">Hip</option>
-                          <option value="knee">Knee</option>
-                          <option value="ankle">Ankle</option>
-                        </select>
-                      </Field>
-                    </div>
-                  </div>
-
-                  {/* Variants strip */}
                   {variants?.length > 1 && (
                     <div className="rounded-lg border p-3">
-                      <div className="text-slate-600 mb-2">Variants</div>
+                      <div className="text-zinc-600 mb-2">Variants</div>
                       <div className="flex gap-2 overflow-x-auto pb-1">
                         {variants.map((v,i)=>(
                           <button key={i} onClick={()=>setResultUrl(v)}
-                            className={`shrink-0 rounded-lg border ${resultUrl===v ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200'} bg-slate-50`}
+                            className={`shrink-0 rounded-lg border ${resultUrl===v ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-200'} bg-white/70`}
                           >
                             <img src={v} alt={`v${i+1}`} className="h-20 w-20 object-cover rounded-md" />
                           </button>
@@ -1047,11 +1015,11 @@ export default function Dashboard() {
 
                   {resultUrl && (
                     <div className="rounded-lg border p-3">
-                      <div className="text-slate-600 mb-2">Result</div>
+                      <div className="text-zinc-600 mb-2">Result</div>
                       <img
                         src={resultUrl}
                         alt="final"
-                        className="w-full max-h-64 object-contain rounded-md border bg-slate-50"
+                        className="w-full max-h-64 object-contain rounded-md border bg-white/70"
                       />
                     </div>
                   )}
@@ -1063,13 +1031,13 @@ export default function Dashboard() {
                 <div className="space-y-3 mt-3">
                   <ModeTabs mode={bgMode} setMode={setBgMode} />
                   <Field label="Primary">
-                    <Color value={color} onChange={setColor} />
+                    <Color value={primaryColor} onChange={setColor} />
                   </Field>
 
                   {bgMode === 'gradient' && (
                     <>
                       <Field label="Secondary">
-                        <Color value={color2} onChange={setColor2} />
+                        <Color value={secondaryColor} onChange={setColor2} />
                       </Field>
                       <Field label="Angle">
                         <Range value={angle} onChange={setAngle} min={0} max={360} />
@@ -1096,7 +1064,7 @@ export default function Dashboard() {
                     <Range value={padding} onChange={setPadding} min={0} max={64} />
                   </Field>
 
-                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-700">
+                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-zinc-700">
                     <input
                       type="checkbox"
                       checked={shadow}
@@ -1106,10 +1074,10 @@ export default function Dashboard() {
                   </label>
 
                   <div className="mt-3">
-                    <div className="text-xs text-slate-500 mb-2">Final Preview</div>
+                    <div className="text-xs text-zinc-500 mb-2">Final Preview</div>
                     <div
-                      style={frameStyle}
-                      className="relative rounded-xl overflow-hidden border border-slate-200"
+                      style={frameStyleComputed}
+                      className="relative rounded-xl overflow-hidden border border-zinc-200"
                     >
                       <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
                         {resultUrl ? (
@@ -1119,7 +1087,7 @@ export default function Dashboard() {
                             className="max-w-full max-h-[38vh] object-contain"
                           />
                         ) : (
-                          <div className="grid place-items-center h-[140px] text-xs text-slate-400">
+                          <div className="grid place-items-center h-[140px] text-xs text-zinc-400">
                             — Run Remove BG first —
                           </div>
                         )}
@@ -1131,12 +1099,12 @@ export default function Dashboard() {
 
               {/* Enhance inspector */}
               {tool === 'enhance' && (
-                <div className="space-y-2 text-xs text-slate-600 mt-3">
+                <div className="space-y-2 text-xs text-zinc-600 mt-3">
                   <div>
                     Choose a preset above or press <span className="font-semibold">Customize</span>.
                   </div>
                   {resultUrl && (
-                    <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                    <div className="mt-2 rounded-xl overflow-hidden border border-zinc-200 bg-white/70">
                       <div className="relative w-full min-h-[140px] grid place-items-center">
                         <img
                           src={resultUrl}
@@ -1151,18 +1119,18 @@ export default function Dashboard() {
 
               {/* Model Swap inspector */}
               {tool === 'modelSwap' && (
-                <div className="text-xs text-slate-600 mt-3 space-y-3">
+                <div className="text-xs text-zinc-600 mt-3 space-y-3">
                   <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Inputs</div>
+                    <div className="text-zinc-600 mb-1">Inputs</div>
                     <div className="grid grid-cols-2 gap-2">
                       {local1 ? (
                         <img
                           src={local1}
                           alt="image1"
-                          className="w-full h-24 object-cover rounded-md border bg-slate-50"
+                          className="w-full h-24 object-cover rounded-md border bg-white/70"
                         />
                       ) : (
-                        <div className="h-24 grid place-items-center text-slate-400 border rounded-md bg-slate-50">
+                        <div className="h-24 grid place-items-center text-zinc-400 border rounded-md bg-white/70">
                           — Image 1 —
                         </div>
                       )}
@@ -1170,28 +1138,28 @@ export default function Dashboard() {
                         <img
                           src={local2}
                           alt="image2"
-                          className="w-full h-24 object-cover rounded-md border bg-slate-50"
+                          className="w-full h-24 object-cover rounded-md border bg-white/70"
                         />
                       ) : (
-                        <div className="h-24 grid place-items-center text-slate-400 border rounded-md bg-slate-50">
+                        <div className="h-24 grid place-items-center text-zinc-400 border rounded-md bg-white/70">
                           — Image 2 —
                         </div>
                       )}
                     </div>
                     {swapPrompt && (
-                      <div className="mt-2 text-[11px] text-slate-500">
-                        Prompt: <span className="text-slate-700">{swapPrompt}</span>
+                      <div className="mt-2 text-[11px] text-zinc-500">
+                        Prompt: <span className="text-zinc-700">{swapPrompt}</span>
                       </div>
                     )}
                   </div>
 
                   {resultUrl && (
                     <div className="rounded-lg border p-3">
-                      <div className="text-slate-600 mb-2">Result</div>
+                      <div className="text-zinc-600 mb-2">Result</div>
                       <img
                         src={resultUrl}
                         alt="model-swap-result"
-                        className="w-full max-h-64 object-contain rounded-md border bg-slate-50"
+                        className="w-full max-h-64 object-contain rounded-md border bg-white/70"
                       />
                     </div>
                   )}
@@ -1201,16 +1169,16 @@ export default function Dashboard() {
           </div>
 
           {/* History */}
-          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
-            <div className="text-sm font-semibold text-slate-900 mb-2">History</div>
+          <div className="rounded-2xl md:rounded-3xl border border-zinc-200 bg-white/80 backdrop-blur p-4 md:p-5 shadow-sm">
+            <div className="text-sm font-semibold text-zinc-900 mb-2">History</div>
             {history.length === 0 ? (
-              <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
+              <div className="text-xs text-zinc-500 px-1 py-4">— No renders yet —</div>
             ) : (
               <>
                 <div className="mb-2">
                   <button
                     onClick={() => setHistory([])}
-                    className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50"
+                    className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50"
                   >
                     Clear history
                   </button>
@@ -1220,7 +1188,7 @@ export default function Dashboard() {
                     <button
                       key={i}
                       onClick={() => setResultUrl(h.outputUrl)}
-                      className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-50"
+                      className="group relative rounded-xl overflow-hidden border border-zinc-200 hover:border-zinc-300 transition bg-white/70"
                     >
                       <img
                         src={h.outputUrl || h.inputThumb}
@@ -1278,7 +1246,7 @@ export default function Dashboard() {
                 onConfirm={(type) => {
                   setPieceType(type);
                   setShowPieceType(false);
-                  setTryonStep('archetype'); // بعد اختيار النوع ننتقل لاختيار نوع المودل
+                  setTryonStep('archetype');
                 }}
               />
             </div>
@@ -1298,7 +1266,7 @@ export default function Dashboard() {
 function FileDrop({ label, file, localUrl, onPick, inputRef }) {
   return (
     <div
-      className="min-h-[220px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
+      className="min-h-[220px] grid place-items-center rounded-2xl border-2 border-dashed border-zinc-300/80 bg-white/70 hover:bg-white transition cursor-pointer"
       onClick={() => inputRef.current?.click()}
     >
       <input
@@ -1312,8 +1280,8 @@ function FileDrop({ label, file, localUrl, onPick, inputRef }) {
         }}
       />
       {!localUrl ? (
-        <div className="text-center text-slate-500 text-sm">
-          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-slate-200">
+        <div className="text-center text-zinc-500 text-sm">
+          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-zinc-200">
             ⬆
           </div>
           {label}: Click to choose
@@ -1337,11 +1305,11 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
   return (
     <button
       onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left hover:shadow-md"
+      className="group relative rounded-2xl overflow-hidden border border-zinc-200 hover:border-zinc-300 bg-white shadow-sm transition text-left hover:shadow-md"
     >
-      <div className="relative w-full aspect-[4/3] bg-slate-100">
+      <div className="relative w-full aspect-[4/3] bg-zinc-100">
         {!loaded && (
-          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100" />
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-zinc-100 via-white to-zinc-100" />
         )}
         <img
           src={preview}
@@ -1352,7 +1320,7 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
           onError={() => setBroken(true)}
         />
         {tag && (
-          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 text-white shadow">
+          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-zinc-900/80 text-white shadow">
             {tag}
           </span>
         )}
@@ -1362,7 +1330,7 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
       </div>
       <div className="p-3">
         <div className="font-semibold">{title}</div>
-        <div className="text-xs text-slate-500">{subtitle}</div>
+        <div className="text-xs text-zinc-500">{subtitle}</div>
       </div>
     </button>
   );
@@ -1370,36 +1338,34 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
 
 function ArchetypeChip({ label }) {
   return (
-    <span className="inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-[11px]">
-      <span className="size-2 rounded-full bg-indigo-500" /> {label}
+    <span className="inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-zinc-200 bg-white/70 text-[11px]">
+      <span className="size-2 rounded-full bg-emerald-500" /> {label}
     </span>
   );
 }
 
 function ArchetypeCard({ archetype, active, onSelect }) {
-  // رسم بطاقة توضيحية بدون صور بشرية
   const colors = [
     'from-indigo-500 to-fuchsia-500',
     'from-emerald-500 to-lime-500',
     'from-sky-500 to-indigo-500',
     'from-amber-500 to-rose-500',
-    'from-slate-500 to-gray-700',
+    'from-zinc-500 to-gray-700',
   ];
-  const grad = colors[ Math.abs(archetype.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % colors.length ];
+  const grad = colors[Math.abs(archetype.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % colors.length];
 
   return (
     <button
       onClick={onSelect}
       className={[
         'group relative rounded-2xl overflow-hidden border bg-white shadow-sm transition text-left',
-        active ? 'border-indigo-400 ring-2 ring-indigo-300' : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
+        active ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-md',
       ].join(' ')}
       title={archetype.label}
     >
-      <div className={`relative w-full aspect-[4/5] bg-gradient-to-br ${grad}`}> 
-        {/* Placeholder illustration */}
+      <div className={`relative w-full aspect-[4/5] bg-gradient-to-br ${grad}`}>
         <div className="absolute inset-3 rounded-xl bg-white/70 backdrop-blur border border-white/60 grid place-items-center">
-          <div className="w-12 h-16 rounded-md border-2 border-dashed border-slate-400/80 bg-white/60" />
+          <div className="w-12 h-16 rounded-md border-2 border-dashed border-zinc-400/80 bg-white/60" />
         </div>
         <div className="absolute top-2 left-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
           {active ? 'Selected' : 'Use archetype'}
@@ -1407,7 +1373,7 @@ function ArchetypeCard({ archetype, active, onSelect }) {
       </div>
       <div className="p-3">
         <div className="font-semibold truncate">{archetype.label}</div>
-        <div className="text-[11px] text-slate-500">AR: {archetype.ar || '3:4'}</div>
+        <div className="text-[11px] text-zinc-500">AR: {archetype.ar || '3:4'}</div>
       </div>
     </button>
   );
@@ -1441,7 +1407,7 @@ function TryOnStepper({ step, pieceType, archetypePicked }) {
                       ? 'bg-emerald-500 text-white border-emerald-500'
                       : active
                       ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-600 border-slate-300',
+                      : 'bg-white text-zinc-600 border-zinc-300',
                   ].join(' ')}
                 >
                   {done ? '✓' : i + 1}
@@ -1449,17 +1415,14 @@ function TryOnStepper({ step, pieceType, archetypePicked }) {
                 <div
                   className={[
                     'text-xs sm:text-[13px]',
-                    done ? 'text-emerald-700' : active ? 'text-indigo-700' : 'text-slate-600',
+                    done ? 'text-emerald-700' : active ? 'text-indigo-700' : 'text-zinc-600',
                   ].join(' ')}
                 >
                   {s.label}
                 </div>
               </div>
               {i < steps.length - 1 && (
-                <motion.div
-                  layout
-                  className="h-1 mt-2 rounded-full bg-slate-200 overflow-hidden"
-                >
+                <motion.div layout className="h-1 mt-2 rounded-full bg-zinc-200 overflow-hidden">
                   <motion.div
                     initial={false}
                     animate={{ width: i < idx ? '100%' : '0%' }}
@@ -1478,7 +1441,7 @@ function TryOnStepper({ step, pieceType, archetypePicked }) {
 
 function StepBadge({ phase }) {
   const map = {
-    idle: { label: 'Ready', color: 'bg-slate-200 text-slate-700 border-slate-300' },
+    idle: { label: 'Ready', color: 'bg-zinc-200 text-zinc-700 border-zinc-300' },
     processing: { label: 'Processing', color: 'bg-amber-200 text-amber-900 border-amber-300' },
     ready: { label: 'Done', color: 'bg-emerald-200 text-emerald-900 border-emerald-300' },
     error: { label: 'Error', color: 'bg-rose-200 text-rose-900 border-rose-300' },
@@ -1486,11 +1449,7 @@ function StepBadge({ phase }) {
   const it = map[phase] || map.idle;
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${it.color}`}>
-      <span
-        className={`inline-block size-2 rounded-full ${
-          phase === 'processing' ? 'bg-slate-700 animate-pulse' : 'bg-slate-600'
-        }`}
-      />
+      <span className={`inline-block size-2 rounded-full ${phase === 'processing' ? 'bg-zinc-700 animate-pulse' : 'bg-zinc-600'}`} />
       {it.label}
     </span>
   );
@@ -1498,7 +1457,7 @@ function StepBadge({ phase }) {
 
 function Field({ label, children }) {
   return (
-    <label className="flex items-center justify-between gap-3 text-xs text-slate-700">
+    <label className="flex items-center justify-between gap-3 text-xs text-zinc-700">
       <span className="min-w-28">{label}</span>
       <div className="flex-1">{children}</div>
     </label>
@@ -1509,7 +1468,7 @@ function Color({ value, onChange }) {
     <div className="flex items-center gap-2">
       <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
       <input
-        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+        className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -1526,7 +1485,7 @@ function Range({ value, onChange, min, max, step = 1 }) {
         max={max}
         step={step}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-indigo-600"
+        className="w-full accent-emerald-500"
       />
       <span className="w-10 text-right">{typeof value === 'number' ? value : ''}</span>
     </div>
@@ -1540,14 +1499,14 @@ function ModeTabs({ mode, setMode }) {
     { id: 'pattern', label: 'Pattern' },
   ];
   return (
-    <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+    <div className="inline-flex rounded-xl border border-zinc-200 bg-zinc-50 p-1">
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => setMode(t.id)}
           className={[
             'px-3 py-1.5 text-xs rounded-lg transition',
-            mode === t.id ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:bg-white',
+            mode === t.id ? 'bg-white shadow text-zinc-900' : 'text-zinc-600 hover:bg-white',
           ].join(' ')}
         >
           {t.label}
@@ -1574,7 +1533,7 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
             onClick={() => setActive(o.id)}
             className={[
               'w-full text-left rounded-xl border px-3 py-2 text-sm transition',
-              active === o.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
+              active === o.id ? 'border-emerald-400 bg-emerald-50' : 'border-zinc-200 hover:bg-zinc-50',
             ].join(' ')}
           >
             {o.label}
@@ -1586,7 +1545,7 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
           Cancel
         </button>
         <button
-          className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs"
+          className="rounded-lg bg-zinc-900 text-white px-3 py-1.5 text-xs"
           onClick={() => onConfirm(active)}
         >
           Continue
@@ -1682,11 +1641,11 @@ async function exportPng(url) {
 ------------------------------------------------------- */
 function EnhanceCustomizer({ initial, onChange, onComplete }) {
   return (
-    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border space-y-3">
       <div className="text-sm font-semibold">Enhance Settings</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <label className="space-y-1">
-          <span className="text-slate-600">Style</span>
+          <span className="text-zinc-600">Style</span>
           <input
             defaultValue={initial?.photographyStyle || ''}
             onChange={() => {}}
@@ -1695,7 +1654,7 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
           />
         </label>
         <label className="space-y-1">
-          <span className="text-slate-600">Background</span>
+          <span className="text-zinc-600">Background</span>
           <input
             defaultValue={initial?.background || ''}
             onChange={() => {}}
@@ -1704,7 +1663,7 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
           />
         </label>
         <label className="space-y-1">
-          <span className="text-slate-600">Lighting</span>
+          <span className="text-zinc-600">Lighting</span>
           <input
             defaultValue={initial?.lighting || ''}
             onChange={() => {}}
@@ -1713,7 +1672,7 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
           />
         </label>
         <label className="space-y-1">
-          <span className="text-slate-600">Colors</span>
+          <span className="text-zinc-600">Colors</span>
           <input
             defaultValue={initial?.colorStyle || ''}
             onChange={() => {}}
