@@ -9,7 +9,6 @@ export default function Layout({ children }) {
 
   return (
     <AnimatePresence mode="wait">
-      <div className="min-h-screen flex flex-col bg-[#0B0F19] text-[#F1F5F9]">
         <Navbar />
         <motion.main
           key={router.asPath}
@@ -17,12 +16,10 @@ export default function Layout({ children }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.3 }}
-          className="flex-1 px-4 md:px-10 pt-[5.5rem]"
         >
           {children}
         </motion.main>
         <Footer />
-      </div>
     </AnimatePresence>
   );
 }
