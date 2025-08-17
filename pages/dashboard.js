@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
 
 /* -------------------------------------------------------
    Small helpers
@@ -100,18 +100,15 @@ const ENHANCE_PRESETS = [
   }
 ];
 
-/** مكتبة المودلز (أضفت عينات؛ زد العدد لاحقاً ل٣٠-٤٠) */
-const MODELS = [
-  { id: 'm01', name: 'Ava — Studio Front', pose: 'front', url: '/models/m01.webp' },
-  { id: 'm02', name: 'Maya — Side Pose', pose: 'side', url: '/models/m02.webp' },
-  { id: 'm03', name: 'Lina — Half Body', pose: 'half', url: '/models/m03.webp' },
-  { id: 'm04', name: 'Zoe — Studio 3/4', pose: '34', url: '/models/m04.webp' },
-  { id: 'm05', name: 'Noah — Casual Front', pose: 'front', url: '/models/m05.webp' },
-  { id: 'm06', name: 'Omar — Studio Side', pose: 'side', url: '/models/m06.webp' },
-  { id: 'm07', name: 'Yara — Full Body', pose: 'full', url: '/models/m07.webp' },
-  { id: 'm08', name: 'Sara — 3/4 Smile', pose: '34', url: '/models/m08.webp' },
-  { id: 'm09', name: 'Jude — Front Studio', pose: 'front', url: '/models/m09.webp' },
-  { id: 'm10', name: 'Ali — Casual Half', pose: 'half', url: '/models/m10.webp' },
+/* -------------------------------------------------------
+   Archetypes (no human photos — illustrative cards only)
+------------------------------------------------------- */
+const ARCHETYPES = [
+  { id: 'female-catalog-front', label: 'Female • Catalog • Front', spec: { gender: 'Female', Age: 'Adult', bodyType: 'Average', style: 'Catalog', angle: 'Front', background: 'Beige Studio' }, ar: '3:4' },
+  { id: 'female-editorial-34',  label: 'Female • Editorial • 3/4', spec: { gender: 'Female', Age: 'Adult', bodyType: 'Slim',    style: 'Editorial', angle: 'Three-Quarter', background: 'Matte Beige' }, ar: '3:4' },
+  { id: 'male-catalog-front',   label: 'Male • Catalog • Front',   spec: { gender: 'Male',   Age: 'Adult', bodyType: 'Athletic', style: 'Catalog', angle: 'Front', background: 'Neutral Gray' }, ar: '3:4' },
+  { id: 'male-sport-side',      label: 'Male • Sport • Side',      spec: { gender: 'Male',   Age: 'Adult', bodyType: 'Fit',     style: 'Sport',    angle: 'Side', background: 'Slate Studio' }, ar: '3:4' },
+  { id: 'female-modest-front',  label: 'Female • Modest • Front',  spec: { gender: 'Female', Age: 'Adult', bodyType: 'Average', style: 'Catalog', angle: 'Front', background: 'Soft White', modest: true }, ar: '3:4' },
 ];
 
 /* -------------------------------------------------------
@@ -195,11 +192,12 @@ export default function Dashboard() {
   const [plan, setPlan]   = useState('Free');
 
   // single-file work area
-  // ملاحظة: في Try-On هذا الملف = صورة الملابس (مو صورة الشخص)
+  // في Try-On هذا الملف = صورة الملابس فقط
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
   const [imageData, setImageData] = useState(''); // for removeBG dataURL
   const [resultUrl, setResultUrl] = useState('');
+  const [variants, setVariants] = useState([]); // لعرض جميع المخرجات
 
   // model swap (two images)
   const [file1, setFile1] = useState(null);
@@ -209,10 +207,20 @@ export default function Dashboard() {
   const [swapPrompt, setSwapPrompt] = useState('');
 
   // Try-On specific (stepper)
-  const [selectedModel, setSelectedModel] = useState(null); // { id, name, url }
+  const [selectedArch, setSelectedArch] = useState(null); // { id, label, spec, ar }
   const [pieceType, setPieceType] = useState(null); // 'upper'|'lower'|'dress'
-  const [tryonStep, setTryonStep] = useState('cloth'); // 'cloth' -> 'piece' -> 'model'
+  const [tryonStep, setTryonStep] = useState('cloth'); // 'cloth' -> 'piece' -> 'archetype'
   const [showPieceType, setShowPieceType] = useState(false);
+
+  // Try-On options (Kontext controls)
+  const [tryonOptions, setTryonOptions] = useState({
+    aspect_ratio: '3:4',
+    num_images: 1,
+    seed: null,
+    seedLock: false,
+    guidance_scale: 3.5,
+    safety_tolerance: 2,
+  });
 
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
   const [busy, setBusy] = useState(false);
@@ -287,10 +295,11 @@ export default function Dashboard() {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
     setResultUrl('');
+    setVariants([]);
     setErr(''); setPhase('idle');
     if (tool === 'removeBg') setImageData(await fileToDataURL(f));
 
-    // Try-On flow: after uploading clothing, open piece-type pop-on
+    // Try-On flow: بعد رفع الملابس نفتح اختيار النوع
     if (tool === 'tryon') {
       setTryonStep('piece');
       setShowPieceType(true);
@@ -344,17 +353,24 @@ export default function Dashboard() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
-const buildTryOnPrompt = (pieceType) => {
-  const region =
-    pieceType === 'upper' ? 'the TOP' :
-    pieceType === 'lower' ? 'the BOTTOM' :
-    'the FULL OUTFIT';
+  const buildKontextPrompt = ({ pieceType, archetypeSpec, hints }) => {
+    const region = pieceType === 'upper' ? 'top' : pieceType === 'lower' ? 'bottom' : 'full outfit';
+    const { gender='Female', Age='Adult', bodyType='Average', style='Catalog', angle='Front', background='Beige Studio', modest=false } = archetypeSpec || {};
 
-  return [
-    `Make the model wear the cloth , make it fit and look exatilcy as the cloth photo , make 2 virions of the photo with same cloth in the another pic ,Put the cloth  on ${region} of the person `
-  ].join(' ');
-};
+    const fitHints = [];
+    if (hints?.sleeve) fitHints.push(`${hints.sleeve} sleeves`);
+    if (hints?.neckline) fitHints.push(`${hints.neckline} neckline`);
+    if (hints?.length) fitHints.push(`${hints.length} length`);
 
+    return (
+      `Generate a high-resolution studio-quality image of a realistic ${Age.toLowerCase()} ${gender.toLowerCase()} fashion model ` +
+      `with a ${bodyType.toLowerCase()} body, wearing the uploaded garment on the ${region}. ` +
+      `Angle: ${angle}. Style: ${style} shoot. Background: ${background}. ` +
+      `${modest ? 'Ensure modest coverage if garment allows. ' : ''}` +
+      `${fitHints.length ? `Fit details: ${fitHints.join(', ')}. ` : ''}` +
+      `Preserve fabric details, textures, seams, and prints. Soft studio lighting. No text or watermarks.`
+    ).trim();
+  };
 
   /* ---------- runners ---------- */
   const runRemoveBg = useCallback(async () => {
@@ -404,94 +420,80 @@ const buildTryOnPrompt = (pieceType) => {
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, uploadToStorage, plan, user, localUrl, toasts]);
 
-   // ===== Replacement: runTryOn (paste this whole function) =====
-const runTryOn = useCallback(async () => {
-  // تحقّقات سريعة
-  if (!file)              { setErr('Please upload a clothing image first.'); return; }
-  if (!selectedModel?.url){ setErr('Please select a model first.'); return; }
-  if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
+  // ===== Replacement: runTryOn (Kontext Max — single image) =====
+  const runTryOn = useCallback(async () => {
+    if (!file)              { setErr('Please upload a clothing image first.'); return; }
+    if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
+    if (!selectedArch)      { setErr('Please select a model archetype.'); return; }
 
-  // أصل الروابط لعمل /models/... كرابط مطلق
-  const origin =
-    (typeof window !== 'undefined' && window.location?.origin) ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://aistoreassistant.app';
+    setBusy(true);
+    setErr('');
+    setPhase('processing');
 
-  // IMAGE 1 = صورة الشخص/المودل (مطلقة)
-  const modelUrlAbs = selectedModel.url.startsWith('http')
-    ? selectedModel.url
-    : new URL(selectedModel.url, origin).toString();
+    const toast = toasts.push('Generating try‑on…', { progress: 10 });
+    let progress = 10;
+    const iv = setInterval(() => { progress = Math.min(progress + 6, 88); toast.update({ progress }); }, 500);
 
-  setBusy(true);
-  setErr('');
-  setPhase('processing');
+    try {
+      // رفع صورة القطعة
+      const clothUrl = await uploadToStorage(file);
 
-  // برومبت حسب نوع القطعة (تبقيه كما هو عندك)
-  const prompt = buildTryOnPrompt(pieceType);
+      // إعداد البرومبت
+      const prompt = buildKontextPrompt({ pieceType, archetypeSpec: selectedArch.spec, hints: tryonOptions.hints });
 
-  // توست تقدّم
-  const toast = toasts.push('Generating try-on…', { progress: 10 });
-  let progress = 10;
-  const iv = setInterval(() => {
-    progress = Math.min(progress + 6, 88);
-    toast.update({ progress });
-  }, 500);
+      // تحضير Seed (في حال lock)
+      let seedToUse = tryonOptions.seedLock
+        ? (typeof tryonOptions.seed === 'number' ? tryonOptions.seed : Math.floor(Math.random() * 1e9))
+        : undefined;
+      if (tryonOptions.seedLock && typeof seedToUse === 'number' && tryonOptions.seed !== seedToUse) {
+        setTryonOptions((s) => ({ ...s, seed: seedToUse }));
+      }
 
-  try {
-    // IMAGE 2 = رفع صورة القطعة إلى ستوريج ورجوع رابط عام
-    const clothUrl = await uploadToStorage(file);
+      // استدعاء API
+      const r = await fetch('/api/tryon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: clothUrl,
+          prompt,
+          plan,
+          user_email: user.email,
+          num_images: tryonOptions.num_images,
+          seed: seedToUse,
+          aspect_ratio: tryonOptions.aspect_ratio || selectedArch.ar || '3:4',
+          guidance_scale: tryonOptions.guidance_scale,
+          safety_tolerance: tryonOptions.safety_tolerance,
+        })
+      });
 
-    // استدعاء API المختصر: 4 حقول فقط
-    const r = await fetch('/api/tryon', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image1: modelUrlAbs,       // IMAGE 1
-        image2: clothUrl,          // IMAGE 2
-        pieceType,                    // نص الـTry-On
-        plan,
-        user_email: user.email
-      })
-    });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg = j?.error || (r.status === 401 ? 'Unauthorized.' : 'Generation failed.');
+        throw new Error(msg);
+      }
 
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const msg =
-        j?.error ||
-        (r.status === 400 ? 'Missing required fields.' :
-         r.status === 401 ? 'Unauthorized.' :
-         r.status === 403 ? 'No credits left.' :
-         r.status === 404 ? 'User not found.' :
-         r.status === 500 ? 'Generation failed on the server.' :
-         `Unexpected error (${r.status}).`);
-      throw new Error(msg);
+      const main = j?.image || j?.url || j?.result || (Array.isArray(j?.output) ? j.output[0] : '');
+      if (!main) throw new Error('No output image returned from the API.');
+
+      const all = j?.variants && Array.isArray(j.variants) ? j.variants : [main];
+      setResultUrl(main);
+      setVariants(all);
+      setHistory(h => [ { tool: 'Try‑On', inputThumb: localUrl, outputUrl: main, ts: Date.now() }, ...h ].slice(0, 24));
+
+      setPhase('ready');
+      toast.update({ progress: 100, msg: 'Try‑On ✓' });
+      setTimeout(() => toast.close(), 700);
+    } catch (e) {
+      console.error(e);
+      setPhase('error');
+      setErr(e?.message || 'Processing failed.');
+      toast.update({ msg: `Try‑On failed: ${e?.message || 'Error'}`, type: 'error' });
+      setTimeout(() => toast.close(), 1500);
+    } finally {
+      clearInterval(iv);
+      setBusy(false);
     }
-
-    // التقاط رابط الإخراج
-    const out = j?.image || j?.url || j?.result || (Array.isArray(j?.output) ? j.output[0] : '');
-    if (!out) throw new Error('No output image returned from the API.');
-
-    setResultUrl(out);
-    setHistory(h => [
-      { tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() },
-      ...h
-    ].slice(0, 24));
-
-    setPhase('ready');
-    toast.update({ progress: 100, msg: 'Try-On ✓' });
-    setTimeout(() => toast.close(), 700);
-  } catch (e) {
-    console.error(e);
-    setPhase('error');
-    setErr(e?.message || 'Processing failed.');
-    toast.update({ msg: `Try-On failed: ${e?.message || 'Error'}`, type: 'error' });
-    setTimeout(() => toast.close(), 1500);
-  } finally {
-    clearInterval(iv);
-    setBusy(false);
-  }
-}, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
-
+  }, [file, pieceType, selectedArch, uploadToStorage, plan, user, tryonOptions, localUrl, toasts]);
 
   const runModelSwap = useCallback(async () => {
     if (!file1 || !file2) return setErr('Pick both images.');
@@ -519,20 +521,20 @@ const runTryOn = useCallback(async () => {
 
   /* ---------- handlers ---------- */
   const resetAll = () => {
-    setFile(null); setLocalUrl(''); setResultUrl('');
+    setFile(null); setLocalUrl(''); setResultUrl(''); setVariants([]);
     setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
     setErr(''); setPhase('idle'); setCompare(false);
     // reset tryon
-    setSelectedModel(null); setPieceType(null); setTryonStep(tool==='tryon' ? 'cloth' : 'cloth');
+    setSelectedArch(null); setPieceType(null); setTryonStep(tool==='tryon' ? 'cloth' : 'cloth');
   };
 
   const switchTool = (nextId) => {
     setTool(nextId);
     // reset everything relevant on tool switch
-    setResultUrl(''); setErr(''); setPhase('idle'); setCompare(false);
+    setResultUrl(''); setVariants([]); setErr(''); setPhase('idle'); setCompare(false);
     setFile(null); setLocalUrl('');
     setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
-    setSelectedModel(null); setPieceType(null); setTryonStep(nextId==='tryon' ? 'cloth' : 'cloth');
+    setSelectedArch(null); setPieceType(null); setTryonStep(nextId==='tryon' ? 'cloth' : 'cloth');
   };
 
   const handleRun = () => {
@@ -561,6 +563,9 @@ const runTryOn = useCallback(async () => {
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
 
+  // Helpers for options
+  const setOption = (k, v) => setTryonOptions((s) => ({ ...s, [k]: v }));
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900">
       <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
@@ -583,7 +588,7 @@ const runTryOn = useCallback(async () => {
                   <button
                     key={g.id}
                     onClick={() => { setGroup(g.id); switchTool(g.id === 'product' ? 'enhance' : 'tryon'); }}
-                    className={['inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
+                    className={[`inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition`,
                       Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 hover:bg-slate-100'].join(' ')}
                   >
                     <Icon className="size-4" /> {g.label}
@@ -629,18 +634,18 @@ const runTryOn = useCallback(async () => {
 
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
-          {/* Presets / Model Flow */}
+          {/* Presets / Try-On Flow */}
           <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white/90 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-                  {group === 'product' ? 'Quick Presets' : (tool === 'tryon' ? 'Try-On Flow' : 'Pick a Model')}
+                  {group === 'product' ? 'Quick Presets' : (tool === 'tryon' ? 'Try-On Flow' : 'Model Swap')}
                 </h1>
                 <p className="text-slate-600 text-xs sm:text-sm">
                   {group === 'product'
                     ? <>Pick a preset or open <span className="font-semibold">Customize</span>.</>
                     : tool === 'tryon'
-                      ? <>Step 1: upload clothing → Step 2: choose type → Step 3: pick a model → Run.</>
+                      ? <>Step 1: upload clothing → Step 2: choose type → Step 3: pick an archetype → Run.</>
                       : <>Choose two images and run <span className="font-semibold">Model Swap</span>.</>}
                 </p>
               </div>
@@ -683,26 +688,26 @@ const runTryOn = useCallback(async () => {
             ) : tool === 'tryon' ? (
               <div className="mt-4">
                 {/* Stepper */}
-                <TryOnStepper step={tryonStep} pieceType={pieceType} modelPicked={!!selectedModel} />
+                <TryOnStepper step={tryonStep} pieceType={pieceType} archetypePicked={!!selectedArch} />
 
-                {/* Only show model gallery AFTER pieceType is chosen (step === 'model') */}
-                {tryonStep === 'model' ? (
+                {/* Only show archetypes AFTER pieceType is chosen (step === 'archetype') */}
+                {tryonStep === 'archetype' ? (
                   <div className="mt-3">
-                    <div className="mb-2 text-[12px] font-semibold text-slate-700">Models</div>
+                    <div className="mb-2 text-[12px] font-semibold text-slate-700">Model Archetypes <span className="ml-1 text-[10px] text-slate-500">Illustrative only</span></div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      {MODELS.map((m) => (
-                        <ModelCard
-                          key={m.id}
-                          model={m}
-                          active={selectedModel?.id === m.id}
-                          onSelect={() => setSelectedModel(m)}
+                      {ARCHETYPES.map((a) => (
+                        <ArchetypeCard
+                          key={a.id}
+                          archetype={a}
+                          active={selectedArch?.id === a.id}
+                          onSelect={() => { setSelectedArch(a); if (!tryonOptions.aspect_ratio) setOption('aspect_ratio', a.ar || '3:4'); }}
                         />
                       ))}
                     </div>
                   </div>
                 ) : (
                   <div className="mt-3 rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-600 bg-slate-50">
-                    Upload clothing first, then choose type. Models will appear next.
+                    Upload clothing first, then choose type. Archetypes will appear next.
                   </div>
                 )}
               </div>
@@ -715,7 +720,7 @@ const runTryOn = useCallback(async () => {
           </div>
 
           {/* Workbench */}
-          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_360px]">
             {/* Canvas Panel */}
             <section className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm relative">
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
@@ -832,13 +837,13 @@ const runTryOn = useCallback(async () => {
                   disabled={
                     busy || (
                       tool === 'modelSwap' ? (!file1 || !file2) :
-                      tool === 'tryon' ? (!file || !selectedModel || !pieceType) :
+                      tool === 'tryon' ? (!file || !selectedArch || !pieceType) :
                       !file
                     )
                   }
                   className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                 >
-                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On')}</>)}
+                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try‑On')}</>)}
                 </button>
 
                 {resultUrl && (
@@ -903,7 +908,7 @@ const runTryOn = useCallback(async () => {
                 <span className="text-xs text-slate-500">Tool: {tool}</span>
               </div>
 
-              {/* Try-On summary */}
+              {/* Try-On inspector */}
               {tool === 'tryon' && (
                 <div className="space-y-3 mt-3 text-xs">
                   <div className="rounded-lg border p-3">
@@ -924,19 +929,121 @@ const runTryOn = useCallback(async () => {
                   </div>
 
                   <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Selected Model</div>
-                    {selectedModel ? (
+                    <div className="text-slate-600 mb-1">Selected Archetype</div>
+                    {selectedArch ? (
                       <div className="flex items-center gap-2">
-                        <img src={selectedModel.url} alt={selectedModel.name} className="w-10 h-10 rounded-md object-cover border" />
-                        <div>
-                          <div className="font-semibold text-slate-900">{selectedModel.name}</div>
-                          <div className="text-[11px] text-slate-500">Pose: {selectedModel.pose}</div>
-                        </div>
+                        <ArchetypeChip label={selectedArch.label} />
                       </div>
                     ) : (
-                      <div className="text-slate-400">— Pick a model above —</div>
+                      <div className="text-slate-400">— Pick an archetype above —</div>
                     )}
                   </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-slate-600 mb-2">Try‑On Options</div>
+
+                    <Field label="Aspect Ratio">
+                      <select
+                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                        value={tryonOptions.aspect_ratio}
+                        onChange={(e)=>setOption('aspect_ratio', e.target.value)}
+                      >
+                        {['3:4','4:3','1:1','2:3','3:2','16:9','9:16'].map((r)=>(<option key={r} value={r}>{r}</option>))}
+                      </select>
+                    </Field>
+
+                    <Field label="Variants">
+                      <div className="flex items-center gap-2">
+                        <input type="range" min={1} max={3} value={tryonOptions.num_images}
+                          onChange={(e)=>setOption('num_images', Number(e.target.value))} className="w-full accent-indigo-600" />
+                        <span className="w-6 text-right">{tryonOptions.num_images}</span>
+                      </div>
+                    </Field>
+
+                    <Field label="Seed Lock">
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" checked={tryonOptions.seedLock} onChange={(e)=>setOption('seedLock', e.target.checked)} />
+                        {tryonOptions.seedLock && (
+                          <input type="number" className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                            value={tryonOptions.seed ?? ''}
+                            onChange={(e)=>setOption('seed', e.target.value === '' ? null : Number(e.target.value))}
+                            placeholder="auto" />
+                        )}
+                      </div>
+                    </Field>
+
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-slate-700">Advanced</summary>
+                      <div className="mt-2 space-y-2">
+                        <Field label="Guidance">
+                          <input type="number" step="0.1" min={1} max={12} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                            value={tryonOptions.guidance_scale}
+                            onChange={(e)=>setOption('guidance_scale', Number(e.target.value))} />
+                        </Field>
+                        <Field label="Safety">
+                          <input type="number" min={1} max={6} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                            value={tryonOptions.safety_tolerance}
+                            onChange={(e)=>setOption('safety_tolerance', Number(e.target.value))} />
+                        </Field>
+                      </div>
+                    </details>
+                  </div>
+
+                  <div className="rounded-lg border p-3">
+                    <div className="text-slate-600 mb-2">Fit Hints</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      <Field label="Sleeves">
+                        <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                          value={tryonOptions?.hints?.sleeve || ''}
+                          onChange={(e)=>setOption('hints', { ...(tryonOptions.hints||{}), sleeve: e.target.value || null })}
+                        >
+                          <option value="">—</option>
+                          <option value="short">Short</option>
+                          <option value="long">Long</option>
+                          <option value="none">Sleeveless</option>
+                        </select>
+                      </Field>
+                      <Field label="Neckline">
+                        <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                          value={tryonOptions?.hints?.neckline || ''}
+                          onChange={(e)=>setOption('hints', { ...(tryonOptions.hints||{}), neckline: e.target.value || null })}
+                        >
+                          <option value="">—</option>
+                          <option value="v-neck">V‑neck</option>
+                          <option value="crew">Crew</option>
+                          <option value="collared">Collared</option>
+                        </select>
+                      </Field>
+                      <Field label="Length">
+                        <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                          value={tryonOptions?.hints?.length || ''}
+                          onChange={(e)=>setOption('hints', { ...(tryonOptions.hints||{}), length: e.target.value || null })}
+                        >
+                          <option value="">—</option>
+                          <option value="waist">Waist</option>
+                          <option value="hip">Hip</option>
+                          <option value="knee">Knee</option>
+                          <option value="ankle">Ankle</option>
+                        </select>
+                      </Field>
+                    </div>
+                  </div>
+
+                  {/* Variants strip */}
+                  {variants?.length > 1 && (
+                    <div className="rounded-lg border p-3">
+                      <div className="text-slate-600 mb-2">Variants</div>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {variants.map((v,i)=>(
+                          <button key={i} onClick={()=>setResultUrl(v)}
+                            className={`shrink-0 rounded-lg border ${resultUrl===v ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200'} bg-slate-50`}
+                          >
+                            <img src={v} alt={`v${i+1}`} className="h-20 w-20 object-cover rounded-md" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {resultUrl && (
                     <div className="rounded-lg border p-3">
@@ -1171,7 +1278,7 @@ const runTryOn = useCallback(async () => {
                 onConfirm={(type) => {
                   setPieceType(type);
                   setShowPieceType(false);
-                  setTryonStep('model'); // بعد اختيار النوع ننتقل لاختيار المودل
+                  setTryonStep('archetype'); // بعد اختيار النوع ننتقل لاختيار نوع المودل
                 }}
               />
             </div>
@@ -1261,46 +1368,60 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
   );
 }
 
-function ModelCard({ model, active, onSelect }) {
+function ArchetypeChip({ label }) {
+  return (
+    <span className="inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-[11px]">
+      <span className="size-2 rounded-full bg-indigo-500" /> {label}
+    </span>
+  );
+}
+
+function ArchetypeCard({ archetype, active, onSelect }) {
+  // رسم بطاقة توضيحية بدون صور بشرية
+  const colors = [
+    'from-indigo-500 to-fuchsia-500',
+    'from-emerald-500 to-lime-500',
+    'from-sky-500 to-indigo-500',
+    'from-amber-500 to-rose-500',
+    'from-slate-500 to-gray-700',
+  ];
+  const grad = colors[ Math.abs(archetype.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % colors.length ];
+
   return (
     <button
       onClick={onSelect}
       className={[
-        'group relative rounded-2xl overflow-hidden border bg-white shadow-sm transition',
-        active
-          ? 'border-indigo-400 ring-2 ring-indigo-300'
-          : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
+        'group relative rounded-2xl overflow-hidden border bg-white shadow-sm transition text-left',
+        active ? 'border-indigo-400 ring-2 ring-indigo-300' : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
       ].join(' ')}
-      title={model.name}
+      title={archetype.label}
     >
-      <div className="relative w-full aspect-[4/5] bg-slate-100">
-        <img
-          src={model.url}
-          alt={model.name}
-          className="absolute inset-0 w-full h-full object-cover"
-          loading="lazy"
-        />
+      <div className={`relative w-full aspect-[4/5] bg-gradient-to-br ${grad}`}> 
+        {/* Placeholder illustration */}
+        <div className="absolute inset-3 rounded-xl bg-white/70 backdrop-blur border border-white/60 grid place-items-center">
+          <div className="w-12 h-16 rounded-md border-2 border-dashed border-slate-400/80 bg-white/60" />
+        </div>
         <div className="absolute top-2 left-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
-          {active ? 'Selected' : 'Use model'}
+          {active ? 'Selected' : 'Use archetype'}
         </div>
       </div>
       <div className="p-3">
-        <div className="font-semibold truncate">{model.name}</div>
-        <div className="text-[11px] text-slate-500">Pose: {model.pose}</div>
+        <div className="font-semibold truncate">{archetype.label}</div>
+        <div className="text-[11px] text-slate-500">AR: {archetype.ar || '3:4'}</div>
       </div>
     </button>
   );
 }
 
-/** Stepper أنيق لتدفق الـ Try-On */
-function TryOnStepper({ step, pieceType, modelPicked }) {
-  const map = { cloth: 0, piece: 1, model: 2 };
+/** Stepper لتدفق الـ Try-On (cloth → piece → archetype) */
+function TryOnStepper({ step, pieceType, archetypePicked }) {
+  const map = { cloth: 0, piece: 1, archetype: 2 };
   const idx = map[step] ?? 0;
 
   const steps = [
     { id: 'cloth', label: 'Upload clothing' },
     { id: 'piece', label: pieceType ? `Type: ${pieceType}` : 'Choose type' },
-    { id: 'model', label: modelPicked ? 'Model selected' : 'Pick a model' },
+    { id: 'archetype', label: archetypePicked ? 'Archetype selected' : 'Pick an archetype' },
   ];
 
   return (
