@@ -1,31 +1,29 @@
 // app/page.jsx
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { motion, useAnimation, useReducedMotion } from 'framer-motion';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from "next/link";
+import { motion, useAnimation, useReducedMotion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * WARDROBE COLLIDER — Duo Landing (Enhance + Try-On) — Weird, Bright, B2B, Mobile-first
- * - No uploads / zero-cost demo: abstract holograms, SVG mannequins, CSS gradients
- * - Two capabilities only: Enhance (product retouch/upscale) & Try-On (garment on model)
- * - Highly responsive: phones-first behaviors, sticky CTA, reduced motion friendly
- * - Color system: Apricot Sand (#FFF7ED) base, Tangerine CTA, Lime (Enhance), Fuchsia (Try-On), Sky accents
- * - Animations: orbit/collider ring, beam pulses, shimmer sweeps, SVG path draws — transform/opacity only
+ * WARDROBE COLLIDER — Hyper-Weird B2B Duo Landing (Navbar removed)
+ * - Modes: Enhance (retouch/upscale) & Try-On (garment on mannequin)
+ * - Mobile-first, responsive, reduced-motion friendly
+ * - Visual explanations with pictures (placeholders), animated accents only on transform/opacity
+ * - Bright surreal gradients, blob morphs, glitch-on-press, sticky mobile CTA
  */
 
 export default function Page() {
   return (
-    <main className="relative min-h-screen w-full bg-[#FFF7ED] text-zinc-900">
+    <main className="relative min-h-screen w-full overflow-clip bg-[#FFF7ED] text-zinc-900">
       <CornerGradients />
       <NoiseOverlay />
-      <HeaderBar />
 
       <HeroCollider />
 
-      <SectionDivider />
-
       <HowItWorks />
+
+      <WeirdGallery />
 
       <B2BBenefits />
 
@@ -34,85 +32,19 @@ export default function Page() {
       <BottomCTA />
 
       <StickyMobileCTA />
+
+      <StyleKeyframes />
     </main>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                HEADER (lite)                               */
-/* -------------------------------------------------------------------------- */
-function HeaderBar() {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  return (
-    <header
-      className={[
-        'sticky top-0 z-50 w-full transition-all duration-300',
-        scrolled ? 'shadow-[0_10px_30px_-10px_rgba(249,115,22,.25)]' : '',
-      ].join(' ')}
-      aria-label="Primary"
-    >
-      <div className="h-[3px] w-full bg-gradient-to-r from-orange-400 via-fuchsia-400 to-lime-400 opacity-80" />
-      <div
-        className={[
-          'mx-auto max-w-7xl px-4',
-          'rounded-b-3xl border-b border-zinc-200/60',
-          'backdrop-blur-xl',
-          scrolled ? 'bg-white/80' : 'bg-white/60',
-        ].join(' ')}
-      >
-        <nav className="flex h-16 items-center justify-between">
-          <Link href="/" className="group inline-flex items-center gap-2">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg">
-              <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
-                <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
-              </svg>
-            </div>
-            <span className="font-semibold tracking-tight">Wardrobe Collider</span>
-          </Link>
-
-          <div className="hidden items-center gap-2 md:flex">
-            <a href="#how" className="rounded-full px-3 py-2 text-sm font-medium hover:bg-zinc-900/5">
-              How it works
-            </a>
-            <a href="#benefits" className="rounded-full px-3 py-2 text-sm font-medium hover:bg-zinc-900/5">
-              Benefits
-            </a>
-            <a href="#trust" className="rounded-full px-3 py-2 text-sm font-medium hover:bg-zinc-900/5">
-              Trust
-            </a>
-            <Link
-              href="/dashboard"
-              className="ml-1 inline-flex items-center justify-center rounded-full bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition hover:bg-orange-700"
-            >
-              Launch Studio
-            </Link>
-          </div>
-
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center justify-center rounded-full bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition hover:bg-orange-700 md:hidden"
-          >
-            Start
-          </Link>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                                HERO — COLLIDER                             */
+/*                                HERO — COLLIDER                              */
 /* -------------------------------------------------------------------------- */
 
 function HeroCollider() {
   return (
-    <section className="relative isolate mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 pb-20 pt-10 sm:px-6 md:grid-cols-2 md:px-10 lg:px-16">
+    <section className="relative isolate mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 pb-16 pt-10 sm:px-6 md:grid-cols-2 md:px-10 lg:px-16">
       <HeroCopy />
       <ColliderScene />
     </section>
@@ -122,14 +54,14 @@ function HeroCollider() {
 function HeroCopy() {
   return (
     <div className="relative z-10">
-      <Badge>WEIRD • BRIGHT • BUILT FOR COMMERCE</Badge>
+      <Badge>WEIRD • BRIGHT • B2B • RESPONSIVE</Badge>
 
       <h1 className="mt-3 text-balance text-4xl font-extrabold leading-[1.04] tracking-tight md:text-5xl">
-        Two superpowers for your catalog:{' '}
+        Two superpowers for your catalog:{" "}
         <span className="bg-gradient-to-r from-lime-500 via-orange-500 to-fuchsia-500 bg-clip-text text-transparent">
           Enhance
-        </span>{' '}
-        &{' '}
+        </span>{" "}
+        &{" "}
         <span className="bg-gradient-to-r from-fuchsia-500 via-orange-500 to-lime-500 bg-clip-text text-transparent">
           Try-On
         </span>
@@ -137,8 +69,8 @@ function HeroCopy() {
       </h1>
 
       <p className="mt-3 max-w-xl text-base md:text-lg">
-        No studios. No reshoots. Our AI retouches product photos to high-res and previews garments on models—ready for
-        every channel.
+        No studios. No reshoots. Our AI retouches product photos to high-res and previews garments on models — ready
+        for every channel.
       </p>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -193,14 +125,12 @@ function GhostCTA({ href, children }) {
 
 function ColliderScene() {
   const prefersReducedMotion = useReducedMotion();
-
-  // Mode toggles the dominant effect: 'enhance' or 'tryon'
-  const [mode, setMode] = useState('enhance');
+  const [mode, setMode] = useState("enhance");
 
   // Auto cycle between modes unless reduced-motion
   useEffect(() => {
     if (prefersReducedMotion) return;
-    const t = setInterval(() => setMode((m) => (m === 'enhance' ? 'tryon' : 'enhance')), 3600);
+    const t = setInterval(() => setMode((m) => (m === "enhance" ? "tryon" : "enhance")), 3600);
     return () => clearInterval(t);
   }, [prefersReducedMotion]);
 
@@ -208,54 +138,51 @@ function ColliderScene() {
   const ringControls = useAnimation();
   useEffect(() => {
     if (prefersReducedMotion) return;
-    ringControls.start({
-      rotate: 360,
-      transition: { duration: 40, repeat: Infinity, ease: 'linear' },
-    });
+    ringControls.start({ rotate: 360, transition: { duration: 40, repeat: Infinity, ease: "linear" } });
   }, [prefersReducedMotion, ringControls]);
 
-  // pulse color for the active mode
   const pulseColor =
-    mode === 'enhance'
-      ? 'shadow-[0_0_0_8px_rgba(163,230,53,.12)]'
-      : 'shadow-[0_0_0_8px_rgba(244,114,182,.12)]';
+    mode === "enhance"
+      ? "shadow-[0_0_0_8px_rgba(163,230,53,.12)]"
+      : "shadow-[0_0_0_8px_rgba(244,114,182,.12)]";
 
   return (
     <div className="relative mx-auto w-[min(92vw,38rem)]">
       {/* Mode switcher chips (mobile-friendly) */}
       <div className="mb-3 flex items-center gap-2">
-        <Chip active={mode === 'enhance'} color="bg-lime-500" onClick={() => setMode('enhance')}>
+        <Chip active={mode === "enhance"} color="bg-lime-500" onClick={() => setMode("enhance")}>
           Enhance
         </Chip>
-        <Chip active={mode === 'tryon'} color="bg-fuchsia-500" onClick={() => setMode('tryon')}>
+        <Chip active={mode === "tryon"} color="bg-fuchsia-500" onClick={() => setMode("tryon")}>
           Try-On
         </Chip>
       </div>
 
       <div
         className={[
-          'relative aspect-square w-full rounded-3xl border border-orange-200 bg-white p-5',
-          'shadow-[0_20px_60px_rgba(249,115,22,0.12)]',
-        ].join(' ')}
+          "relative aspect-square w-full rounded-3xl border border-orange-200 bg-white p-5",
+          "shadow-[0_20px_60px_rgba(249,115,22,0.12)]",
+          "group",
+        ].join(" ")}
       >
         {/* Collider ring + beams */}
         <motion.div
           aria-hidden
           animate={ringControls}
           className={[
-            'absolute left-1/2 top-1/2 h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full',
-            'bg-[conic-gradient(from_0deg,#f97316,#22c55e,#38bdf8,#f472b6,#f97316)] opacity-70',
-            'blur-xl',
-          ].join(' ')}
+            "absolute left-1/2 top-1/2 h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full",
+            "bg-[conic-gradient(from_0deg,#f97316,#22c55e,#38bdf8,#f472b6,#f97316)] opacity-70",
+            "blur-xl",
+          ].join(" ")}
         />
 
         {/* Inner plate */}
         <div
           className={[
-            'absolute left-1/2 top-1/2 h-[52%] w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]',
-            'bg-white/70 backdrop-blur-md ring-1 ring-zinc-200',
+            "absolute left-1/2 top-1/2 h-[52%] w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]",
+            "bg-white/70 backdrop-blur-md ring-1 ring-zinc-200",
             pulseColor,
-          ].join(' ')}
+          ].join(" ")}
         />
 
         {/* ENTRY capsule (Product) */}
@@ -268,9 +195,9 @@ function ColliderScene() {
           subtitle="Sharper • Brighter • Cleaner"
           colorClass="from-lime-400 to-emerald-400"
           boxClass="right-3 top-3"
-          active={mode === 'enhance'}
+          active={mode === "enhance"}
         >
-          <EnhancePreview active={mode === 'enhance'} />
+          <EnhancePreview active={mode === "enhance"} />
         </OutletCard>
 
         {/* TRY-ON outlet (bottom-right) */}
@@ -280,26 +207,32 @@ function ColliderScene() {
           subtitle="Realistic models • Sizes"
           colorClass="from-fuchsia-400 to-amber-400"
           boxClass="bottom-3 right-3"
-          active={mode === 'tryon'}
+          active={mode === "tryon"}
         >
-          <TryOnPreview active={mode === 'tryon'} />
+          <TryOnPreview active={mode === "tryon"} />
         </OutletCard>
 
         {/* beam to enhance */}
         <Beam
-          start={{ x: '54%', y: '46%' }}
-          end={{ x: '86%', y: '18%' }}
+          start={{ x: "54%", y: "46%" }}
+          end={{ x: "86%", y: "18%" }}
           gradient="linear-gradient(90deg,#A3E635,#ffffff)"
           paused={prefersReducedMotion}
         />
 
         {/* beam to try-on */}
         <Beam
-          start={{ x: '50%', y: '54%' }}
-          end={{ x: '86%', y: '78%' }}
+          start={{ x: "50%", y: "54%" }}
+          end={{ x: "86%", y: "78%" }}
           gradient="linear-gradient(90deg,#F472B6,#ffffff)"
           paused={prefersReducedMotion}
         />
+
+        {/* Press & hold to glitch */}
+        <div className="pointer-events-none absolute inset-0 rounded-3xl [--g:0] group-active:[--g:1]">
+          <div className="absolute inset-0 rounded-3xl opacity-0 blur-sm transition-opacity duration-150 group-active:opacity-100"
+               style={{ background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px)" }} />
+        </div>
       </div>
 
       {/* Legend / micro help */}
@@ -310,11 +243,9 @@ function ColliderScene() {
         <span className="inline-flex items-center gap-2">
           <Dot className="bg-fuchsia-500" /> Try-On
         </span>
-        <span className="inline-flex items-center gap-1">•</span>
+        <span aria-hidden className="inline-flex items-center gap-1">•</span>
         <span className="">Auto-cycles. Tap a chip to focus.</span>
       </div>
-
-      <StyleKeyframes />
     </div>
   );
 }
@@ -324,20 +255,18 @@ function Chip({ active, color, children, onClick }) {
     <button
       onClick={onClick}
       className={[
-        'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition',
-        active
-          ? 'border-zinc-300 bg-white shadow-sm'
-          : 'border-zinc-200 bg-white/70 hover:bg-white',
-      ].join(' ')}
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+        active ? "border-zinc-300 bg-white shadow-sm" : "border-zinc-200 bg-white/70 hover:bg-white",
+      ].join(" ")}
     >
-      <span className={`h-2 w-2 rounded-full ${color}`} aria-hidden />
+      <span className={["h-2 w-2 rounded-full", color].join(" ")} aria-hidden />
       {children}
     </button>
   );
 }
 
-function Dot({ className = '' }) {
-  return <span className={`inline-block h-2 w-2 rounded-full ${className}`} aria-hidden />;
+function Dot({ className = "" }) {
+  return <span className={["inline-block h-2 w-2 rounded-full", className].join(" ")} aria-hidden />;
 }
 
 function EntryCapsule() {
@@ -345,10 +274,7 @@ function EntryCapsule() {
   const controls = useAnimation();
   useEffect(() => {
     if (prefersReducedMotion) return;
-    controls.start({
-      y: [0, -4, 0],
-      transition: { duration: 3, repeat: Infinity, ease: 'easeInOut' },
-    });
+    controls.start({ y: [0, -4, 0], transition: { duration: 3, repeat: Infinity, ease: "easeInOut" } });
   }, [prefersReducedMotion, controls]);
 
   return (
@@ -375,41 +301,34 @@ function EntryCapsule() {
 
 function Beam({ start, end, gradient, paused }) {
   const prefersReducedMotion = paused;
+  const dx = useMemo(() => 0, []);
   return (
     <motion.div
       aria-hidden
-      className="absolute h-1 origin-left"
+      className="absolute h-1 origin-left rounded-md"
       style={{
         left: start.x,
         top: start.y,
-        width: '38%',
-        transform: `translate(-50%,-50%)`,
+        width: "38%",
+        transform: "translate(-50%,-50%)",
         background: gradient,
-        boxShadow: '0 0 18px rgba(0,0,0,0.08)',
-        borderRadius: '8px',
+        boxShadow: "0 0 18px rgba(0,0,0,0.08)",
+        borderRadius: "8px",
       }}
-      animate={
-        prefersReducedMotion
-          ? { opacity: 0.6 }
-          : { opacity: [0.3, 0.85, 0.3] }
-      }
-      transition={
-        prefersReducedMotion
-          ? {}
-          : { duration: 3.4, repeat: Infinity, repeatType: 'mirror' }
-      }
+      animate={prefersReducedMotion ? { opacity: 0.6 } : { opacity: [0.3, 0.85, 0.3] }}
+      transition={prefersReducedMotion ? {} : { duration: 3.4, repeat: Infinity, repeatType: "mirror" }}
     />
   );
 }
 
 function OutletCard({ id, title, subtitle, colorClass, boxClass, active, children }) {
   return (
-    <div className={`pointer-events-auto absolute ${boxClass} z-[2]`}>
+    <div className={["pointer-events-auto absolute", boxClass, "z-[2]"].join(" ")}> 
       <div
         className={[
-          'relative w-[10.5rem] rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm transition',
-          active ? 'ring-2 ring-offset-2 ring-offset-white ring-zinc-200' : '',
-        ].join(' ')}
+          "relative w-[10.5rem] rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm transition",
+          active ? "ring-2 ring-zinc-200 ring-offset-2 ring-offset-white" : "",
+        ].join(" ")}
         role="group"
         aria-labelledby={`${id}-title`}
       >
@@ -418,7 +337,7 @@ function OutletCard({ id, title, subtitle, colorClass, boxClass, active, childre
         </div>
       </div>
       <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold">
-        <span className={`inline-block h-2 w-2 rounded-full bg-gradient-to-r ${colorClass}`} aria-hidden />
+        <span className={["inline-block h-2 w-2 rounded-full bg-gradient-to-r", colorClass].join(" ")} aria-hidden />
         <span id={`${id}-title`}>{title}</span>
       </div>
       <div className="text-[10px] text-zinc-500">{subtitle}</div>
@@ -439,9 +358,9 @@ function EnhancePreview({ active }) {
       {/* shimmer sweep for 'enhance' */}
       <div
         className={[
-          'absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.8),transparent)] bg-[length:200%_100%]',
-          active ? 'animate-shimmer' : 'opacity-50',
-        ].join(' ')}
+          "absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.8),transparent)] bg-[length:200%_100%]",
+          active ? "animate-shimmer" : "opacity-50",
+        ].join(" ")}
       />
       {/* focus vignette */}
       <div className="pointer-events-none absolute inset-0 rounded-lg shadow-[inset_0_0_40px_rgba(0,0,0,0.15)]" />
@@ -450,7 +369,6 @@ function EnhancePreview({ active }) {
 }
 
 function TryOnPreview({ active }) {
-  // flip garment opacity/scale
   const prefersReducedMotion = useReducedMotion();
   const [flip, setFlip] = useState(false);
   useEffect(() => {
@@ -480,7 +398,7 @@ function TryOnPreview({ active }) {
         className="absolute left-1/2 top-[48%] h-24 w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-md"
         animate={active ? { opacity: flip ? 0.95 : 0.7, scale: flip ? 1 : 0.98 } : { opacity: 0.7, scale: 1 }}
         transition={{ duration: 0.6 }}
-        style={{ background: 'linear-gradient(135deg,#c084fc,#f472b6)' }}
+        style={{ background: "linear-gradient(135deg,#c084fc,#f472b6)" }}
       />
       {/* inner shadow */}
       <div className="pointer-events-none absolute inset-0 rounded-lg shadow-[inset_0_0_40px_rgba(0,0,0,0.12)]" />
@@ -489,49 +407,26 @@ function TryOnPreview({ active }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              SECTION: DIVIDER                               */
-/* -------------------------------------------------------------------------- */
-
-function SectionDivider() {
-  return (
-    <div className="mx-auto my-6 max-w-7xl px-5 sm:px-6 md:px-10 lg:px-16">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold">1 / 2</span>
-          <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/70 ring-1 ring-zinc-200">
-            <div className="h-full w-1/2 rounded-full bg-gradient-to-r from-orange-400 via-fuchsia-400 to-lime-400" />
-          </div>
-        </div>
-        <a
-          href="#how"
-          className="inline-flex items-center justify-center rounded-full bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(249,115,22,0.3)] hover:bg-orange-700"
-        >
-          Continue →
-        </a>
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                              HOW IT WORKS (2)                               */
+/*                              HOW IT WORKS (with pics)                      */
 /* -------------------------------------------------------------------------- */
 
 function HowItWorks() {
   const steps = [
     {
-      title: 'Enhance',
-      hue: 'from-lime-400 to-emerald-400',
-      copy: 'Auto retouch & upscale to high-res. Better lighting, color, and clarity — instantly.',
-      bullets: ['High-res export', 'Color-correct', 'Fast previews'],
-      icon: '✨',
+      title: "Enhance",
+      hue: "from-lime-400 to-emerald-400",
+      copy: "Auto retouch & upscale to high-res. Better lighting, color, and clarity — instantly.",
+      bullets: ["High-res export", "Color-correct", "Fast previews"],
+      img: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?q=80&w=1400&auto=format&fit=crop",
+      icon: "✨",
     },
     {
-      title: 'Try-On',
-      hue: 'from-fuchsia-400 to-amber-400',
-      copy: 'Realistic on-model previews for garments. Size and fit awareness with consistent lighting.',
-      bullets: ['Multiple sizes', 'Skin-tone friendly', 'Export-ready'],
-      icon: '🧍',
+      title: "Try-On",
+      hue: "from-fuchsia-400 to-amber-400",
+      copy: "Realistic on-model previews for garments. Size and fit awareness with consistent lighting.",
+      bullets: ["Multiple sizes", "Skin-tone friendly", "Export-ready"],
+      img: "https://images.unsplash.com/photo-1562158070-4b69b9a39a8a?q=80&w=1400&auto=format&fit=crop",
+      icon: "🧍",
     },
   ];
 
@@ -552,31 +447,86 @@ function HowItWorks() {
             transition={{ duration: 0.45 }}
             className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm"
           >
-            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-gradient-to-br opacity-30 blur-2xl sm:h-36 sm:w-36" style={{ backgroundImage: `linear-gradient(to bottom right, var(--tw-gradient-stops))` }}>
-              {/* gradient background hint, actual colors from class on child below */}
-            </div>
+            {/* gradient background hint */}
+            <div
+              className="absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-30 blur-2xl sm:h-36 sm:w-36"
+              style={{ backgroundImage: "linear-gradient(to bottom right, var(--tw-gradient-stops))" }}
+            />
 
             <div className="relative z-10">
-              <div className={`mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-semibold ring-1 ring-zinc-200`}>
-                <span className={`inline-block h-2 w-2 rounded-full bg-gradient-to-r ${s.hue}`} />
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-semibold ring-1 ring-zinc-200">
+                <span className={["inline-block h-2 w-2 rounded-full bg-gradient-to-r", s.hue].join(" ")} />
                 {s.title}
               </div>
-              <div className="text-2xl" aria-hidden>
-                {s.icon}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-2xl" aria-hidden>
+                    {s.icon}
+                  </div>
+                  <p className="mt-2 text-sm text-zinc-700">{s.copy}</p>
+                  <ul className="mt-3 space-y-1 text-sm">
+                    {s.bullets.map((b) => (
+                      <li key={b} className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-orange-400" />
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
+                    <img src={s.img} alt={`${s.title} example`} className="h-full w-full object-cover" />
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl mix-blend-overlay" style={{ background: "radial-gradient(120px 80px at 80% 20%, rgba(255,255,255,0.5), transparent 60%)" }} />
+                  </div>
+                </div>
               </div>
-              <p className="mt-2 text-sm text-zinc-700">{s.copy}</p>
-              <ul className="mt-3 space-y-1 text-sm">
-                {s.bullets.map((b) => (
-                  <li key={b} className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-orange-400" />
-                    {b}
-                  </li>
-                ))}
-              </ul>
             </div>
 
             {/* decorative gradient ring per card */}
-            <div className={`pointer-events-none absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br ${s.hue} opacity-10`} aria-hidden />
+            <div className={["pointer-events-none absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br opacity-10", s.hue].join(" ")} aria-hidden />
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 WEIRD GALLERY                               */
+/* -------------------------------------------------------------------------- */
+
+function WeirdGallery() {
+  const images = [
+    "https://images.unsplash.com/photo-1608571428094-4813d4d9d94c?q=80&w=1400&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1520975682031-5f1b1a3bb0de?q=80&w=1400&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9b?q=80&w=1400&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1610395219791-24f9f2c8b447?q=80&w=1400&auto=format&fit=crop",
+  ];
+
+  return (
+    <section className="relative mx-auto max-w-7xl px-5 pb-12 pt-4 sm:px-6 md:px-10 lg:px-16">
+      <div className="mb-4 flex items-end justify-between">
+        <h3 className="text-2xl font-extrabold">Pictures explain the vibe</h3>
+        <span className="text-xs text-zinc-600">Press & hold any tile to glitch</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {images.map((src, i) => (
+          <motion.div
+            key={src}
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.4, delay: i * 0.05 }}
+            className="group relative aspect-square overflow-hidden rounded-3xl border border-zinc-200 bg-white"
+          >
+            <img src={src} alt={`Sample ${i + 1}`} className="h-full w-full object-cover transition group-active:scale-[1.04]" />
+            {/* surreal overlay */}
+            <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100">
+              <div className="absolute inset-0 animate-hue rounded-3xl mix-blend-color" style={{ background: "conic-gradient(from 0deg, rgba(249,115,22,.25), rgba(132,204,22,.25), rgba(99,102,241,.25), rgba(236,72,153,.25), rgba(249,115,22,.25))" }} />
+            </div>
+            {/* glitch on press */}
+            <div className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 blur-[1px] transition group-active:opacity-100" style={{ background: "repeating-linear-gradient(0deg, rgba(255,255,255,0.25), rgba(255,255,255,0.25) 1px, transparent 1px, transparent 3px)" }} />
           </motion.div>
         ))}
       </div>
@@ -590,26 +540,10 @@ function HowItWorks() {
 
 function B2BBenefits() {
   const items = [
-    {
-      title: 'Speed to Launch',
-      desc: 'Go from concept to publish-ready assets in minutes, not weeks.',
-      kpi: 'x10',
-    },
-    {
-      title: 'Consistency at Scale',
-      desc: 'On-brand lighting, angles, and scenes across entire catalogs.',
-      kpi: '99.9%',
-    },
-    {
-      title: 'Lower Cost',
-      desc: 'No studio bookings. No reshoots. Predictable, transparent pricing.',
-      kpi: '-70%',
-    },
-    {
-      title: 'API Ready',
-      desc: 'Plug your workflow: DAM, PIM, Shopify, or internal tools.',
-      kpi: 'REST',
-    },
+    { title: "Speed to Launch", desc: "From concept to publish-ready in minutes.", kpi: "×10" },
+    { title: "Consistency at Scale", desc: "On-brand lighting and angles across catalogs.", kpi: "99.9%" },
+    { title: "Lower Cost", desc: "No studios. No reshoots. Predictable pricing.", kpi: "−70%" },
+    { title: "API Ready", desc: "Plug your DAM, PIM, Shopify, or internal tools.", kpi: "REST" },
   ];
 
   return (
@@ -644,7 +578,7 @@ function B2BBenefits() {
 /* -------------------------------------------------------------------------- */
 
 function LogosAndTrust() {
-  const logos = ['Shopify', 'TikTok Shop', 'Meta', 'Woo', 'Klaviyo', 'GA4'];
+  const logos = ["Shopify", "TikTok Shop", "Meta", "Woo", "Klaviyo", "GA4"];
   return (
     <section id="trust" className="relative mx-auto max-w-7xl px-5 pb-8 pt-6 sm:px-6 md:px-10 lg:px-16">
       <div className="mb-3 text-center text-[11px] uppercase tracking-widest text-zinc-600">EXPORT-READY FOR</div>
@@ -661,17 +595,8 @@ function LogosAndTrust() {
         </div>
       </div>
       <style jsx>{`
-        .animate-marquee {
-          animation: marquee 26s linear infinite;
-        }
-        @keyframes marquee {
-          from {
-            transform: translateX(0);
-          }
-          to {
-            transform: translateX(-50%);
-          }
-        }
+        .animate-marquee { animation: marquee 26s linear infinite; }
+        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       `}</style>
     </section>
   );
@@ -745,7 +670,8 @@ function NoiseOverlay() {
 <svg xmlns=\'http://www.w3.org/2000/svg\' width=\'1600\' height=\'900\'><filter id=\'n\'>\
 <feTurbulence type=\'fractalNoise\' baseFrequency=\'0.95\' numOctaves=\'4\'/>\
 </filter>\
-<rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' opacity=\'0.6\'/></svg>")',
+<rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' opacity=\'0.6\'/>\
+</svg>")',
       }}
     />
   );
@@ -757,18 +683,12 @@ function NoiseOverlay() {
 
 function StyleKeyframes() {
   return (
-    <style jsx>{`
-      @keyframes shimmer {
-        0% {
-          background-position: -200% 0;
-        }
-        100% {
-          background-position: 200% 0;
-        }
-      }
-      .animate-shimmer {
-        animation: shimmer 2.2s linear infinite;
-      }
+    <style jsx global>{`
+      @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+      .animate-shimmer { animation: shimmer 2.2s linear infinite; }
+
+      @keyframes hue { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+      .animate-hue { animation: hue 8s linear infinite; }
     `}</style>
   );
 }
