@@ -3,256 +3,319 @@
 
 import Link from "next/link";
 import { motion, useAnimation, useReducedMotion } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 /**
- * WARDROBE COLLIDER — Hyper-Weird B2B Duo Landing (Navbar removed)
- * - Modes: Enhance (retouch/upscale) & Try-On (garment on mannequin)
- * - Mobile-first, responsive, reduced-motion friendly
- * - Visual explanations with pictures (placeholders), animated accents only on transform/opacity
- * - Bright surreal gradients, blob morphs, glitch-on-press, sticky mobile CTA
- * - B2B focus: benefits, trust logos, API-ready messaging
+ * MIRAGE FORGE — Super-Weird B2B Landing (from scratch)
+ * Goal: shockingly modern, very weird visuals, yet clear value in < 1 minute.
+ * What it is: AI visuals for catalogs — Enhance (retouch/upscale) + Try‑On (on-model preview) for B2B teams.
+ * Constraints: no navbar/footer, mobile-first, accessible, reduced-motion friendly.
  */
 
 export default function Page() {
   return (
-    <main className="relative min-h-screen w-full overflow-clip bg-[#FFF7ED] text-zinc-900">
-      <CornerGradients />
-      <BlobField />
-      <NoiseOverlay />
+    <main className="relative min-h-screen w-full overflow-clip bg-[#FFFDF7] text-zinc-900">
+      <BackStage />
 
-      <HeroCollider />
-      <HowItWorks />
-      <WeirdGallery />
-      <B2BBenefits />
-      <LogosAndTrust />
-      <BottomCTA />
+      <HeroPortal />
+      <OneMinuteExplainer />
+      <FeatureShowcase />
+      <ProofOfValue />
+      <TrustMarquee />
+      <FinalCTA />
       <StickyMobileCTA />
 
-      <StyleKeyframes />
+      <GlobalStyles />
+      <SvgDefs />
     </main>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                HERO — COLLIDER                              */
+/*                                      HERO                                   */
 /* -------------------------------------------------------------------------- */
 
-function HeroCollider() {
+function HeroPortal() {
   return (
-    <section className="relative isolate mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 pb-16 pt-10 sm:px-6 md:grid-cols-2 md:px-10 lg:px-16">
-      <HeroCopy />
-      <ColliderScene />
+    <section className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-5 pb-14 pt-10 sm:px-6 md:grid-cols-2 md:px-10 lg:px-16">
+      <div className="relative z-10">
+        <Badge>AI VISUALS • B2B • RESPONSIVE</Badge>
+        <h1 className="mt-3 text-balance text-4xl font-extrabold leading-[1.04] tracking-tight md:text-5xl">
+          Mirage Forge
+          <span className="ml-2 inline-block align-middle text-base font-semibold text-orange-500">β</span>
+        </h1>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-700 md:text-base">
+          Enhance products to crisp high‑res and preview garments on models — without studios or reshoots. Made for
+          catalogs, marketplaces, and agencies.
+        </p>
+
+        <ul className="mt-4 grid max-w-md grid-cols-1 gap-2 text-sm">
+          <li className="flex items-center gap-2"><Dot className="bg-emerald-500" /> Retouch, upscale, color‑correct</li>
+          <li className="flex items-center gap-2"><Dot className="bg-fuchsia-500" /> On‑model try‑on in multiple sizes</li>
+          <li className="flex items-center gap-2"><Dot className="bg-orange-500" /> API & bulk pipelines for teams</li>
+        </ul>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
+          <GhostCTA href="#explainer">60‑sec explainer</GhostCTA>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-600">
+          <Pill>No credit card</Pill>
+          <Pill>High‑res exports</Pill>
+          <Pill>SLA & SSO</Pill>
+        </div>
+      </div>
+
+      <PortalScene />
     </section>
   );
 }
 
-function HeroCopy() {
+function PortalScene() {
+  const prefersReducedMotion = useReducedMotion();
+  const orbit = useAnimation();
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    orbit.start({ rotate: 360, transition: { duration: 40, repeat: Infinity, ease: "linear" } });
+  }, [prefersReducedMotion, orbit]);
+
   return (
-    <div className="relative z-10">
-      <Badge>WEIRD • BRIGHT • B2B • RESPONSIVE</Badge>
+    <div className="relative mx-auto w-[min(92vw,40rem)]">
+      <div
+        className="relative aspect-square w-full overflow-visible rounded-[2rem] border border-zinc-200 bg-white/80 p-4 shadow-[0_30px_80px_rgba(249,115,22,0.12)] backdrop-blur-md"
+        style={{ filter: "url(#goo)" }}
+        aria-label="Visual portal"
+      >
+        {/* spinning conic halo */}
+        <motion.div
+          aria-hidden
+          animate={orbit}
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl"
+          style={{ background: "conic-gradient(from 0deg,#f97316,#22c55e,#38bdf8,#f472b6,#f97316)" }}
+        />
 
-      <h1 className="mt-3 text-balance text-4xl font-extrabold leading-[1.04] tracking-tight md:text-5xl">
-        Two superpowers for your catalog:{" "}
-        <span className="bg-gradient-to-r from-lime-500 via-orange-500 to-fuchsia-500 bg-clip-text text-transparent">
-          {" "}Enhance
-        </span>{" "}
-        &{" "}
-        <span className="bg-gradient-to-r from-fuchsia-500 via-orange-500 to-lime-500 bg-clip-text text-transparent">
-          Try-On
-        </span>
-        .
-      </h1>
+        {/* core plate */}
+        <div className="absolute left-1/2 top-1/2 h-[56%] w-[56%] -translate-x-1/2 -translate-y-1/2 rounded-[1.8rem] bg-white/80 ring-1 ring-zinc-200" />
 
-      <p className="mt-3 max-w-xl text-base md:text-lg">
-        No studios. No reshoots. Our AI retouches product photos to high-res and previews garments on models — ready
-        for every channel.
-      </p>
+        {/* goo blobs */}
+        <GooBlob className="left-[18%] top-[38%] from-emerald-300 to-lime-300" delay={0} />
+        <GooBlob className="right-[16%] top-[28%] from-fuchsia-300 to-rose-300" delay={6} />
+        <GooBlob className="left-[30%] bottom-[18%] from-sky-300 to-indigo-300" delay={12} />
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
-        <GhostCTA href="#how">30-sec tour</GhostCTA>
+        {/* tokens (enhance / try-on) */}
+        <Token label="Enhance" hue="from-lime-400 to-emerald-400" x="12%" y="12%" />
+        <Token label="Try‑On" hue="from-fuchsia-400 to-amber-400" x="76%" y="70%" />
+
+        {/* product plate sample */}
+        <div className="absolute left-6 top-1/2 -translate-y-1/2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
+          <div className="relative h-24 w-32 rounded-xl border border-zinc-200 bg-gradient-to-br from-white to-orange-50">
+            <div className="absolute inset-0 grid place-items-center" aria-hidden>
+              <svg width="80" height="60" viewBox="0 0 80 60">
+                <rect x="10" y="16" width="60" height="28" rx="6" fill="#fde68a" />
+                <rect x="16" y="22" width="48" height="16" rx="4" fill="#fb923c" />
+              </svg>
+            </div>
+            <div className="pointer-events-none absolute inset-0 animate-shimmer bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.6),transparent)] bg-[length:180%_100%]" />
+          </div>
+          <div className="mt-1 text-center text-[10px] text-zinc-500">Product (sample)</div>
+        </div>
+
+        {/* beams */}
+        <Beam x1="48%" y1="48%" x2="86%" y2="20%" gradient="linear-gradient(90deg,#A3E635,#ffffff)" />
+        <Beam x1="50%" y1="52%" x2="83%" y2="78%" gradient="linear-gradient(90deg,#F472B6,#ffffff)" />
+
+        {/* press to glitch hint */}
+        <div className="pointer-events-none absolute inset-0 rounded-[2rem] opacity-0 blur-[1px] transition group-active:opacity-100" style={{ background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px)" }} />
       </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-        <Pill>No credit card</Pill>
-        <Pill>High-res exports</Pill>
-        <Pill>API for scale</Pill>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-zinc-600">
+        <span className="inline-flex items-center gap-2"><Dot className="bg-lime-500" /> Enhance</span>
+        <span className="inline-flex items-center gap-2"><Dot className="bg-fuchsia-500" /> Try‑On</span>
+        <span aria-hidden className="inline-flex items-center gap-1">•</span>
+        <span>Tap & hold portal for micro‑glitch.</span>
       </div>
     </div>
   );
 }
 
-function Badge({ children }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-3 py-1 text-[11px] font-semibold">
-      {children}
-    </span>
-  );
-}
-function Pill({ children }) {
-  return <span className="rounded-full border border-zinc-200 bg-white px-3 py-1">{children}</span>;
-}
-function PrimaryCTA({ href, children }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition hover:bg-orange-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
-    >
-      {children}
-      <span className="ml-1" aria-hidden>
-        →
-      </span>
-    </Link>
-  );
-}
-function GhostCTA({ href, children }) {
-  return (
-    <a
-      href={href}
-      className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300"
-    >
-      {children}
-    </a>
-  );
-}
-
-/* ------------------------------ COLLIDER SCENE ----------------------------- */
-
-function ColliderScene() {
+function GooBlob({ className = "", delay = 0 }) {
   const prefersReducedMotion = useReducedMotion();
-  const [mode, setMode] = useState("enhance");
+  return (
+    <div
+      aria-hidden
+      className={["absolute h-40 w-40 rounded-full blur-2xl bg-gradient-to-br", className, prefersReducedMotion ? "opacity-30" : "animate-blob"].join(" ")}
+      style={{ animationDelay: `${delay}s` }}
+    />
+  );
+}
 
-  // Auto cycle between modes unless reduced-motion
+function Token({ label, hue, x, y }) {
+  return (
+    <div
+      className="absolute"
+      style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}
+    >
+      <div className="rounded-xl border border-zinc-200 bg-white p-2 shadow-sm">
+        <div className="relative aspect-[4/5] w-24 overflow-hidden rounded-lg bg-gradient-to-br from-white to-zinc-50">
+          <div className={["absolute inset-0 rounded-lg bg-gradient-to-r opacity-50", hue].join(" ")} aria-hidden />
+        </div>
+        <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold">
+          <span className={["inline-block h-2 w-2 rounded-full bg-gradient-to-r", hue].join(" ")} aria-hidden />
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Beam({ x1, y1, x2, y2, gradient }) {
+  const prefersReducedMotion = useReducedMotion();
+  return (
+    <motion.div
+      aria-hidden
+      className="absolute h-1 origin-left rounded-md"
+      style={{ left: x1, top: y1, width: "38%", transform: "translate(-50%,-50%)", background: gradient, boxShadow: "0 0 18px rgba(0,0,0,0.08)" }}
+      animate={prefersReducedMotion ? { opacity: 0.6 } : { opacity: [0.3, 0.85, 0.3] }}
+      transition={prefersReducedMotion ? {} : { duration: 3.4, repeat: Infinity, repeatType: "mirror" }}
+    />
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              60-SECOND EXPLAINER                            */
+/* -------------------------------------------------------------------------- */
+
+function OneMinuteExplainer() {
+  const steps = [
+    { h: "Upload", p: "Drop product shots or garment flats.", icon: "📤" },
+    { h: "Enhance", p: "AI retouch + upscale to crisp high‑res.", icon: "✨" },
+    { h: "Try‑On", p: "Preview garments on models in sizes.", icon: "🧍" },
+    { h: "Export", p: "Publish‑ready assets & API delivery.", icon: "🚀" },
+  ];
+  const prefersReducedMotion = useReducedMotion();
+  const [i, setI] = useState(0);
   useEffect(() => {
-    if (prefersReducedMotion) return;
-    const t = setInterval(() => setMode((m) => (m === "enhance" ? "tryon" : "enhance")), 3600);
+    const t = setInterval(() => setI((v) => (v + 1) % steps.length), prefersReducedMotion ? 4000 : 6000);
     return () => clearInterval(t);
-  }, [prefersReducedMotion]);
-
-  // Orbit animation controller for the collider ring
-  const ringControls = useAnimation();
-  useEffect(() => {
-    if (prefersReducedMotion) return;
-    ringControls.start({ rotate: 360, transition: { duration: 40, repeat: Infinity, ease: "linear" } });
-  }, [prefersReducedMotion, ringControls]);
-
-  const pulseColor =
-    mode === "enhance"
-      ? "shadow-[0_0_0_8px_rgba(163,230,53,.12)]"
-      : "shadow-[0_0_0_8px_rgba(244,114,182,.12)]";
+  }, [prefersReducedMotion, steps.length]);
 
   return (
-    <div className="relative mx-auto w-[min(92vw,38rem)]">
-      {/* Mode switcher chips (mobile-friendly) */}
-      <div className="mb-3 flex items-center gap-2">
-        <Chip active={mode === "enhance"} color="bg-lime-500" onClick={() => setMode("enhance")}>
-          Enhance
-        </Chip>
-        <Chip active={mode === "tryon"} color="bg-fuchsia-500" onClick={() => setMode("tryon")}>
-          Try-On
-        </Chip>
-      </div>
-
-      <div
-        className={[
-          "relative aspect-square w-full rounded-3xl border border-orange-200 bg-white p-5",
-          "shadow-[0_20px_60px_rgba(249,115,22,0.12)]",
-          "group",
-        ].join(" ")}
-      >
-        {/* Collider ring + beams */}
+    <section id="explainer" className="relative mx-auto max-w-6xl px-5 pb-12 pt-4 sm:px-6 md:px-10 lg:px-16">
+      <div className="mx-auto grid gap-4 md:grid-cols-[1fr_1fr]">
         <motion.div
-          aria-hidden
-          animate={ringControls}
-          className={[
-            "absolute left-1/2 top-1/2 h:[72%] w:[72%] h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full",
-            "bg-[conic-gradient(from_0deg,#f97316,#22c55e,#38bdf8,#f472b6,#f97316)] opacity-70",
-            "blur-xl",
-          ].join(" ")}
-        />
-
-        {/* Inner plate */}
-        <div
-          className={[
-            "absolute left-1/2 top-1/2 h-[52%] w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-[2rem]",
-            "bg-white/70 backdrop-blur-md ring-1 ring-zinc-200",
-            pulseColor,
-          ].join(" ")}
-        />
-
-        {/* ENTRY capsule (Product) */}
-        <EntryCapsule />
-
-        {/* ENHANCE outlet (top-right) */}
-        <OutletCard
-          id="enhance"
-          title="Enhance"
-          subtitle="Sharper • Brighter • Cleaner"
-          colorClass="from-lime-400 to-emerald-400"
-          boxClass="right-3 top-3"
-          active={mode === "enhance"}
+          key={i}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm"
+          aria-live="polite"
         >
-          <EnhancePreview active={mode === "enhance"} />
-        </OutletCard>
+          <div className="mb-3 inline-flex items-center gap-2 text-[12px] font-semibold">
+            <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-white">{i + 1}/4</span>
+            <span className="text-zinc-600">60‑sec explainer</span>
+          </div>
+          <div className="text-2xl font-extrabold leading-tight">
+            {steps[i].icon} {steps[i].h}
+          </div>
+          <p className="mt-1 text-zinc-700">{steps[i].p}</p>
+          <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+            <motion.div
+              key={`bar-${i}`}
+              className="h-full w-full origin-left bg-gradient-to-r from-orange-400 via-fuchsia-400 to-lime-400"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: prefersReducedMotion ? 3.6 : 5.6, ease: "linear" }}
+            />
+          </div>
+        </motion.div>
 
-        {/* TRY-ON outlet (bottom-right) */}
-        <OutletCard
-          id="tryon"
-          title="Try-On"
-          subtitle="Realistic models • Sizes"
-          colorClass="from-fuchsia-400 to-amber-400"
-          boxClass="bottom-3 right-3"
-          active={mode === "tryon"}
-        >
-          <TryOnPreview active={mode === "tryon"} />
-        </OutletCard>
+        <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="mb-2 text-[12px] font-semibold text-zinc-600">Why teams pick Mirage Forge</div>
+          <ul className="space-y-2 text-sm">
+            <li className="flex items-center gap-2"><Dot className="bg-emerald-500" /> 10× faster launches</li>
+            <li className="flex items-center gap-2"><Dot className="bg-fuchsia-500" /> 99.9% consistency at scale</li>
+            <li className="flex items-center gap-2"><Dot className="bg-orange-500" /> −70% cost vs. reshoots</li>
+            <li className="flex items-center gap-2"><Dot className="bg-sky-500" /> API & SSO, SOC2 path</li>
+          </ul>
+          <div className="mt-5 grid grid-cols-2 gap-3 text-[11px] text-zinc-600 md:grid-cols-4">
+            {[
+              "Marketplaces",
+              "Social Commerce",
+              "D2C Brands",
+              "Agencies",
+            ].map((t) => (
+              <div key={t} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-center">{t}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-        {/* beam to enhance */}
-        <Beam
-          start={{ x: "54%", y: "46%" }}
-          end={{ x: "86%", y: "18%" }}
-          gradient="linear-gradient(90deg,#A3E635,#ffffff)"
-          paused={prefersReducedMotion}
-        />
+/* -------------------------------------------------------------------------- */
+/*                               FEATURE SHOWCASE                              */
+/* -------------------------------------------------------------------------- */
 
-        {/* beam to try-on */}
-        <Beam
-          start={{ x: "50%", y: "54%" }}
-          end={{ x: "86%", y: "78%" }}
-          gradient="linear-gradient(90deg,#F472B6,#ffffff)"
-          paused={prefersReducedMotion}
-        />
+function FeatureShowcase() {
+  const [mode, setMode] = useState("enhance");
+  const prefersReducedMotion = useReducedMotion();
 
-        {/* Press & hold to glitch */}
-        <div className="pointer-events-none absolute inset-0 rounded-3xl [--g:0] group-active:[--g:1]">
-          {/* why: tiny visible glitch hint only on intent (press) */}
-          <div
-            className="absolute inset-0 rounded-3xl opacity-0 blur-sm transition-opacity duration-150 group-active:opacity-100"
-            style={{
-              background:
-                "repeating-linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px)",
-            }}
-          />
+  return (
+    <section className="relative mx-auto max-w-7xl px-5 pb-12 pt-4 sm:px-6 md:px-10 lg:px-16">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-extrabold md:text-3xl">What it actually does</h2>
+        <div className="flex items-center gap-2">
+          <ModeChip active={mode === "enhance"} onClick={() => setMode("enhance")} label="Enhance" dot="bg-lime-500" />
+          <ModeChip active={mode === "tryon"} onClick={() => setMode("tryon")} label="Try‑On" dot="bg-fuchsia-500" />
         </div>
       </div>
 
-      {/* Legend / micro help */}
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-zinc-600">
-        <span className="inline-flex items-center gap-2">
-          <Dot className="bg-lime-500" /> Enhance
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <Dot className="bg-fuchsia-500" /> Try-On
-        </span>
-        <span aria-hidden className="inline-flex items-center gap-1">•</span>
-        <span className="">Auto-cycles. Tap a chip to focus.</span>
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Visual */}
+        <motion.div
+          key={mode}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+          className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm"
+        >
+          {mode === "enhance" ? <EnhanceVisual /> : <TryOnVisual />}
+        </motion.div>
+
+        {/* Copy */}
+        <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+          {mode === "enhance" ? (
+            <>
+              <h3 className="text-xl font-extrabold">Enhance</h3>
+              <p className="mt-1 text-sm text-zinc-700">Auto retouch & upscale to high‑res. Better lighting, color, and clarity.</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li className="flex items-center gap-2"><Dot className="bg-emerald-500" /> High‑res export</li>
+                <li className="flex items-center gap-2"><Dot className="bg-orange-500" /> Color‑correct</li>
+                <li className="flex items-center gap-2"><Dot className="bg-sky-500" /> Fast previews</li>
+              </ul>
+            </>
+          ) : (
+            <>
+              <h3 className="text-xl font-extrabold">Try‑On</h3>
+              <p className="mt-1 text-sm text-zinc-700">Realistic on‑model previews for garments. Size & fit awareness.</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li className="flex items-center gap-2"><Dot className="bg-fuchsia-500" /> Multiple sizes</li>
+                <li className="flex items-center gap-2"><Dot className="bg-amber-500" /> Skin‑tone friendly</li>
+                <li className="flex items-center gap-2"><Dot className="bg-emerald-500" /> Export‑ready</li>
+              </ul>
+            </>
+          )}
+          <div className="mt-5">
+            <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
 
-function Chip({ active, color, children, onClick }) {
+function ModeChip({ active, onClick, label, dot }) {
   return (
     <button
       onClick={onClick}
@@ -261,115 +324,28 @@ function Chip({ active, color, children, onClick }) {
         active ? "border-zinc-300 bg-white shadow-sm" : "border-zinc-200 bg-white/70 hover:bg-white",
       ].join(" ")}
     >
-      <span className={["h-2 w-2 rounded-full", color].join(" ")} aria-hidden />
-      {children}
+      <span className={["h-2 w-2 rounded-full", dot].join(" ")} aria-hidden />
+      {label}
     </button>
   );
 }
 
-function Dot({ className = "" }) {
-  return <span className={["inline-block h-2 w-2 rounded-full", className].join(" ")} aria-hidden />;
-}
-
-function EntryCapsule() {
-  const prefersReducedMotion = useReducedMotion();
-  const controls = useAnimation();
-  useEffect(() => {
-    if (prefersReducedMotion) return;
-    controls.start({ y: [0, -4, 0], transition: { duration: 3, repeat: Infinity, ease: "easeInOut" } });
-  }, [prefersReducedMotion, controls]);
-
+function EnhanceVisual() {
   return (
-    <motion.div
-      animate={controls}
-      className="absolute left-6 top-1/2 -translate-y-1/2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm"
-      aria-label="Product entry"
-    >
-      <div className="relative h-24 w-32 rounded-xl border border-zinc-200 bg-gradient-to-br from-white to-orange-50">
-        {/* abstract product box */}
-        <div className="absolute inset-0 grid place-items-center">
-          <svg width="80" height="60" viewBox="0 0 80 60" aria-hidden>
-            <rect x="10" y="16" width="60" height="28" rx="6" fill="#fde68a" />
-            <rect x="16" y="22" width="48" height="16" rx="4" fill="#fb923c" />
-          </svg>
-        </div>
-        {/* little shimmer */}
-        <div className="pointer-events-none absolute inset-0 animate-shimmer bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.6),transparent)] bg-[length:180%_100%]" />
-      </div>
-      <div className="mt-1 text-center text-[10px] text-zinc-500">Product (sample)</div>
-    </motion.div>
-  );
-}
-
-function Beam({ start, end, gradient, paused }) {
-  const prefersReducedMotion = paused;
-  return (
-    <motion.div
-      aria-hidden
-      className="absolute h-1 origin-left rounded-md"
-      style={{
-        left: start.x,
-        top: start.y,
-        width: "38%",
-        transform: "translate(-50%,-50%)",
-        background: gradient,
-        boxShadow: "0 0 18px rgba(0,0,0,0.08)",
-        borderRadius: "8px",
-      }}
-      animate={prefersReducedMotion ? { opacity: 0.6 } : { opacity: [0.3, 0.85, 0.3] }}
-      transition={prefersReducedMotion ? {} : { duration: 3.4, repeat: Infinity, repeatType: "mirror" }}
-    />
-  );
-}
-
-function OutletCard({ id, title, subtitle, colorClass, boxClass, active, children }) {
-  return (
-    <div className={["pointer-events-auto absolute", boxClass, "z-[2]"].join(" ")}> 
-      <div
-        className={[
-          "relative w-[10.5rem] rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm transition",
-          active ? "ring-2 ring-zinc-200 ring-offset-2 ring-offset-white" : "",
-        ].join(" ")}
-        role="group"
-        aria-labelledby={`${id}-title`}
-      >
-        <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-gradient-to-br from-white to-zinc-50">
-          {children}
-        </div>
-      </div>
-      <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold">
-        <span className={["inline-block h-2 w-2 rounded-full bg-gradient-to-r", colorClass].join(" ")} aria-hidden />
-        <span id={`${id}-title`}>{title}</span>
-      </div>
-      <div className="text-[10px] text-zinc-500">{subtitle}</div>
+    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
+      <img
+        src="https://images.unsplash.com/photo-1556905055-8f358a7a47b2?q=80&w=1400&auto=format&fit=crop"
+        alt="Sample product before/after"
+        className="h-full w-full object-cover"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white/0 via-white/0 to-white/0" />
+      <div className="pointer-events-none absolute inset-0 animate-hue mix-blend-color" style={{ background: "conic-gradient(from 0deg, rgba(249,115,22,.12), rgba(132,204,22,.12), rgba(99,102,241,.12), rgba(236,72,153,.12), rgba(249,115,22,.12))" }} />
+      <div className="pointer-events-none absolute inset-0 animate-shimmer bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.6),transparent)] bg-[length:200%_100%]" />
     </div>
   );
 }
 
-function EnhancePreview({ active }) {
-  return (
-    <>
-      {/* base abstract product */}
-      <div className="absolute inset-0 grid place-items-center">
-        <svg width="96" height="72" viewBox="0 0 96 72" className="opacity-90" aria-hidden>
-          <rect x="10" y="18" width="76" height="36" rx="8" fill="#fde68a" />
-          <rect x="18" y="26" width="60" height="20" rx="6" fill="#fb923c" />
-        </svg>
-      </div>
-      {/* shimmer sweep for 'enhance' */}
-      <div
-        className={[
-          "absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.8),transparent)] bg-[length:200%_100%]",
-          active ? "animate-shimmer" : "opacity-50",
-        ].join(" ")}
-      />
-      {/* focus vignette */}
-      <div className="pointer-events-none absolute inset-0 rounded-lg shadow-[inset_0_0_40px_rgba(0,0,0,0.15)]" />
-    </>
-  );
-}
-
-function TryOnPreview({ active }) {
+function TryOnVisual() {
   const prefersReducedMotion = useReducedMotion();
   const [flip, setFlip] = useState(false);
   useEffect(() => {
@@ -379,203 +355,47 @@ function TryOnPreview({ active }) {
   }, [prefersReducedMotion]);
 
   return (
-    <>
-      {/* mannequin */}
+    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
       <div className="absolute inset-0 grid place-items-center">
-        <svg width="110" height="140" viewBox="0 0 110 140" className="opacity-90" aria-hidden>
+        <svg width="120" height="160" viewBox="0 0 120 160" className="opacity-90" aria-hidden>
           <defs>
-            <linearGradient id="skin" x1="0" x2="1">
-              <stop offset="0%" stopColor="#fde68a" />
-              <stop offset="100%" stopColor="#fca5a5" />
+            <linearGradient id="skin2" x1="0" x2="1">
+              <stop offset="0%" stopColor="#fde68a" /><stop offset="100%" stopColor="#fca5a5" />
             </linearGradient>
           </defs>
-          <circle cx="55" cy="20" r="12" fill="url(#skin)" />
-          <rect x="30" y="36" width="50" height="44" rx="10" fill="#e5e7eb" />
-          <rect x="22" y="82" width="66" height="34" rx="14" fill="#e5e7eb" />
+          <circle cx="60" cy="24" r="12" fill="url(#skin2)" />
+          <rect x="35" y="42" width="50" height="48" rx="10" fill="#e5e7eb" />
+          <rect x="26" y="92" width="68" height="38" rx="14" fill="#e5e7eb" />
         </svg>
       </div>
-      {/* garment overlay */}
       <motion.div
-        className="absolute left-1/2 top-[48%] h-24 w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-md"
-        animate={active ? { opacity: flip ? 0.95 : 0.7, scale: flip ? 1 : 0.98 } : { opacity: 0.7, scale: 1 }}
+        className="absolute left-1/2 top-[48%] h-28 w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-md"
+        animate={{ opacity: flip ? 0.95 : 0.7, scale: flip ? 1 : 0.98 }}
         transition={{ duration: 0.6 }}
         style={{ background: "linear-gradient(135deg,#c084fc,#f472b6)" }}
       />
-      {/* inner shadow */}
-      <div className="pointer-events-none absolute inset-0 rounded-lg shadow-[inset_0_0_40px_rgba(0,0,0,0.12)]" />
-    </>
+      <div className="pointer-events-none absolute inset-0 rounded-2xl shadow-[inset_0_0_44px_rgba(0,0,0,0.12)]" />
+    </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              HOW IT WORKS (with pics)                      */
+/*                                  PROOF / B2B                                */
 /* -------------------------------------------------------------------------- */
 
-function HowItWorks() {
-  const steps = [
-    {
-      title: "Enhance",
-      hue: "from-lime-400 to-emerald-400",
-      copy: "Auto retouch & upscale to high-res. Better lighting, color, and clarity — instantly.",
-      bullets: ["High-res export", "Color-correct", "Fast previews"],
-      img: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?q=80&w=1400&auto=format&fit=crop",
-      icon: "✨",
-    },
-    {
-      title: "Try-On",
-      hue: "from-fuchsia-400 to-amber-400",
-      copy: "Realistic on-model previews for garments. Size and fit awareness with consistent lighting.",
-      bullets: ["Multiple sizes", "Skin-tone friendly", "Export-ready"],
-      img: "https://images.unsplash.com/photo-1562158070-4b69b9a39a8a?q=80&w=1400&auto=format&fit=crop",
-      icon: "🧍",
-    },
-  ];
-
-  return (
-    <section id="how" className="relative mx-auto max-w-7xl px-5 pb-14 pt-6 sm:px-6 md:px-10 lg:px-16">
-      <h2 className="text-center text-3xl font-extrabold md:text-4xl">How it works</h2>
-      <p className="mx-auto mt-2 max-w-2xl text-center text-zinc-700">
-        Two clear paths. Same result: publish-ready visuals for every channel in minutes — no studio, no reshoots.
-      </p>
-
-      <div className="mx-auto mt-8 grid max-w-6xl gap-4 sm:grid-cols-2">
-        {steps.map((s) => (
-          <motion.div
-            key={s.title}
-            initial={{ opacity: 0, y: 8 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.35 }}
-            transition={{ duration: 0.45 }}
-            className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm"
-          >
-            {/* gradient background hint */}
-            <div
-              className="absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-30 blur-2xl sm:h-36 sm:w-36"
-              style={{ backgroundImage: "linear-gradient(to bottom right, var(--tw-gradient-stops))" }}
-            />
-
-            <div className="relative z-10">
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-semibold ring-1 ring-zinc-200">
-                <span className={["inline-block h-2 w-2 rounded-full bg-gradient-to-r", s.hue].join(" ")} />
-                {s.title}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-2xl" aria-hidden>
-                    {s.icon}
-                  </div>
-                  <p className="mt-2 text-sm text-zinc-700">{s.copy}</p>
-                  <ul className="mt-3 space-y-1 text-sm">
-                    {s.bullets.map((b) => (
-                      <li key={b} className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-orange-400" />
-                        {b}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
-                    <img src={s.img} alt={`${s.title} example`} className="h-full w-full object-cover" />
-                    <div
-                      className="pointer-events-none absolute inset-0 rounded-2xl mix-blend-overlay"
-                      style={{
-                        background:
-                          "radial-gradient(120px 80px at 80% 20%, rgba(255,255,255,0.5), transparent 60%)",
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* decorative gradient ring per card */}
-            <div
-              className={[
-                "pointer-events-none absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br opacity-10",
-                s.hue,
-              ].join(" ")}
-              aria-hidden
-            />
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                                 WEIRD GALLERY                               */
-/* -------------------------------------------------------------------------- */
-
-function WeirdGallery() {
-  const images = [
-    "https://images.unsplash.com/photo-1608571428094-4813d4d9d94c?q=80&w=1400&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1520975682031-5f1b1a3bb0de?q=80&w=1400&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9b?q=80&w=1400&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1610395219791-24f9f2c8b447?q=80&w=1400&auto=format&fit=crop",
-  ];
-
-  return (
-    <section className="relative mx-auto max-w-7xl px-5 pb-12 pt-4 sm:px-6 md:px-10 lg:px-16">
-      <div className="mb-4 flex items-end justify-between">
-        <h3 className="text-2xl font-extrabold">Pictures explain the vibe</h3>
-        <span className="text-xs text-zinc-600">Press & hold any tile to glitch</span>
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {images.map((src, i) => (
-          <motion.div
-            key={src}
-            initial={{ opacity: 0, y: 8 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.4, delay: i * 0.05 }}
-            className="group relative aspect-square overflow-hidden rounded-3xl border border-zinc-200 bg-white"
-          >
-            <img src={src} alt={`Sample ${i + 1}`} className="h-full w-full object-cover transition group-active:scale-[1.04]" />
-            {/* surreal overlay */}
-            <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100">
-              <div
-                className="absolute inset-0 animate-hue rounded-3xl mix-blend-color"
-                style={{
-                  background:
-                    "conic-gradient(from 0deg, rgba(249,115,22,.25), rgba(132,204,22,.25), rgba(99,102,241,.25), rgba(236,72,153,.25), rgba(249,115,22,.25))",
-                }}
-              />
-            </div>
-            {/* glitch on press */}
-            <div
-              className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 blur-[1px] transition group-active:opacity-100"
-              style={{
-                background:
-                  "repeating-linear-gradient(0deg, rgba(255,255,255,0.25), rgba(255,255,255,0.25) 1px, transparent 1px, transparent 3px)",
-              }}
-            />
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                             B2B BENEFITS / PROOF                            */
-/* -------------------------------------------------------------------------- */
-
-function B2BBenefits() {
+function ProofOfValue() {
   const items = [
-    { title: "Speed to Launch", desc: "From concept to publish-ready in minutes.", kpi: "×10" },
-    { title: "Consistency at Scale", desc: "On-brand lighting and angles across catalogs.", kpi: "99.9%" },
-    { title: "Lower Cost", desc: "No studios. No reshoots. Predictable pricing.", kpi: "−70%" },
-    { title: "API Ready", desc: "Plug your DAM, PIM, Shopify, or internal tools.", kpi: "REST" },
+    { kpi: "×10", title: "Speed to Launch", desc: "From concept to publish‑ready in minutes." },
+    { kpi: "99.9%", title: "Consistency at Scale", desc: "On‑brand lighting & angles across catalogs." },
+    { kpi: "−70%", title: "Lower Cost", desc: "No studios. No reshoots. Predictable pricing." },
+    { kpi: "REST", title: "API Ready", desc: "Plug your DAM, PIM, Shopify, or internal tools." },
   ];
 
   return (
-    <section id="benefits" className="relative mx-auto max-w-7xl px-5 pb-10 pt-6 sm:px-6 md:px-10 lg:px-16">
+    <section className="relative mx-auto max-w-7xl px-5 pb-10 pt-6 sm:px-6 md:px-10 lg:px-16">
       <h2 className="text-center text-3xl font-extrabold md:text-4xl">Built for B2B teams</h2>
       <p className="mx-auto mt-2 max-w-2xl text-center text-zinc-700">
-        For social-first brands, marketplaces, and agencies that need fast, consistent, on-brand visuals.
+        For social‑first brands, marketplaces, and agencies that need fast, consistent, on‑brand visuals.
       </p>
 
       <div className="mx-auto mt-8 grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -599,21 +419,18 @@ function B2BBenefits() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               TRUST / LOGOS                                 */
+/*                                   TRUST / LOGOS                             */
 /* -------------------------------------------------------------------------- */
 
-function LogosAndTrust() {
+function TrustMarquee() {
   const logos = ["Shopify", "TikTok Shop", "Meta", "Woo", "Klaviyo", "GA4"];
   return (
-    <section id="trust" className="relative mx-auto max-w-7xl px-5 pb-8 pt-6 sm:px-6 md:px-10 lg:px-16">
-      <div className="mb-3 text-center text-[11px] uppercase tracking-widest text-zinc-600">EXPORT-READY FOR</div>
+    <section className="relative mx-auto max-w-7xl px-5 pb-8 pt-6 sm:px-6 md:px-10 lg:px-16">
+      <div className="mb-3 text-center text-[11px] uppercase tracking-widest text-zinc-600">EXPORT‑READY FOR</div>
       <div className="[mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
         <div className="animate-marquee flex min-w-full items-center gap-6 opacity-80 hover:[animation-play-state:paused]">
           {logos.concat(logos).map((name, i) => (
-            <div
-              key={`${name}-${i}`}
-              className="relative h-8 w-32 rounded-xl border border-zinc-200 bg-white text-center text-xs font-semibold text-zinc-700 shadow-sm"
-            >
+            <div key={`${name}-${i}`} className="relative h-8 w-32 rounded-xl border border-zinc-200 bg-white text-center text-xs font-semibold text-zinc-700 shadow-sm">
               <div className="absolute inset-0 grid place-items-center">{name}</div>
             </div>
           ))}
@@ -624,10 +441,10 @@ function LogosAndTrust() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                  BOTTOM CTA                                 */
+/*                                     CTA                                     */
 /* -------------------------------------------------------------------------- */
 
-function BottomCTA() {
+function FinalCTA() {
   return (
     <section className="relative mx-auto max-w-6xl px-5 pb-24 pt-8 text-center sm:px-6 md:px-10">
       <div className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 to-fuchsia-50 p-8 shadow-[0_20px_60px_rgba(249,115,22,0.12)]">
@@ -637,11 +454,8 @@ function BottomCTA() {
         </p>
         <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
-          <a
-            href="#how"
-            className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold transition hover:bg-zinc-50"
-          >
-            See how it works
+          <a href="#explainer" className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold transition hover:bg-zinc-50">
+            See the 60‑sec tour
           </a>
         </div>
       </div>
@@ -650,17 +464,13 @@ function BottomCTA() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                STICKY CTA (M)                               */
+/*                                 STICKY CTA (M)                              */
 /* -------------------------------------------------------------------------- */
 
 function StickyMobileCTA() {
   return (
     <div className="md:hidden">
-      <Link
-        href="/dashboard"
-        className="fixed inset-x-4 bottom-4 z-50 flex items-center justify-center rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-orange-500/30 transition hover:bg-orange-700"
-        aria-label="Start now"
-      >
+      <Link href="/dashboard" className="fixed inset-x-4 bottom-4 z-50 flex items-center justify-center rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-orange-500/30 transition hover:bg-orange-700" aria-label="Start now">
         Start now →
       </Link>
     </div>
@@ -668,8 +478,50 @@ function StickyMobileCTA() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                   BACKDROP                                  */
+/*                                  SHARED UI                                  */
 /* -------------------------------------------------------------------------- */
+
+function Badge({ children }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-3 py-1 text-[11px] font-semibold">
+      {children}
+    </span>
+  );
+}
+function Pill({ children }) {
+  return <span className="rounded-full border border-zinc-200 bg-white px-3 py-1">{children}</span>;
+}
+function PrimaryCTA({ href, children }) {
+  return (
+    <Link href={href} className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition hover:bg-orange-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
+      {children}
+      <span className="ml-1" aria-hidden>→</span>
+    </Link>
+  );
+}
+function GhostCTA({ href, children }) {
+  return (
+    <a href={href} className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300">
+      {children}
+    </a>
+  );
+}
+function Dot({ className = "" }) {
+  return <span className={["inline-block h-2 w-2 rounded-full", className].join(" ")} aria-hidden />;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                    BACKSTAGE                                */
+/* -------------------------------------------------------------------------- */
+
+function BackStage() {
+  return (
+    <>
+      <CornerGradients />
+      <NoiseOverlay />
+    </>
+  );
+}
 
 function CornerGradients() {
   return (
@@ -677,35 +529,6 @@ function CornerGradients() {
       <div className="pointer-events-none absolute -left-28 -top-28 h-[28rem] w-[28rem] rounded-full bg-[conic-gradient(at_30%_30%,#f97316_0%,#fde047_25%,#22c55e_50%,#60a5fa_75%,#f97316_100%)] opacity-40 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -right-24 h-[26rem] w-[26rem] rounded-full bg-[conic-gradient(at_70%_70%,#84cc16_0%,#22c55e_25%,#f472b6_55%,#f97316_80%,#84cc16_100%)] opacity-40 blur-3xl" />
     </>
-  );
-}
-
-function BlobField() {
-  const prefersReducedMotion = useReducedMotion();
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-      <div
-        className={[
-          "absolute left-[10%] top-[25%] h-40 w-40 rounded-full blur-2xl",
-          "bg-gradient-to-br from-emerald-300 to-lime-300",
-          prefersReducedMotion ? "opacity-20" : "animate-blob",
-        ].join(" ")}
-      />
-      <div
-        className={[
-          "absolute right-[12%] top-[20%] h-52 w-52 rounded-full blur-2xl",
-          "bg-gradient-to-br from-fuchsia-300 to-rose-300",
-          prefersReducedMotion ? "opacity-20" : "animate-blob-slow",
-        ].join(" ")}
-      />
-      <div
-        className={[
-          "absolute bottom-[10%] left-[25%] h-48 w-48 rounded-full blur-2xl",
-          "bg-gradient-to-br from-sky-300 to-indigo-300",
-          prefersReducedMotion ? "opacity-20" : "animate-blob",
-        ].join(" ")}
-      />
-    </div>
   );
 }
 
@@ -728,10 +551,10 @@ function NoiseOverlay() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 UTIL / STYLES                               */
+/*                                  GLOBAL CSS                                 */
 /* -------------------------------------------------------------------------- */
 
-function StyleKeyframes() {
+function GlobalStyles() {
   return (
     <style jsx global>{`
       @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
@@ -748,8 +571,21 @@ function StyleKeyframes() {
         33%      { transform: translate(10px,-18px) scale(1.06); }
         66%      { transform: translate(-12px,10px) scale(0.96); }
       }
-      .animate-blob { animation: blob 14s ease-in-out infinite; }
-      .animate-blob-slow { animation: blob 22s ease-in-out infinite; }
+      .animate-blob { animation: blob 16s ease-in-out infinite; }
     `}</style>
+  );
+}
+
+function SvgDefs() {
+  return (
+    <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
+      <defs>
+        <filter id="goo">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -8" result="goo" />
+          <feBlend in="SourceGraphic" in2="goo" />
+        </filter>
+      </defs>
+    </svg>
   );
 }
