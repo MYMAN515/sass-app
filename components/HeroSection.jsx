@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { motion, useAnimation, useReducedMotion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
+import React from "react";
 
 /**
  * NOVA WEAVE — Totally-new, ultra-weird, modern B2B landing
