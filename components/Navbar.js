@@ -9,6 +9,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MoonIcon, SunIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/solid';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
+/**
+ * Bright, friendly navbar matching the PRISM LAB hero (non-dark by default)
+ * - Sticky, translucent on top of apricot background, adds elevation on scroll
+ * - Active link underline gradient; clear CTAs
+ * - Light mobile drawer (not dark) with the same palette
+ */
+
 const LINKS = [
   { href: '/', label: 'Home' },
   { href: '/pricing', label: 'Pricing' },
@@ -23,22 +30,24 @@ export default function Navbar() {
   const [supabase] = useState(() => createBrowserSupabaseClient());
 
   const [scrolled, setScrolled] = useState(false);
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(false); // default to light
   const [menuOpen, setMenuOpen] = useState(false);
 
   const [user, setUser] = useState(null);
   const [plan, setPlan] = useState('Free');
   const [credits, setCredits] = useState(0);
   const [loading, setLoading] = useState(true);
-  const creditPulseRef = useRef(0); // لتوليد key مختلف عند التغيير للأنيميشن
+  const creditPulseRef = useRef(0);
 
-  // لماذا: تمييز الرابط الحالي بصريًا
-  const isActive = useCallback((href) => {
-    if (href === '/') return pathname === '/';
-    return pathname?.startsWith(href);
-  }, [pathname]);
+  const isActive = useCallback(
+    (href) => {
+      if (href === '/') return pathname === '/';
+      return pathname?.startsWith(href);
+    },
+    [pathname]
+  );
 
-  // Theme init
+  // Theme init (prefer light, but respect saved or system)
   useEffect(() => {
     const stored = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -62,7 +71,6 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // --- util: جلب بيانات المستخدم من جدول Data
   const syncUserData = useCallback(
     async (uid, fallbackEmail) => {
       try {
@@ -76,7 +84,7 @@ export default function Navbar() {
           setPlan(data?.plan || 'Free');
           setCredits((prev) => {
             if (typeof data?.credits === 'number' && data.credits !== prev) {
-              creditPulseRef.current += 1; // لتحديث key للأنيميشن
+              creditPulseRef.current += 1;
             }
             return data?.credits ?? 0;
           });
@@ -88,7 +96,7 @@ export default function Navbar() {
           }));
         }
       } catch (_e) {
-        // no-op
+        // ignore
       } finally {
         setLoading(false);
       }
@@ -96,13 +104,15 @@ export default function Navbar() {
     [supabase]
   );
 
-  // Session & initial fetch + realtime
+  // Session & realtime
   useEffect(() => {
     let mounted = true;
     let channel;
 
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!mounted) return;
 
       if (!session?.user) {
@@ -116,20 +126,13 @@ export default function Navbar() {
         name: session.user.user_metadata?.name || session.user.email,
       });
 
-      // جلب أولي
       await syncUserData(session.user.id, session.user.email);
 
-      // ✅ Realtime: استمع لتحديثات صف المستخدم في Data
       channel = supabase
         .channel('public:Data:credits')
         .on(
           'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'Data',
-            filter: `user_id=eq.${session.user.id}`,
-          },
+          { event: 'UPDATE', schema: 'public', table: 'Data', filter: `user_id=eq.${session.user.id}` },
           (payload) => {
             const newCredits = payload.new?.credits;
             const newPlan = payload.new?.plan;
@@ -142,15 +145,11 @@ export default function Navbar() {
             if (newPlan) setPlan(newPlan);
           }
         )
-        .subscribe(status => {
-          // console.log('Realtime status', status);
-        });
+        .subscribe();
 
-      // Fallback: لو أي صفحة بثّت الحدث "credits:refresh" نعيد الجلب
       const onRefresh = () => syncUserData(session.user.id, session.user.email);
       window.addEventListener('credits:refresh', onRefresh);
 
-      // Cleanup
       return () => {
         mounted = false;
         window.removeEventListener('credits:refresh', onRefresh);
@@ -177,44 +176,49 @@ export default function Navbar() {
     router.push('/login');
   };
 
-  // اغلاق الدرج بالمفتاح ESC
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
     if (menuOpen) window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [menuOpen]);
 
-  // لون تنبيهي لو الكريدت قليل
   const lowCredits = !loading && user && credits <= 3 && plan !== 'Pro';
 
   return (
     <header
       className={[
         'fixed top-0 z-50 w-full transition-all duration-300',
-        scrolled ? 'shadow-[0_10px_30px_-10px_rgba(0,0,0,.5)]' : '',
+        scrolled ? 'shadow-[0_10px_30px_-10px_rgba(249,115,22,.25)]' : '',
       ].join(' ')}
       aria-label="Primary"
     >
+      {/* subtle top accent line */}
+      <div className="bg-gradient-to-r from-orange-400 via-fuchsia-400 to-lime-400 h-[3px] w-full opacity-70" />
+
       <div
         className={[
           'mx-auto max-w-7xl px-4',
-          'rounded-b-3xl border-b border-white/10',
+          'rounded-b-3xl border-b border-zinc-200/60 dark:border-white/10',
           'backdrop-blur-xl',
-          'bg-white/5 dark:bg-zinc-900/50',
+          scrolled
+            ? 'bg-white/80 dark:bg-zinc-900/70'
+            : 'bg-white/60 dark:bg-zinc-900/50',
         ].join(' ')}
-        style={{ boxShadow: scrolled ? 'inset 0 -1px 0 rgba(255,255,255,.06)' : 'none' }}
+        style={{ boxShadow: scrolled ? 'inset 0 -1px 0 rgba(0,0,0,.04)' : 'none' }}
       >
-        <nav className="h-16 flex items-center justify-between text-white">
+        <nav className="h-16 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="group inline-flex items-center gap-2">
-            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg">
+            <div className="grid place-items-center h-9 w-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg">
               <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
                 <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
               </svg>
             </div>
-            <span className="font-semibold tracking-tight">
+            <span className="font-semibold tracking-tight text-zinc-900 dark:text-white">
               AI Studio
-              <span className="ml-2 inline-block align-middle h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="ml-2 inline-block align-middle h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </span>
           </Link>
 
@@ -224,16 +228,19 @@ export default function Navbar() {
               <Link
                 key={l.href}
                 href={l.href}
+                aria-current={isActive(l.href) ? 'page' : undefined}
                 className={[
                   'relative px-3 py-2 rounded-full text-sm font-medium transition',
-                  'hover:bg-white/10',
-                  isActive(l.href) ? 'text-white' : 'text-white/80',
+                  'hover:bg-zinc-900/5 dark:hover:bg-white/10',
+                  isActive(l.href)
+                    ? 'text-zinc-900 dark:text-white'
+                    : 'text-zinc-700 dark:text-white/80',
                 ].join(' ')}
               >
                 <span className="relative">
                   {l.label}
                   {isActive(l.href) && (
-                    <span className="absolute -bottom-1 left-0 right-0 mx-auto h-[2px] w-6 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
+                    <span className="absolute -bottom-1 left-0 right-0 mx-auto h-[2px] w-6 rounded-full bg-gradient-to-r from-orange-500 via-fuchsia-500 to-lime-500" />
                   )}
                 </span>
               </Link>
@@ -241,7 +248,7 @@ export default function Navbar() {
 
             <button
               onClick={toggleTheme}
-              className="ml-1 inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-9 transition"
+              className="ml-1 inline-flex items-center justify-center h-9 w-9 rounded-full border border-zinc-300/70 bg-white/70 text-zinc-700 hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition"
               aria-label="Toggle theme"
               title="Toggle theme"
             >
@@ -250,30 +257,29 @@ export default function Navbar() {
 
             {/* User/CTA */}
             {loading ? (
-              <div className="ml-2 h-9 w-52 rounded-full bg-white/10 animate-pulse" />
+              <div className="ml-2 h-9 w-52 rounded-full bg-zinc-200/70 dark:bg-white/10 animate-pulse" />
             ) : user ? (
               <div className="ml-2 flex items-center gap-2">
-                <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
-                  <span className="inline-block size-2 rounded-full bg-emerald-400" />
+                <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-zinc-300/70 bg-white/70 px-3 py-1 text-xs text-zinc-700 dark:border-white/15 dark:bg-white/10 dark:text-white">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
                   Plan: <strong className="font-semibold">{plan}</strong>
                 </span>
 
-                {/* Credits pill مع أنيميشن عند التغيير */}
                 <Link
                   href={lowCredits ? '/pricing' : '#'}
                   className={[
                     'hidden lg:inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition',
                     lowCredits
-                      ? 'border-rose-400/40 bg-rose-400/15 hover:bg-rose-400/25'
-                      : 'border-white/15 bg-white/10 hover:bg-white/15',
+                      ? 'border-rose-400/40 bg-rose-400/15 text-rose-700 hover:bg-rose-400/25 dark:text-rose-200'
+                      : 'border-zinc-300/70 bg-white/70 text-zinc-700 hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white',
                   ].join(' ')}
                   title={lowCredits ? 'Recharge credits' : 'Credits'}
                 >
                   Credits:{' '}
                   <motion.strong
                     key={creditPulseRef.current}
-                    initial={{ scale: 1.2, color: lowCredits ? '#fecaca' : '#fff' }}
-                    animate={{ scale: 1, color: '#fff' }}
+                    initial={{ scale: 1.2 }}
+                    animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 260, damping: 18 }}
                     className="font-semibold"
                     aria-live="polite"
@@ -285,21 +291,18 @@ export default function Navbar() {
 
                 <Link
                   href="/enhance"
-                  className="hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                  className="hidden lg:inline-flex items-center gap-2 rounded-full bg-orange-600 hover:bg-orange-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition"
                 >
                   🚀 Launch Studio
                 </Link>
 
                 <div
                   title={user.email}
-                  className="ml-1 grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold"
+                  className="ml-1 grid place-items-center h-9 w-9 rounded-full bg-white text-zinc-900 border border-zinc-300/70 font-bold dark:bg-white/10 dark:text-white dark:border-white/15"
                 >
                   {initials}
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="text-xs underline text-white/80 hover:text-white"
-                >
+                <button onClick={handleLogout} className="text-xs underline text-zinc-600 hover:text-zinc-900 dark:text-white/80 dark:hover:text-white">
                   Logout
                 </button>
               </div>
@@ -307,7 +310,7 @@ export default function Navbar() {
               <div className="ml-2 flex items-center gap-2">
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                  className="inline-flex items-center gap-2 rounded-full bg-orange-600 hover:bg-orange-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition"
                 >
                   Sign in
                 </Link>
@@ -317,7 +320,7 @@ export default function Navbar() {
 
           {/* Mobile toggle */}
           <button
-            className="md:hidden inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-10 transition"
+            className="md:hidden inline-flex items-center justify-center h-10 w-10 rounded-full border border-zinc-300/70 bg-white/70 text-zinc-700 hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition"
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
@@ -332,19 +335,24 @@ export default function Navbar() {
         {menuOpen && (
           <>
             <motion.div
-              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               onClick={() => setMenuOpen(false)}
             />
             <motion.aside
-              className="fixed right-0 top-0 bottom-0 z-50 w-[84vw] max-w-sm bg-[#0f0a1f] text-white border-l border-white/10 shadow-2xl"
-              role="dialog" aria-modal="true"
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-[84vw] max-w-sm bg-[#FFF7ED] text-zinc-900 border-l border-zinc-200 shadow-2xl dark:bg-[#0f0a1f] dark:text-white dark:border-white/10"
+              role="dialog"
+              aria-modal="true"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
             >
-              <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
+              <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-200 dark:border-white/10">
                 <div className="inline-flex items-center gap-2">
-                  <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500">
+                  <div className="grid place-items-center h-9 w-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500">
                     <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
                       <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
                     </svg>
@@ -352,8 +360,9 @@ export default function Navbar() {
                   <span className="font-semibold">AI Studio</span>
                 </div>
                 <button
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-10 transition"
-                  onClick={() => setMenuOpen(false)} aria-label="Close menu"
+                  className="inline-flex items-center justify-center h-10 w-10 rounded-full border border-zinc-300/70 bg-white/70 text-zinc-700 hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition"
+                  onClick={() => setMenuOpen(false)}
+                  aria-label="Close menu"
                 >
                   <XMarkIcon className="w-6 h-6" />
                 </button>
@@ -367,7 +376,9 @@ export default function Navbar() {
                     onClick={() => setMenuOpen(false)}
                     className={[
                       'block rounded-xl px-3 py-3 text-sm font-medium transition',
-                      isActive(l.href) ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5',
+                      isActive(l.href)
+                        ? 'bg-white text-zinc-900 shadow-sm dark:bg-white/10 dark:text-white'
+                        : 'text-zinc-700 hover:bg-white dark:text-white/80 dark:hover:bg-white/5',
                     ].join(' ')}
                   >
                     {l.label}
@@ -376,7 +387,7 @@ export default function Navbar() {
 
                 <button
                   onClick={toggleTheme}
-                  className="mt-2 inline-flex items-center gap-2 rounded-xl px-3 py-3 text-sm font-medium border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                  className="mt-2 inline-flex items-center gap-2 rounded-xl px-3 py-3 text-sm font-medium border border-zinc-300/70 bg-white/70 text-zinc-700 hover:bg-white transition dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                 >
                   {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
                   {dark ? 'Light Mode' : 'Dark Mode'}
@@ -384,24 +395,28 @@ export default function Navbar() {
 
                 <div className="pt-4">
                   {loading ? (
-                    <div className="h-10 w-full rounded-xl bg-white/10 animate-pulse" />
-                  ) : user ? (
+                    <div className="h-10 w-full rounded-xl bg-zinc-200/70 dark:bg-white/10 animate-pulse" />)
+                  : user ? (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <div className="grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold">
+                        <div className="grid place-items-center h-9 w-9 rounded-full bg-white text-zinc-900 border border-zinc-300/70 font-bold dark:bg-white/10 dark:text-white dark:border-white/15">
                           {initials}
                         </div>
                         <div className="text-sm font-medium truncate">{user.name || user.email}</div>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1">
-                          <span className="inline-block size-2 rounded-full bg-emerald-400" />
+                        <span className="inline-flex items-center gap-2 rounded-full border border-zinc-300/70 bg-white/70 px-2.5 py-1 text-zinc-700 dark:border-white/15 dark:bg-white/10 dark:text-white">
+                          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
                           Plan: <strong className="font-semibold">{plan}</strong>
                         </span>
-                        <span className={[
-                          'inline-flex items-center gap-2 rounded-full px-2.5 py-1 border',
-                          lowCredits ? 'border-rose-400/40 bg-rose-400/15' : 'border-white/15 bg-white/10'
-                        ].join(' ')}>
+                        <span
+                          className={[
+                            'inline-flex items-center gap-2 rounded-full px-2.5 py-1 border',
+                            lowCredits
+                              ? 'border-rose-400/40 bg-rose-400/15 text-rose-700 dark:text-rose-200'
+                              : 'border-zinc-300/70 bg-white/70 text-zinc-700 dark:border-white/15 dark:bg-white/10 dark:text-white',
+                          ].join(' ')}
+                        >
                           Credits:{' '}
                           <motion.strong
                             key={`m-${creditPulseRef.current}`}
@@ -418,7 +433,7 @@ export default function Navbar() {
                         <Link
                           href="/enhance"
                           onClick={() => setMenuOpen(false)}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-orange-600 hover:bg-orange-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition"
                         >
                           🚀 Launch Studio
                         </Link>
@@ -426,14 +441,17 @@ export default function Navbar() {
                           <Link
                             href="/pricing"
                             onClick={() => setMenuOpen(false)}
-                            className="text-xs underline text-rose-300 hover:text-rose-200"
+                            className="text-xs underline text-rose-600 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
                           >
                             Recharge
                           </Link>
                         ) : (
                           <button
-                            onClick={() => { setMenuOpen(false); handleLogout(); }}
-                            className="text-xs underline text-white/80 hover:text-white"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              handleLogout();
+                            }}
+                            className="text-xs underline text-zinc-600 hover:text-zinc-900 dark:text-white/80 dark:hover:text-white"
                           >
                             Logout
                           </button>
@@ -444,7 +462,7 @@ export default function Navbar() {
                     <Link
                       href="/login"
                       onClick={() => setMenuOpen(false)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-orange-600 hover:bg-orange-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition"
                     >
                       Sign in
                     </Link>
@@ -452,7 +470,7 @@ export default function Navbar() {
                 </div>
               </div>
 
-              <div className="mt-auto p-4 text-xs text-white/50 border-t border-white/10">
+              <div className="mt-auto p-4 text-xs text-zinc-500 border-t border-zinc-200 dark:text-white/50 dark:border-white/10">
                 © {new Date().getFullYear()} AI Studio
               </div>
             </motion.aside>
