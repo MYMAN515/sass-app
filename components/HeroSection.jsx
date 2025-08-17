@@ -1,28 +1,33 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 
 /**
- * MintLemon AI — Fintech‑style B2B SaaS Landing Page
- * Next.js (App Router) + TailwindCSS + Framer Motion
- *
- * Drop this file into: /app/page.jsx
- * Make sure Tailwind is set up and framer-motion is installed.
- *
- * Palette: mint (#D8FFEA / #CFFAE2) & lemon (#FFF7B3 / #FFF0A6)
- * Typeface: system UI (Inter recommended)
+ * MintLemon AI — Fintech-style B2B SaaS Landing
+ * - Keep <img> (no Next/Image) ✅
+ * - Pricing removed ✅
+ * - Footer removed ✅
+ * - Logo removed from header ✅
+ * - All "Try ..." CTAs removed (Hero + Sticky) ✅
+ * - Sticky CTA (mobile) kept, now "Book a demo" + "Talk to sales" ✅
+ * - More animations + reduced-motion friendly ✅
  */
 
-const fadeUp = {
-  initial: { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
+// --- SEO (App Router) ---
+export const metadata = {
+  title: 'MintLemon AI — Product Enhance & Virtual Try-On for Teams',
+  description:
+    'B2B AI pipelines for product photo enhancement and virtual try-on. Book a demo to integrate secure, scalable workflows into your store.',
+  openGraph: {
+    title: 'MintLemon AI — Enhance & Try-On',
+    description:
+      'B2B AI pipelines for product photo enhancement and virtual try-on.',
+    type: 'website',
+  },
 }
 
-const float = {
-  initial: { y: 0 },
-  animate: { y: [0, -6, 0], transition: { repeat: Infinity, duration: 5 } },
-}
+const ease = [0.22, 1, 0.36, 1]
 
 export default function Page() {
   return (
@@ -33,9 +38,7 @@ export default function Page() {
       <LogosStrip />
       <HowItWorks />
       <ProductDemo />
-      <Pricing />
       <FAQ />
-      <Footer />
       <MobileStickyCTA />
     </main>
   )
@@ -43,22 +46,31 @@ export default function Page() {
 
 /* -------------------------- UI — HEADER -------------------------- */
 function Header() {
+  // No logo block per request
   return (
-    <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+    <header className="sticky top-0 z-40 border-b border-zinc-100/60 bg-white/60 backdrop-blur supports-[backdrop-filter]:bg-white/60">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 md:py-4">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#B9F7D6] to-[#FFF39C] shadow-sm" />
-          <span className="font-semibold tracking-tight">MintLemon AI</span>
-        </div>
-        <nav className="hidden items-center gap-6 text-sm text-zinc-700 md:flex">
+        <nav className="flex items-center gap-6 text-sm text-zinc-700">
           <a href="#features" className="hover:text-zinc-900">Features</a>
           <a href="#how" className="hover:text-zinc-900">How it works</a>
-          <a href="#pricing" className="hover:text-zinc-900">Pricing</a>
+          <a href="#security" className="hover:text-zinc-900">Security</a>
           <a href="#faq" className="hover:text-zinc-900">FAQ</a>
         </nav>
         <div className="flex items-center gap-2">
-          <button className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100">Log in</button>
-          <a href="#pricing" className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">Start free</a>
+          <a
+            href="#book"
+            className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+            aria-label="Book a demo"
+          >
+            Book a demo
+          </a>
+          <a
+            href="#sales"
+            className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50"
+            aria-label="Talk to sales"
+          >
+            Talk to sales
+          </a>
         </div>
       </div>
     </header>
@@ -67,42 +79,89 @@ function Header() {
 
 /* --------------------------- UI — HERO --------------------------- */
 function Hero() {
+  const rm = useReducedMotion()
   return (
-    <section className="relative mx-auto max-w-7xl px-4 pb-8 pt-12 sm:pt-16 md:pb-16 md:pt-24">
+    <section className="relative mx-auto max-w-7xl px-4 pb-10 pt-12 sm:pt-16 md:pb-16 md:pt-24">
       <div className="grid items-center gap-10 md:grid-cols-2">
-        <motion.div {...fadeUp}>
-          <motion.h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-            Enhance & Try‑On for Product Photos
+        <motion.div
+          initial={rm ? { opacity: 1 } : { opacity: 0, y: 18 }}
+          animate={rm ? { opacity: 1 } : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease }}
+        >
+          <motion.h1
+            className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl"
+            initial={rm ? { opacity: 1 } : { opacity: 0, y: 10 }}
+            animate={rm ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease, delay: 0.05 }}
+          >
+            AI Enhance & Virtual Try-On — built for teams
           </motion.h1>
-          <p className="mt-4 max-w-xl text-lg text-zinc-700">
-            Make your product images look premium with AI enhancements, or place garments on studio‑ready models — in seconds.
-          </p>
-          <p className="mt-1 text-zinc-500">تعزيز الصور وتجربة الملابس افتراضياً بذكاء فائق وبسهولة.</p>
 
+          <p className="mt-4 max-w-xl text-lg text-zinc-700">
+            Premium product images in seconds. Clean backgrounds, upscale, and place garments on studio-ready models — with audit logs and SSO.
+          </p>
+          <p className="mt-1 text-zinc-600">
+            منصّة للفرق: تعزيز الصور وتجربة الملابس افتراضياً مع خصوصية عالية وتكامل مؤسسي.
+          </p>
+
+          {/* B2B CTAs — no "Try" wording */}
           <div className="mt-6 flex flex-wrap gap-3">
-            <a href="#demo" className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-5 py-3 font-medium text-zinc-900 shadow-sm transition hover:shadow-md">
-              Try Enhance
+            <a
+              href="#book"
+              className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-5 py-3 font-medium text-zinc-900 shadow-sm transition hover:shadow-md"
+            >
+              Book a demo
               <svg className="h-4 w-4 transition group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </a>
-            <a href="#demo" className="inline-flex items-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-medium shadow-sm transition hover:bg-zinc-50">
-              Try Try‑On
+            <a
+              href="#sales"
+              className="inline-flex items-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-medium shadow-sm transition hover:bg-zinc-50"
+            >
+              Talk to sales
             </a>
           </div>
 
-          <div className="mt-6 flex items-center gap-4 text-sm text-zinc-600">
-            <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 shadow-sm">
-              <ShieldIcon />
-              <span>Secure & Private</span>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 shadow-sm">
-              <ZapIcon />
-              <span>Fast results</span>
-            </div>
-          </div>
+          <motion.div
+            className="mt-6 flex flex-wrap items-center gap-3 text-sm text-zinc-700"
+            initial={rm ? {} : { opacity: 0 }}
+            whileInView={rm ? {} : { opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease }}
+          >
+            <Chip icon={<ShieldIcon />}>SSO & SOC-style controls</Chip>
+            <Chip icon={<LockIcon />}>Encrypted at rest</Chip>
+            <Chip icon={<ZapIcon />}>Optimized inference</Chip>
+          </motion.div>
         </motion.div>
 
-        <motion.div className="relative" variants={float} initial="initial" animate="animate">
+        <motion.div
+          className="relative"
+          initial={rm ? { opacity: 1 } : { opacity: 0, scale: 0.98 }}
+          animate={rm ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+          transition={{ duration: 0.7, ease, delay: 0.05 }}
+        >
           <HeroDemos />
+          {/* Floating badges */}
+          {!rm && (
+            <>
+              <motion.div
+                className="absolute -right-4 -top-4 rounded-2xl border border-zinc-200 bg-white/80 px-3 py-2 text-xs shadow-sm"
+                initial={{ y: 0 }}
+                animate={{ y: [0, -6, 0] }}
+                transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
+              >
+                4× Upscale
+              </motion.div>
+              <motion.div
+                className="absolute -left-4 bottom-6 rounded-2xl border border-zinc-200 bg-white/80 px-3 py-2 text-xs shadow-sm"
+                initial={{ y: 0 }}
+                animate={{ y: [0, -8, 0] }}
+                transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+              >
+                Background Clean
+              </motion.div>
+            </>
+          )}
         </motion.div>
       </div>
     </section>
@@ -119,7 +178,7 @@ function HeroDemos() {
         />
       </DemoCard>
 
-      <DemoCard title="Try‑On" subtitle="Garment → Model">
+      <DemoCard title="Try-On" subtitle="Garment → Model">
         <TryOnMock />
       </DemoCard>
     </div>
@@ -134,7 +193,14 @@ function LogosStrip() {
         <p className="mb-4 text-center text-xs uppercase tracking-wider">Trusted by product teams</p>
         <div className="grid grid-cols-2 place-items-center gap-6 sm:grid-cols-3 md:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-7 w-24 rounded-md bg-zinc-100" />
+            <motion.div
+              key={i}
+              className="h-7 w-24 rounded-md bg-zinc-100"
+              initial={{ opacity: 0, y: 8 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.05, ease }}
+            />
           ))}
         </div>
       </div>
@@ -144,31 +210,35 @@ function LogosStrip() {
 
 /* ------------------------ UI — HOW IT WORKS ---------------------- */
 function HowItWorks() {
-  const items = [
-    {
-      title: 'Upload',
-      desc: 'Drop a product photo or a garment + choose Enhance or Try‑On.',
-    },
+  const steps = [
+    { title: 'Upload', desc: 'Drop a product photo or a garment + choose Enhance or Try-On.' },
     { title: 'Tune', desc: 'Pick style strength, background, and output size.' },
-    { title: 'Export', desc: 'Download web‑ready images or push to your store.' },
+    { title: 'Export', desc: 'Download web-ready images or push to your store.' },
   ]
 
   return (
     <section id="how" className="mx-auto max-w-7xl px-4 py-12 md:py-16">
-      <motion.h2 {...fadeUp} className="text-center text-2xl font-semibold tracking-tight md:text-3xl">
+      <motion.h2
+        id="features"
+        className="text-center text-2xl font-semibold tracking-tight md:text-3xl"
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6, ease }}
+      >
         How it works
       </motion.h2>
       <p className="mx-auto mt-2 max-w-2xl text-center text-zinc-600">ثلاث خطوات بسيطة لنتائج احترافية.</p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-        {items.map((it, idx) => (
+        {steps.map((it, idx) => (
           <motion.div
-            key={idx}
+            key={it.title}
             className="rounded-2xl border border-zinc-200 bg-white/70 p-5 shadow-sm"
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 16, rotate: -0.3 }}
+            whileInView={{ opacity: 1, y: 0, rotate: 0 }}
             viewport={{ once: true, amount: 0.4 }}
-            transition={{ duration: 0.5, delay: idx * 0.06 }}
+            transition={{ duration: 0.55, delay: idx * 0.07, ease }}
           >
             <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#CFFAE2] to-[#FFF0A6] font-semibold text-zinc-900">
               {idx + 1}
@@ -193,104 +263,9 @@ function ProductDemo() {
             afterUrl="https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?q=80&w=1200&auto=format&fit=crop"
           />
         </DemoCard>
-        <DemoCard title="Try‑On" subtitle="Place garment on model">
+        <DemoCard title="Try-On" subtitle="Place garment on model">
           <TryOnMock />
         </DemoCard>
-      </div>
-    </section>
-  )
-}
-
-/* ---------------------------- UI — PRICING ----------------------- */
-function Pricing() {
-  const tiers = [
-    {
-      name: 'Starter',
-      price: '$19',
-      blurb: '100 images / mo',
-      features: ['Enhance & background clean', 'Basic Try‑On', 'Email support'],
-      cta: 'Start free',
-    },
-    {
-      name: 'Pro',
-      price: '$69',
-      blurb: '1,000 images / mo',
-      features: ['Advanced Enhance (4x upscaler)', 'Pro Try‑On models', 'Priority support', 'API access'],
-      cta: 'Go Pro',
-      highlight: true,
-    },
-    {
-      name: 'Enterprise',
-      price: 'Custom',
-      blurb: 'Unlimited seats',
-      features: ['SLA & SSO', 'Private models', 'On‑prem or VPC'],
-      cta: 'Talk to sales',
-    },
-  ]
-
-  return (
-    <section id="pricing" className="mx-auto max-w-7xl px-4 py-12 md:py-16">
-      <motion.h2 {...fadeUp} className="text-center text-3xl font-semibold tracking-tight">Pricing</motion.h2>
-      <p className="mx-auto mt-2 max-w-2xl text-center text-zinc-600">Simple plans that scale with your catalog.</p>
-
-      <div className="mt-8 grid gap-5 md:grid-cols-3">
-        {tiers.map((t, idx) => (
-          <motion.div
-            key={t.name}
-            className={[
-              'relative rounded-3xl border p-6 shadow-sm',
-              t.highlight
-                ? 'border-zinc-900 bg-white'
-                : 'border-zinc-200 bg-white/70',
-            ].join(' ')}
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: idx * 0.08 }}
-          >
-            {t.highlight && (
-              <div className="absolute right-4 top-4 rounded-full bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-3 py-1 text-xs font-medium text-zinc-900 shadow-sm">
-                Most popular
-              </div>
-            )}
-            <div className="text-lg font-semibold">{t.name}</div>
-            <div className="mt-1 flex items-end gap-1">
-              <div className="text-3xl font-bold">{t.price}</div>
-              <div className="text-sm text-zinc-500">{t.blurb}</div>
-            </div>
-            <ul className="mt-4 space-y-2 text-sm text-zinc-700">
-              {t.features.map((f) => (
-                <li key={f} className="flex items-start gap-2">
-                  <CheckIcon />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <a
-              href="#"
-              className={[
-                'mt-6 inline-flex w-full items-center justify-center rounded-2xl px-4 py-2 font-medium',
-                t.highlight
-                  ? 'bg-zinc-900 text-white hover:bg-zinc-800'
-                  : 'bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] text-zinc-900 hover:shadow-md',
-              ].join(' ')}
-            >
-              {t.cta}
-            </a>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-zinc-600">
-        <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 shadow-sm">
-          <ShieldIcon /> GDPR ready
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 shadow-sm">
-          <LockIcon /> Encrypted storage
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 shadow-sm">
-          <ZapIcon /> Optimized inference
-        </div>
       </div>
     </section>
   )
@@ -300,13 +275,21 @@ function Pricing() {
 function FAQ() {
   const qa = [
     { q: 'Do you store my images?', a: 'You control retention. Choose 0–30 days or instant purge. Enterprise can bring its own storage (S3, GCS, Azure).' },
-    { q: 'Can I use my own models?', a: 'Yes. Fine‑tune private Try‑On mannequins and enhancement styles on Pro+.' },
+    { q: 'Can I use my own models?', a: 'Yes. Fine-tune private Try-On mannequins and enhancement styles on Pro+.' },
     { q: 'Is there an API?', a: 'Absolutely. REST & webhooks for bulk jobs and store pipelines.' },
   ]
 
   return (
     <section id="faq" className="mx-auto max-w-7xl px-4 py-12 md:py-16">
-      <motion.h2 {...fadeUp} className="text-center text-3xl font-semibold tracking-tight">FAQ</motion.h2>
+      <motion.h2
+        className="text-center text-3xl font-semibold tracking-tight"
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6, ease }}
+      >
+        FAQ
+      </motion.h2>
       <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-3">
         {qa.map((item, idx) => (
           <motion.div
@@ -315,7 +298,7 @@ function FAQ() {
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: idx * 0.06 }}
+            transition={{ duration: 0.5, delay: idx * 0.06, ease }}
           >
             <div className="text-base font-semibold">{item.q}</div>
             <p className="mt-1 text-sm text-zinc-600">{item.a}</p>
@@ -326,29 +309,33 @@ function FAQ() {
   )
 }
 
-/* ---------------------------- UI — FOOTER ------------------------ */
-function Footer() {
+/* ---------------------- UI — MOBILE STICKY CTA ------------------- */
+function MobileStickyCTA() {
+  // Keep sticky; swap "Enhance / Try-On" with B2B CTAs
   return (
-    <footer className="border-t border-zinc-200 bg-white/70">
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-zinc-600 md:flex-row">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#B9F7D6] to-[#FFF39C]" />
-          <span>© {new Date().getFullYear()} MintLemon AI</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <a href="#" className="hover:text-zinc-900">Security</a>
-          <a href="#" className="hover:text-zinc-900">Privacy</a>
-          <a href="#" className="hover:text-zinc-900">Terms</a>
-        </div>
+    <div className="fixed inset-x-0 bottom-3 z-40 mx-auto block w-[92%] rounded-2xl border border-zinc-200 bg-white/90 p-2 shadow-md backdrop-blur md:hidden">
+      <div className="flex items-center justify-between gap-2">
+        <a href="#book" className="flex-1 rounded-xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-4 py-2 text-center font-medium text-zinc-900">
+          Book a demo
+        </a>
+        <a href="#sales" className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-center font-medium">
+          Talk to sales
+        </a>
       </div>
-    </footer>
+    </div>
   )
 }
 
 /* -------------------------- REUSABLE PIECES ---------------------- */
 function DemoCard({ title, subtitle, children }) {
   return (
-    <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm md:p-5">
+    <motion.div
+      className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm md:p-5"
+      initial={{ opacity: 0, y: 14, scale: 0.99 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.6, ease }}
+    >
       <div className="mb-3 flex items-end justify-between">
         <div>
           <div className="text-base font-semibold">{title}</div>
@@ -357,7 +344,7 @@ function DemoCard({ title, subtitle, children }) {
         <span className="inline-flex h-8 w-20 items-center justify-center rounded-xl bg-gradient-to-br from-[#CFFAE2] to-[#FFF0A6] text-xs font-medium text-zinc-900"/>
       </div>
       {children}
-    </div>
+    </motion.div>
   )
 }
 
@@ -397,13 +384,13 @@ function TryOnMock() {
         <img
           src="https://images.unsplash.com/photo-1520975916090-3105956dac38?q=80&w=1200&auto=format&fit=crop"
           alt="model"
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover transition-opacity"
           style={{ opacity: tab === 'before' ? 1 : 0 }}
         />
         <img
           src="https://images.unsplash.com/photo-1548883354-51e87a8514d4?q=80&w=1200&auto=format&fit=crop"
           alt="model with garment"
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover transition-opacity"
           style={{ opacity: tab === 'after' ? 1 : 0 }}
         />
       </div>
@@ -418,21 +405,25 @@ function TryOnMock() {
           onClick={() => setTab('after')}
           className={`rounded-xl border px-3 py-1.5 text-sm ${tab === 'after' ? 'border-zinc-900 bg-white' : 'border-zinc-200 bg-white/70'}`}
         >
-          Try‑On
+          Try-On
         </button>
       </div>
     </div>
   )
 }
 
-function MobileStickyCTA() {
+function Chip({ icon, children }) {
   return (
-    <div className="fixed inset-x-0 bottom-3 z-40 mx-auto block w-[92%] rounded-2xl border border-zinc-200 bg-white/90 p-2 shadow-md backdrop-blur md:hidden">
-      <div className="flex items-center justify-between gap-2">
-        <a href="#demo" className="flex-1 rounded-xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-4 py-2 text-center font-medium text-zinc-900">Enhance</a>
-        <a href="#demo" className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-center font-medium">Try‑On</a>
-      </div>
-    </div>
+    <motion.div
+      className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 shadow-sm"
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5, ease }}
+    >
+      {icon}
+      <span>{children}</span>
+    </motion.div>
   )
 }
 
@@ -466,13 +457,6 @@ function LockIcon() {
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  )
-}
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6L9 17l-5-5" />
     </svg>
   )
 }
