@@ -15,6 +15,7 @@ import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
  * - Active link: mint→lemon underline
  * - Primary CTA: dark pill (matches hero), secondary: bordered white
  * - Mobile drawer with the same palette and soft cards
+ * - Brand fixed to AIStore (logo + name) on desktop & mobile
  */
 
 const LINKS = [
@@ -24,6 +25,26 @@ const LINKS = [
   { href: '/history', label: 'History' },
   { href: '/blog', label: 'Blog' },
 ];
+
+// --- Brand (AIStore) ---
+function Brand({ className = '' }) {
+  return (
+    <Link
+      href="/"
+      aria-label="AIStore Home"
+      className={`group inline-flex items-center gap-2 ${className}`}
+    >
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-sm">
+        <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
+          <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
+        </svg>
+      </span>
+      <span className="font-semibold tracking-tight text-zinc-900 dark:text-white whitespace-nowrap">
+        AIStore
+      </span>
+    </Link>
+  );
+}
 
 export default function Navbar() {
   const router = useRouter();
@@ -201,14 +222,8 @@ export default function Navbar() {
         style={{ boxShadow: scrolled ? 'inset 0 -1px 0 rgba(0,0,0,.04)' : 'none' }}
       >
         <nav className="h-16 flex items-center justify-between">
-          {/* Brand (light, minimal — matches hero) */}
-          <Link href="/" className="group inline-flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#B9F7D6] to-[#FFF39C] shadow-sm" />
-            <span className="font-semibold tracking-tight text-zinc-900 dark:text-white">
-              MintLemon
-              <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 align-middle" />
-            </span>
-          </Link>
+          {/* Brand fixed (logo + name) */}
+          <Brand className="shrink-0" />
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-2">
@@ -278,20 +293,20 @@ export default function Navbar() {
 
                 <Link
                   href="/enhance"
-                  className="hidden lg:inline-flex items-center gap-2 rounded-full bg-zinc-900 hover:bg-zinc-800 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition"
+                  className="hidden lg:inline-flex items-center gap-2 rounded-full bg-zinc-900 hover:bg-zinc-800 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition whitespace-nowrap"
                 >
                   Book a demo
                 </Link>
 
                 <Link
                   href="/contact"
-                  className="hidden lg:inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white hover:bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-900 transition"
+                  className="hidden lg:inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white hover:bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-900 transition whitespace-nowrap"
                 >
                   Talk to sales
                 </Link>
 
                 <div
-                  title={user.email}
+                  title={user?.email}
                   className="ml-1 grid place-items-center h-9 w-9 rounded-full bg-white text-zinc-900 border border-zinc-300/70 font-bold dark:bg-white/10 dark:text-white dark:border-white/15"
                 >
                   {initials}
@@ -307,13 +322,13 @@ export default function Navbar() {
               <div className="ml-2 flex items-center gap-2">
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 rounded-full bg-zinc-900 hover:bg-zinc-800 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition"
+                  className="inline-flex items-center gap-2 rounded-full bg-zinc-900 hover:bg-zinc-800 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition whitespace-nowrap"
                 >
                   Sign in
                 </Link>
                 <Link
                   href="/contact"
-                  className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white hover:bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-900 transition"
+                  className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white hover:bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-900 transition whitespace-nowrap"
                 >
                   Talk to sales
                 </Link>
@@ -353,13 +368,11 @@ export default function Navbar() {
               exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
             >
-              {/* Drawer Header */}
+              {/* Drawer Body */}
               <div className="bg-gradient-to-b from-[#F3FFF8] to-[#FFFCE8] h-full text-zinc-900 dark:bg-[linear-gradient(to_bottom,#0b0f14,#0b0f14)] dark:text-white flex flex-col">
+                {/* Drawer Header with Brand */}
                 <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-200/80 dark:border-white/10">
-                  <div className="inline-flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#B9F7D6] to-[#FFF39C] shadow-sm" />
-                    <span className="font-semibold">MintLemon</span>
-                  </div>
+                  <Brand />
                   <button
                     className="inline-flex items-center justify-center h-10 w-10 rounded-full border border-zinc-300/70 bg-white/70 text-zinc-700 hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition"
                     onClick={() => setMenuOpen(false)}
@@ -379,7 +392,7 @@ export default function Navbar() {
                       className={[
                         'block rounded-2xl px-3 py-3 text-sm font-medium transition',
                         isActive(l.href)
-                          ? 'bg-white text-zinc-900 shadow-sm dark:bg-white/10 dark:text-white'
+                          ? 'bg-white text-zinc-900 shadow-sm dark:bg白/10 dark:text-white' // harmless if dark
                           : 'text-zinc-700 hover:bg-white/70 dark:text-white/80 dark:hover:bg-white/5',
                       ].join(' ')}
                     >
@@ -475,7 +488,7 @@ export default function Navbar() {
                 </div>
 
                 <div className="mt-auto p-4 text-xs text-zinc-500 border-t border-zinc-200/70 dark:text-white/50 dark:border-white/10">
-                  © {new Date().getFullYear()} MintLemon
+                  © {new Date().getFullYear()} AIStore
                 </div>
               </div>
             </motion.aside>
