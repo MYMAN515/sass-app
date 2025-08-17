@@ -1,1611 +1,692 @@
+// components/HeroSection.jsx
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { motion, useAnimation, useReducedMotion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-/* -------------------------------------------------------
-   Small helpers
-------------------------------------------------------- */
-const STORAGE_BUCKET = 'img';
+/**
+ * Weird AF • Bright, playful, undeniably B2B
+ * - Non-dark palette (pastels & candy gradients)
+ * - Instantly clear value prop (Enhance + Try-On for products)
+ * - Heavy micro-interactions: magnets, parallax, marquee, blobs, stickers
+ * - Meme-friendly copy, but conversion-first CTAs
+ * - No navbar / no footer
+ */
 
-const hexToRGBA = (hex, a = 1) => {
-  const c = hex.replace('#', '');
-  const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
-  const n = parseInt(v, 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = (n) & 255;
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-};
-
-const fileToDataURL = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-const pickFirstUrl = (obj) => {
-  if (!obj) return '';
-  if (typeof obj === 'string') return obj;
-  const keys = ['image', 'image_url', 'output', 'result', 'url'];
-  for (const k of keys) if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
-  return '';
-};
-
-/* -------------------------------------------------------
-   Presets (images live in /public)
-------------------------------------------------------- */
-const ENHANCE_PRESETS = [
-  {
-    id: 'clean-studio',
-    title: 'Clean Studio',
-    subtitle: 'Soft light • white sweep',
-    tag: 'Popular',
-    config: {
-      photographyStyle: 'studio product photography, 50mm prime',
-      background: 'white seamless',
-      lighting: 'large softbox, gentle reflections',
-      colorStyle: 'neutral whites, subtle grays',
-      realism: 'hyperrealistic details',
-      outputQuality: '4k sharp'
-    },
-    preview: '/clean-studio.webp'
-  },
-  {
-    id: 'desert-tones',
-    title: 'Desert Tones',
-    subtitle: 'Warm • cinematic',
-    tag: 'Warm',
-    config: {
-      photographyStyle: 'cinematic product shot',
-      background: 'warm beige backdrop',
-      lighting: 'golden hour, soft shadows',
-      colorStyle: 'sand, beige, amber',
-      realism: 'photo-real, crisp textures',
-      outputQuality: '4k'
-    },
-    preview: '/desert-tones.webp'
-  },
-  {
-    id: 'editorial-beige',
-    title: 'Editorial Beige',
-    subtitle: 'Minimal • magazine look',
-    tag: 'Editorial',
-    config: {
-      photographyStyle: 'editorial catalog',
-      background: 'matte beige',
-      lighting: 'directional key + fill',
-      colorStyle: 'beige monochrome',
-      realism: 'realistic',
-      outputQuality: '4k print'
-    },
-    preview: '/editorial-beige.webp'
-  },
-  {
-    id: 'slate-contrast',
-    title: 'Slate Contrast',
-    subtitle: 'Dark slate • specular',
-    tag: 'High-contrast',
-    config: {
-      photographyStyle: 'hero product shot',
-      background: 'charcoal slate',
-      lighting: 'hard key + rim, controlled specular',
-      colorStyle: 'cool slate, deep blacks',
-      realism: 'high-fidelity',
-      outputQuality: '4k'
-    },
-    preview: '/slate-contrast.webp'
-  }
-];
-
-/** مكتبة المودلز (أضفت عينات؛ زد العدد لاحقاً ل٣٠-٤٠) */
-const MODELS = [
-  { id: 'm01', name: 'Ava — Studio Front', pose: 'front', url: '/models/m01.webp' },
-  { id: 'm02', name: 'Maya — Side Pose', pose: 'side', url: '/models/m02.webp' },
-  { id: 'm03', name: 'Lina — Half Body', pose: 'half', url: '/models/m03.webp' },
-  { id: 'm04', name: 'Zoe — Studio 3/4', pose: '34', url: '/models/m04.webp' },
-  { id: 'm05', name: 'Noah — Casual Front', pose: 'front', url: '/models/m05.webp' },
-  { id: 'm06', name: 'Omar — Studio Side', pose: 'side', url: '/models/m06.webp' },
-  { id: 'm07', name: 'Yara — Full Body', pose: 'full', url: '/models/m07.webp' },
-  { id: 'm08', name: 'Sara — 3/4 Smile', pose: '34', url: '/models/m08.webp' },
-  { id: 'm09', name: 'Jude — Front Studio', pose: 'front', url: '/models/m09.webp' },
-  { id: 'm10', name: 'Ali — Casual Half', pose: 'half', url: '/models/m10.webp' },
-];
-
-/* -------------------------------------------------------
-   Toast system with progress
-------------------------------------------------------- */
-function useToasts() {
-  const [items, setItems] = useState([]);
-  const push = (msg, opts = {}) => {
-    const id = Math.random().toString(36).slice(2);
-    const item = { id, msg, type: opts.type || 'info', progress: opts.progress ?? null };
-    setItems((s) => [...s, item]);
-    return {
-      id,
-      update: (patch) => setItems((s) => s.map((it) => (it.id === id ? { ...it, ...patch } : it))),
-      close: () => setItems((s) => s.filter((it) => it.id !== id))
-    };
-  };
-  const remove = (id) => setItems((s) => s.filter((it) => it.id !== id));
-  return { items, push, remove };
-}
-
-function ToastHost({ items, onClose }) {
+export default function HeroSection() {
   return (
-    <div className="fixed left-1/2 -translate-x-1/2 bottom-4 z-[999] w-[92vw] max-w-sm sm:max-w-md space-y-2">
-      <AnimatePresence initial={false}>
-        {items.map((t) => (
-          <motion.div
-            key={t.id}
-            initial={{ y: 16, opacity: 0, scale: 0.98 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 16, opacity: 0, scale: 0.98 }}
-            className="rounded-xl border border-slate-200 bg-white shadow-lg p-3"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-slate-800">{t.msg}</div>
-              <button className="text-xs text-slate-500 hover:text-slate-800" onClick={() => onClose(t.id)}>✕</button>
-            </div>
-            {typeof t.progress === 'number' && (
-              <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  className="h-full bg-slate-900 transition-all"
-                  style={{ width: `${Math.min(Math.max(t.progress, 0), 100)}%` }}
-                />
-              </div>
-            )}
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
+    <section className="relative w-full overflow-hidden font-sans text-zinc-900">
+      <BackgroundWhimsy />
+      <TopBlock />
+      <LogosMarquee />
+      <ProofPills />
+      <ComicHowItWorks />
+      <MemeTicker />
+      <BottomBlock />
+      <StickyMobileCTA />
+    </section>
   );
 }
 
-/* -------------------------------------------------------
-   Dashboard
-------------------------------------------------------- */
-const GROUPS = [
-  { id: 'product', label: 'Product', icon: BoxIcon },
-  { id: 'people', label: 'People', icon: PersonIcon }
-];
+/* ============================================================================
+   TOP BLOCK — loud, weird, crystal clear
+============================================================================ */
 
-const PRODUCT_TOOLS = [
-  { id: 'removeBg', label: 'Remove BG', icon: ScissorsIcon },
-  { id: 'enhance',  label: 'Enhance',   icon: RocketIcon }
-];
-
-const PEOPLE_TOOLS = [
-  { id: 'tryon',     label: 'Try-On',     icon: PersonIcon },
-  { id: 'modelSwap', label: 'Model Swap', icon: SwapIcon   }
-];
-
-export default function Dashboard() {
-  const supabase = useSupabaseClient();
-  const user = useUser();
-  const router = useRouter();
-  const toasts = useToasts();
-
-  /* ---------- app state ---------- */
-  const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState('product');     // product | people
-  const [tool, setTool]   = useState('enhance');     // active tool per group
-  const [plan, setPlan]   = useState('Free');
-
-  // single-file work area
-  // ملاحظة: في Try-On هذا الملف = صورة الملابس (مو صورة الشخص)
-  const [file, setFile] = useState(null);
-  const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState(''); // for removeBG dataURL
-  const [resultUrl, setResultUrl] = useState('');
-
-  // model swap (two images)
-  const [file1, setFile1] = useState(null);
-  const [file2, setFile2] = useState(null);
-  const [local1, setLocal1] = useState('');
-  const [local2, setLocal2] = useState('');
-  const [swapPrompt, setSwapPrompt] = useState('');
-
-  // Try-On specific (stepper)
-  const [selectedModel, setSelectedModel] = useState(null); // { id, name, url }
-  const [pieceType, setPieceType] = useState(null); // 'upper'|'lower'|'dress'
-  const [tryonStep, setTryonStep] = useState('cloth'); // 'cloth' -> 'piece' -> 'model'
-  const [showPieceType, setShowPieceType] = useState(false);
-
-  const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const [history, setHistory] = useState([]);
-
-  // compare overlay
-  const [compare, setCompare] = useState(false);
-  const [compareOpacity, setCompareOpacity] = useState(50);
-
-  // remove/bg frame
-  const [bgMode, setBgMode] = useState('color');   // color | gradient | pattern
-  const [color, setColor] = useState('#ffffff');
-  const [color2, setColor2] = useState('#f1f5f9');
-  const [angle, setAngle] = useState(35);
-  const [radius, setRadius] = useState(18);
-  const [padding, setPadding] = useState(20);
-  const [shadow, setShadow] = useState(true);
-  const [patternOpacity, setPatternOpacity] = useState(0.06);
-
-  // enhance modal
-  const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
-  const [showEnhance, setShowEnhance] = useState(false);
-
-  const dropRef = useRef(null);
-  const inputRef = useRef(null);
-  const inputRef1 = useRef(null);
-  const inputRef2 = useRef(null);
-
-  /* ---------- auth and init ---------- */
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (user === undefined) return;
-      if (!user) { router.replace('/login'); return; }
-
-      try {
-        const { data } = await supabase
-          .from('Data')
-          .select('plan')
-          .eq('user_id', user.id)
-          .single();
-        if (!mounted) return;
-        setPlan(data?.plan || 'Free');
-      } catch {/* ignore */}
-
-      setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [user, router, supabase]);
-
-  /* ---------- drag & drop / paste (single file area) ---------- */
-  useEffect(() => {
-    const el = dropRef.current; if (!el) return;
-    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-slate-400'); };
-    const leave = () => el.classList.remove('ring-2','ring-slate-400');
-    const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
-    el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
-
-    const onPaste = async (e) => {
-      const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
-      const f = item?.getAsFile?.(); if (f) await onPick(f);
-    };
-    window.addEventListener('paste', onPaste);
-    return () => {
-      el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop);
-      window.removeEventListener('paste', onPaste);
-    };
-  }, [tool]);
-
-  const onPick = async (f) => {
-    setFile(f);
-    setLocalUrl(URL.createObjectURL(f));
-    setResultUrl('');
-    setErr(''); setPhase('idle');
-    if (tool === 'removeBg') setImageData(await fileToDataURL(f));
-
-    // Try-On flow: after uploading clothing, open piece-type pop-on
-    if (tool === 'tryon') {
-      setTryonStep('piece');
-      setShowPieceType(true);
-    }
-  };
-
-  /* ---------- computed styles ---------- */
-  const frameStyle = useMemo(() => {
-    let bgStyle;
-    if (bgMode === 'color') {
-      bgStyle = { background: color };
-    } else if (bgMode === 'gradient') {
-      bgStyle = { background: `linear-gradient(${angle}deg, ${color}, ${color2})` };
-    } else {
-      const svg = encodeURIComponent(
-        `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'>
-          <defs><pattern id='p' width='24' height='24' patternUnits='userSpaceOnUse'>
-            <path d='M0 12h24M12 0v24' stroke='${hexToRGBA('#000000', patternOpacity)}' stroke-width='1' opacity='0.2'/>
-          </pattern></defs>
-          <rect width='100%' height='100%' fill='${color}'/>
-          <rect width='100%' height='100%' fill='url(#p)'/>
-        </svg>`
-      );
-      bgStyle = { backgroundColor: color, backgroundImage: `url("data:image/svg+xml;utf8,${svg}")`, backgroundSize: '24px 24px' };
-    }
-    return {
-      ...bgStyle,
-      borderRadius: `${radius}px`,
-      padding: `${padding}px`,
-      boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.12), 0 6px 18px rgba(0,0,0,.06)' : 'none',
-      transition: 'all .25s ease'
-    };
-  }, [bgMode, color, color2, angle, radius, padding, shadow, patternOpacity]);
-
-  /* ---------- storage ---------- */
-  const uploadToStorage = useCallback(async (f) => {
-    if (!f) throw new Error('no file');
-    const ext = (f.name?.split('.').pop() || 'png').toLowerCase();
-    const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, f, {
-      cacheControl: '3600', upsert: false, contentType: f.type || 'image/*',
-    });
-    if (upErr) throw upErr;
-    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-    if (!data?.publicUrl) throw new Error('no public url');
-    return data.publicUrl;
-  }, [supabase, user]);
-
-  /* ---------- prompt builders ---------- */
-  const buildEnhancePrompt = (f) =>
-    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
-      .filter(Boolean).join(', ');
-
-const buildTryOnPrompt = (pieceType) => {
-  const region =
-    pieceType === 'upper' ? 'the TOP' :
-    pieceType === 'lower' ? 'the BOTTOM' :
-    'the FULL OUTFIT';
-
-  return [
-    `Make the model wear the cloth , make it fit and look exatilcy as the cloth photo , make 2 virions of the photo with same cloth in the another pic ,Put the cloth  on ${region} of the person `
-  ].join(' ');
-};
-
-
-  /* ---------- runners ---------- */
-  const runRemoveBg = useCallback(async () => {
-    if (!file) return setErr('Pick an image first.');
-    setBusy(true); setErr(''); setPhase('processing');
-    const t = toasts.push('Removing background…', { progress: 8 });
-    let adv = 8; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
-    try {
-      const r = await fetch('/api/remove-bg', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData })
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from remove-bg');
-      setResultUrl(out);
-      setHistory(h => [{ tool:'Remove BG', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-      setPhase('ready'); t.update({ progress: 100, msg: 'Background removed ✓' });
-      setTimeout(() => t.close(), 700);
-    } catch (e) {
-      console.error(e); setPhase('error'); setErr('Failed to process.');
-      t.update({ msg: 'Remove BG failed', type: 'error' }); setTimeout(() => t.close(), 1500);
-    } finally { clearInterval(iv); setBusy(false); }
-  }, [file, imageData, localUrl, toasts]);
-
-  const runEnhance = useCallback(async (selections) => {
-    if (!file) return setErr('Pick an image first.');
-    setBusy(true); setErr(''); setPhase('processing');
-    const imageUrl = await uploadToStorage(file);
-    const prompt = buildEnhancePrompt(selections);
-    const t = toasts.push('Enhancing…', { progress: 12 });
-    let adv = 12; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
-    try {
-      const r = await fetch('/api/enhance', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email })
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || 'enhance failed');
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from enhance');
-      setResultUrl(out);
-      setHistory(h => [{ tool:'Enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-      setPhase('ready'); t.update({ progress: 100, msg: 'Enhanced ✓' }); setTimeout(() => t.close(), 700);
-    } catch (e) {
-      console.error(e); setPhase('error'); setErr('Failed to process.');
-      t.update({ msg: 'Enhance failed', type: 'error' }); setTimeout(() => t.close(), 1500);
-    } finally { clearInterval(iv); setBusy(false); }
-  }, [file, uploadToStorage, plan, user, localUrl, toasts]);
-
-   // ===== Replacement: runTryOn (paste this whole function) =====
-const runTryOn = useCallback(async () => {
-  // تحقّقات سريعة
-  if (!file)              { setErr('Please upload a clothing image first.'); return; }
-  if (!selectedModel?.url){ setErr('Please select a model first.'); return; }
-  if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
-
-  // أصل الروابط لعمل /models/... كرابط مطلق
-  const origin =
-    (typeof window !== 'undefined' && window.location?.origin) ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://aistoreassistant.app';
-
-  // IMAGE 1 = صورة الشخص/المودل (مطلقة)
-  const modelUrlAbs = selectedModel.url.startsWith('http')
-    ? selectedModel.url
-    : new URL(selectedModel.url, origin).toString();
-
-  setBusy(true);
-  setErr('');
-  setPhase('processing');
-
-  // برومبت حسب نوع القطعة (تبقيه كما هو عندك)
-  const prompt = buildTryOnPrompt(pieceType);
-
-  // توست تقدّم
-  const toast = toasts.push('Generating try-on…', { progress: 10 });
-  let progress = 10;
-  const iv = setInterval(() => {
-    progress = Math.min(progress + 6, 88);
-    toast.update({ progress });
-  }, 500);
-
-  try {
-    // IMAGE 2 = رفع صورة القطعة إلى ستوريج ورجوع رابط عام
-    const clothUrl = await uploadToStorage(file);
-
-    // استدعاء API المختصر: 4 حقول فقط
-    const r = await fetch('/api/tryon', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image1: modelUrlAbs,       // IMAGE 1
-        image2: clothUrl,          // IMAGE 2
-        pieceType,                    // نص الـTry-On
-        plan,
-        user_email: user.email
-      })
-    });
-
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const msg =
-        j?.error ||
-        (r.status === 400 ? 'Missing required fields.' :
-         r.status === 401 ? 'Unauthorized.' :
-         r.status === 403 ? 'No credits left.' :
-         r.status === 404 ? 'User not found.' :
-         r.status === 500 ? 'Generation failed on the server.' :
-         `Unexpected error (${r.status}).`);
-      throw new Error(msg);
-    }
-
-    // التقاط رابط الإخراج
-    const out = j?.image || j?.url || j?.result || (Array.isArray(j?.output) ? j.output[0] : '');
-    if (!out) throw new Error('No output image returned from the API.');
-
-    setResultUrl(out);
-    setHistory(h => [
-      { tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() },
-      ...h
-    ].slice(0, 24));
-
-    setPhase('ready');
-    toast.update({ progress: 100, msg: 'Try-On ✓' });
-    setTimeout(() => toast.close(), 700);
-  } catch (e) {
-    console.error(e);
-    setPhase('error');
-    setErr(e?.message || 'Processing failed.');
-    toast.update({ msg: `Try-On failed: ${e?.message || 'Error'}`, type: 'error' });
-    setTimeout(() => toast.close(), 1500);
-  } finally {
-    clearInterval(iv);
-    setBusy(false);
-  }
-}, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
-
-
-  const runModelSwap = useCallback(async () => {
-    if (!file1 || !file2) return setErr('Pick both images.');
-    setBusy(true); setErr(''); setPhase('processing');
-    const [image1, image2] = await Promise.all([uploadToStorage(file1), uploadToStorage(file2)]);
-    const t = toasts.push('Running Model Swap…', { progress: 10 });
-    let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
-    try {
-      const r = await fetch('/api/model', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image1, image2, prompt: swapPrompt, plan, user_email: user.email })
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || 'model swap failed');
-      const out = pickFirstUrl(j) || j?.url || j?.image;
-      if (!out) throw new Error('No output from model.');
-      setResultUrl(out);
-      setHistory(h => [{ tool:'Model Swap', inputThumb: local1, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-      setPhase('ready'); t.update({ progress: 100, msg: 'Model Swap done ✓' }); setTimeout(() => t.close(), 700);
-    } catch (e) {
-      console.error(e); setPhase('error'); setErr('Failed to process.');
-      t.update({ msg: 'Model Swap failed', type: 'error' }); setTimeout(() => t.close(), 1500);
-    } finally { clearInterval(iv); setBusy(false); }
-  }, [file1, file2, swapPrompt, uploadToStorage, plan, user, local1, toasts]);
-
-  /* ---------- handlers ---------- */
-  const resetAll = () => {
-    setFile(null); setLocalUrl(''); setResultUrl('');
-    setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
-    setErr(''); setPhase('idle'); setCompare(false);
-    // reset tryon
-    setSelectedModel(null); setPieceType(null); setTryonStep(tool==='tryon' ? 'cloth' : 'cloth');
-  };
-
-  const switchTool = (nextId) => {
-    setTool(nextId);
-    // reset everything relevant on tool switch
-    setResultUrl(''); setErr(''); setPhase('idle'); setCompare(false);
-    setFile(null); setLocalUrl('');
-    setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
-    setSelectedModel(null); setPieceType(null); setTryonStep(nextId==='tryon' ? 'cloth' : 'cloth');
-  };
-
-  const handleRun = () => {
-    if (group === 'product') {
-      if (tool === 'removeBg') return runRemoveBg();
-      if (tool === 'enhance')  return setShowEnhance(true);
-    } else {
-      if (tool === 'tryon') return runTryOn();
-      if (tool === 'modelSwap') return runModelSwap();
-    }
-  };
-
-  /* ---------- UI ---------- */
-  if (loading || user === undefined) {
-    return (
-      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-slate-50 to-slate-100 text-slate-600">
-        <div className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 border shadow-sm text-sm">Loading…</div>
-      </main>
-    );
-  }
-  if (!user) return null;
-
-  const initials = (() => {
-    const n = user?.user_metadata?.name || user?.email || 'U';
-    const p = n.split(' ').filter(Boolean);
-    return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
-  })();
+function TopBlock() {
+  const prefersReducedMotion = useReducedMotion();
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900">
-      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
-        {/* Sidebar */}
-        <aside className="rounded-2xl border border-slate-200 bg-white shadow-sm sticky top-3 md:top-4 self-start h-fit">
-          <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
-            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
-              <SparkleIcon className="w-4 h-4" />
-            </div>
-            <div className="font-semibold tracking-tight">AI Studio</div>
+    <div className="relative z-10 px-6 pt-24 pb-16 md:px-10 lg:px-20 lg:pt-28 lg:pb-20">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1.1fr,1fr]"
+      >
+        {/* Left — copy */}
+        <div>
+          <BadgeRow />
+          <WigglyTitle />
+
+          <p className="mt-4 max-w-xl text-lg md:text-xl text-zinc-600">
+            Upload a product photo → get studio-grade images and virtual try-ons in seconds.
+            Weirdly simple. Dangerously effective.
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-center gap-2 text-[12px] text-zinc-600">
+            <Pill>Free starter credits</Pill>
+            <Dot />
+            <Pill>No studio needed</Pill>
+            <Dot />
+            <Pill>GDPR-friendly</Pill>
           </div>
 
-          <div className="px-3 py-3">
-            <div className="text-xs font-semibold text-slate-500 mb-1">Workspace</div>
-            <div className="inline-flex rounded-full border border-slate-300 bg-white p-1">
-              {GROUPS.map((g) => {
-                const Active = group === g.id;
-                const Icon = g.icon;
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => { setGroup(g.id); switchTool(g.id === 'product' ? 'enhance' : 'tryon'); }}
-                    className={['inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                      Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 hover:bg-slate-100'].join(' ')}
-                  >
-                    <Icon className="size-4" /> {g.label}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <MagnetCTA href="/dashboard" ariaLabel="Open the dashboard">
+              Get started free
+            </MagnetCTA>
+            <GhostCTA href="#live-demo">Watch 30s demo</GhostCTA>
           </div>
 
-          <div className="px-3 pb-3">
-            <div className="text-xs font-semibold text-slate-500 mb-1">Tools</div>
-            <div className="space-y-1">
-              {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((t) => {
-                const Active = tool === t.id;
-                const Icon = t.icon;
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => switchTool(t.id)}
-                    className={[
-                      'w-full group flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition',
-                      Active ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                             : 'text-slate-700 hover:bg-slate-100 border border-transparent'
-                    ].join(' ')}
-                  >
-                    <Icon className={['size-4', Active ? 'text-indigo-600' : 'text-slate-500 group-hover:text-slate-700'].join(' ')} />
-                    <span className="truncate">{t.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <EarlyEmailCapture />
+
+          <div className="mt-4 flex items-center gap-3 text-xs text-zinc-500">
+            <span className="font-medium">Trusted by 1,200+ stores</span>
+            <Dot />
+            <span>Avg render 15s</span>
+            <Dot />
+            <span>99.9% uptime</span>
           </div>
-
-          <div className="px-4 py-3 border-t border-slate-200">
-            <div className="flex items-center gap-3">
-              <div className="grid place-items-center size-10 rounded-full bg-slate-100 text-slate-700 font-bold">{initials}</div>
-              <div className="text-sm">
-                <div className="font-medium leading-tight">{user.user_metadata?.name || user.email}</div>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main column */}
-        <section className="space-y-5 md:space-y-6">
-          {/* Presets / Model Flow */}
-          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white/90 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-                  {group === 'product' ? 'Quick Presets' : (tool === 'tryon' ? 'Try-On Flow' : 'Pick a Model')}
-                </h1>
-                <p className="text-slate-600 text-xs sm:text-sm">
-                  {group === 'product'
-                    ? <>Pick a preset or open <span className="font-semibold">Customize</span>.</>
-                    : tool === 'tryon'
-                      ? <>Step 1: upload clothing → Step 2: choose type → Step 3: pick a model → Run.</>
-                      : <>Choose two images and run <span className="font-semibold">Model Swap</span>.</>}
-                </p>
-              </div>
-
-              {group === 'product' ? (
-                <button
-                  onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
-                >
-                  ✨ Customize Enhance
-                </button>
-              ) : tool === 'tryon' ? (
-                pieceType ? (
-                  <button
-                    onClick={() => setShowPieceType(true)}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50"
-                  >
-                    Change clothing type
-                  </button>
-                ) : null
-              ) : null}
-            </div>
-
-            {group === 'product' ? (
-              <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {ENHANCE_PRESETS.map((p) => (
-                    <PresetCard
-                      key={p.id}
-                      title={p.title}
-                      subtitle={p.subtitle}
-                      preview={p.preview}
-                      tag={p.tag}
-                      onClick={() => { setTool('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : tool === 'tryon' ? (
-              <div className="mt-4">
-                {/* Stepper */}
-                <TryOnStepper step={tryonStep} pieceType={pieceType} modelPicked={!!selectedModel} />
-
-                {/* Only show model gallery AFTER pieceType is chosen (step === 'model') */}
-                {tryonStep === 'model' ? (
-                  <div className="mt-3">
-                    <div className="mb-2 text-[12px] font-semibold text-slate-700">Models</div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      {MODELS.map((m) => (
-                        <ModelCard
-                          key={m.id}
-                          model={m}
-                          active={selectedModel?.id === m.id}
-                          onSelect={() => setSelectedModel(m)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-600 bg-slate-50">
-                    Upload clothing first, then choose type. Models will appear next.
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700">Model Swap</div>
-                <div className="text-xs text-slate-600">Upload two images below and write a short instruction.</div>
-              </div>
-            )}
-          </div>
-
-          {/* Workbench */}
-          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_340px]">
-            {/* Canvas Panel */}
-            <section className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm relative">
-              <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
-                <div className="inline-flex rounded-full border border-slate-300 bg-white p-1">
-                  {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((it) => {
-                    const Active = tool === it.id;
-                    const Icon = it.icon;
-                    return (
-                      <button
-                        key={it.id}
-                        onClick={() => switchTool(it.id)}
-                        className={[
-                          'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                          Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 hover:bg-slate-100'
-                        ].join(' ')}
-                      >
-                        <Icon className="size-4" />
-                        <span>{it.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center gap-2">
-                  <StepBadge phase={phase} />
-                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50">Reset</button>
-                </div>
-              </div>
-
-              {/* Drop areas */}
-              {tool !== 'modelSwap' ? (
-                <div
-                  ref={dropRef}
-                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                  onClick={() => inputRef.current?.click()}
-                  title="Drag & drop / Click / Paste (Ctrl+V)"
-                >
-                  <input
-                    ref={inputRef}
-                    type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
-                  />
-                  {!localUrl && !resultUrl ? (
-                    <div className="text-center text-slate-500 text-sm">
-                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-slate-200">⬆</div>
-                      {tool === 'tryon'
-                        ? 'Upload a clothing image (PNG/JPG). Transparent PNG preferred.'
-                        : 'Drag & drop an image here, click to choose, or paste (Ctrl+V)'}
-                    </div>
-                  ) : (
-                    <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
-                      {compare && localUrl && resultUrl ? (
-                        <div className="relative max-w-full max-h-[70vh]">
-                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
-                          <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
-                               className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
-                        </div>
-                      ) : (
-                        <img
-                          src={resultUrl || localUrl}
-                          alt="preview"
-                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
-                          draggable={false}
-                          loading="lazy"
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="m-3 sm:m-4 md:m-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Image 1 */}
-                    <FileDrop
-                      label="Image 1"
-                      file={file1}
-                      localUrl={local1}
-                      onPick={async (f) => { setFile1(f); setLocal1(URL.createObjectURL(f)); setResultUrl(''); setPhase('idle'); }}
-                      inputRef={inputRef1}
-                    />
-                    {/* Image 2 */}
-                    <FileDrop
-                      label="Image 2"
-                      file={file2}
-                      localUrl={local2}
-                      onPick={async (f) => { setFile2(f); setLocal2(URL.createObjectURL(f)); setResultUrl(''); setPhase('idle'); }}
-                      inputRef={inputRef2}
-                    />
-                  </div>
-                  <div className="mt-3">
-                    <label className="text-xs text-slate-600">Prompt</label>
-                    <input
-                      value={swapPrompt} onChange={(e)=>setSwapPrompt(e.target.value)}
-                      placeholder="Describe how to combine or arrange the two images…"
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                    />
-                  </div>
-
-                  {/* Result preview for model swap */}
-                  {resultUrl && (
-                    <div className="mt-4">
-                      <div className="text-xs text-slate-600 mb-2">Result</div>
-                      <div className="w-full rounded-xl border bg-slate-50 p-2 grid place-items-center">
-                        <img src={resultUrl} alt="result" className="max-w-full max-h-[60vh] object-contain rounded-lg" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
-                <button
-                  onClick={handleRun}
-                  disabled={
-                    busy || (
-                      tool === 'modelSwap' ? (!file1 || !file2) :
-                      tool === 'tryon' ? (!file || !selectedModel || !pieceType) :
-                      !file
-                    )
-                  }
-                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
-                >
-                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On')}</>)}
-                </button>
-
-                {resultUrl && (
-                  <>
-                    <button
-                      onClick={() => exportPng(resultUrl)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50"
-                    >
-                      ⬇ Download PNG
-                    </button>
-                    <a
-                      href={resultUrl} target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50"
-                    >
-                      ↗ Open
-                    </a>
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(resultUrl).catch(()=>{}); }}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50"
-                    >
-                      🔗 Copy URL
-                    </button>
-
-                    {tool !== 'modelSwap' && localUrl && (
-                      <>
-                        <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2">
-                          <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
-                          Compare
-                        </label>
-                        {compare && (
-                          <div className="flex items-center gap-2">
-                            <input type="range" min={0} max={100} value={compareOpacity}
-                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} />
-                            <span className="text-xs w-8 text-right">{compareOpacity}%</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-
-                {!!err && <div className="text-xs text-rose-600">{err}</div>}
-              </div>
-
-              {/* busy overlay */}
-              <AnimatePresence>
-                {busy && (
-                  <motion.div
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="pointer-events-none absolute inset-0 rounded-2xl md:rounded-3xl grid place-items-center bg-white/60"
-                  >
-                    <div className="text-xs px-3 py-2 rounded-lg bg-white border shadow">Working…</div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </section>
-
-            {/* Inspector */}
-            <aside className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:pb-5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900">Inspector</div>
-                <span className="text-xs text-slate-500">Tool: {tool}</span>
-              </div>
-
-              {/* Try-On summary */}
-              {tool === 'tryon' && (
-                <div className="space-y-3 mt-3 text-xs">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Clothing</div>
-                    {localUrl ? (
-                      <img src={localUrl} alt="cloth" className="w-full max-h-48 object-contain rounded-md border bg-slate-50" />
-                    ) : (
-                      <div className="text-slate-400">— Upload a clothing image —</div>
-                    )}
-                  </div>
-
-                  <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Type</div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-slate-800">{pieceType ? pieceType : '—'}</div>
-                      <button className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => setShowPieceType(true)}>Change</button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Selected Model</div>
-                    {selectedModel ? (
-                      <div className="flex items-center gap-2">
-                        <img src={selectedModel.url} alt={selectedModel.name} className="w-10 h-10 rounded-md object-cover border" />
-                        <div>
-                          <div className="font-semibold text-slate-900">{selectedModel.name}</div>
-                          <div className="text-[11px] text-slate-500">Pose: {selectedModel.pose}</div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-slate-400">— Pick a model above —</div>
-                    )}
-                  </div>
-
-                  {resultUrl && (
-                    <div className="rounded-lg border p-3">
-                      <div className="text-slate-600 mb-2">Result</div>
-                      <img
-                        src={resultUrl}
-                        alt="final"
-                        className="w-full max-h-64 object-contain rounded-md border bg-slate-50"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Remove BG inspector */}
-              {tool === 'removeBg' && (
-                <div className="space-y-3 mt-3">
-                  <ModeTabs mode={bgMode} setMode={setBgMode} />
-                  <Field label="Primary">
-                    <Color value={color} onChange={setColor} />
-                  </Field>
-
-                  {bgMode === 'gradient' && (
-                    <>
-                      <Field label="Secondary">
-                        <Color value={color2} onChange={setColor2} />
-                      </Field>
-                      <Field label="Angle">
-                        <Range value={angle} onChange={setAngle} min={0} max={360} />
-                      </Field>
-                    </>
-                  )}
-
-                  {bgMode === 'pattern' && (
-                    <Field label="Pattern opacity">
-                      <Range
-                        value={patternOpacity}
-                        onChange={setPatternOpacity}
-                        min={0}
-                        max={0.5}
-                        step={0.01}
-                      />
-                    </Field>
-                  )}
-
-                  <Field label="Radius">
-                    <Range value={radius} onChange={setRadius} min={0} max={48} />
-                  </Field>
-                  <Field label="Padding">
-                    <Range value={padding} onChange={setPadding} min={0} max={64} />
-                  </Field>
-
-                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={shadow}
-                      onChange={(e) => setShadow(e.target.checked)}
-                    />
-                    Shadow
-                  </label>
-
-                  <div className="mt-3">
-                    <div className="text-xs text-slate-500 mb-2">Final Preview</div>
-                    <div
-                      style={frameStyle}
-                      className="relative rounded-xl overflow-hidden border border-slate-200"
-                    >
-                      <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
-                        {resultUrl ? (
-                          <img
-                            src={resultUrl}
-                            alt="final"
-                            className="max-w-full max-h-[38vh] object-contain"
-                          />
-                        ) : (
-                          <div className="grid place-items-center h-[140px] text-xs text-slate-400">
-                            — Run Remove BG first —
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Enhance inspector */}
-              {tool === 'enhance' && (
-                <div className="space-y-2 text-xs text-slate-600 mt-3">
-                  <div>
-                    Choose a preset above or press <span className="font-semibold">Customize</span>.
-                  </div>
-                  {resultUrl && (
-                    <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                      <div className="relative w-full min-h-[140px] grid place-items-center">
-                        <img
-                          src={resultUrl}
-                          alt="final"
-                          className="max-w-full max-h-[38vh] object-contain"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Model Swap inspector */}
-              {tool === 'modelSwap' && (
-                <div className="text-xs text-slate-600 mt-3 space-y-3">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Inputs</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {local1 ? (
-                        <img
-                          src={local1}
-                          alt="image1"
-                          className="w-full h-24 object-cover rounded-md border bg-slate-50"
-                        />
-                      ) : (
-                        <div className="h-24 grid place-items-center text-slate-400 border rounded-md bg-slate-50">
-                          — Image 1 —
-                        </div>
-                      )}
-                      {local2 ? (
-                        <img
-                          src={local2}
-                          alt="image2"
-                          className="w-full h-24 object-cover rounded-md border bg-slate-50"
-                        />
-                      ) : (
-                        <div className="h-24 grid place-items-center text-slate-400 border rounded-md bg-slate-50">
-                          — Image 2 —
-                        </div>
-                      )}
-                    </div>
-                    {swapPrompt && (
-                      <div className="mt-2 text-[11px] text-slate-500">
-                        Prompt: <span className="text-slate-700">{swapPrompt}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {resultUrl && (
-                    <div className="rounded-lg border p-3">
-                      <div className="text-slate-600 mb-2">Result</div>
-                      <img
-                        src={resultUrl}
-                        alt="model-swap-result"
-                        className="w-full max-h-64 object-contain rounded-md border bg-slate-50"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </aside>
-          </div>
-
-          {/* History */}
-          <div className="rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
-            <div className="text-sm font-semibold text-slate-900 mb-2">History</div>
-            {history.length === 0 ? (
-              <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
-            ) : (
-              <>
-                <div className="mb-2">
-                  <button
-                    onClick={() => setHistory([])}
-                    className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50"
-                  >
-                    Clear history
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                  {history.map((h, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setResultUrl(h.outputUrl)}
-                      className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-50"
-                    >
-                      <img
-                        src={h.outputUrl || h.inputThumb}
-                        alt="hist"
-                        className="w-full h-28 object-cover"
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
-                        {h.tool} • {new Date(h.ts).toLocaleTimeString()}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* Modals */}
-      <AnimatePresence>
-        {showEnhance && (
-          <motion.div
-            className="fixed inset-0 z-[100] grid place-items-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="absolute inset-0 bg-black/55" onClick={() => setShowEnhance(false)} />
-            <div className="relative w-full max-w-3xl mx-3">
-              <EnhanceCustomizer
-                initial={pendingEnhancePreset || undefined}
-                onChange={() => {}}
-                onComplete={(form) => {
-                  setShowEnhance(false);
-                  setPendingEnhancePreset(null);
-                  runEnhance(form);
-                }}
-              />
-            </div>
-          </motion.div>
-        )}
-
-        {showPieceType && (
-          <motion.div
-            className="fixed inset-0 z-[110] grid place-items-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="absolute inset-0 bg-black/55" onClick={() => setShowPieceType(false)} />
-            <div className="relative w-full max-w-md mx-3">
-              <PieceTypeModal
-                initial={pieceType || 'upper'}
-                onCancel={() => setShowPieceType(false)}
-                onConfirm={(type) => {
-                  setPieceType(type);
-                  setShowPieceType(false);
-                  setTryonStep('model'); // بعد اختيار النوع ننتقل لاختيار المودل
-                }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Toasts */}
-      <ToastHost items={toasts.items} onClose={toasts.remove} />
-    </main>
-  );
-}
-
-/* -------------------------------------------------------
-   Reusable UI widgets
-------------------------------------------------------- */
-function FileDrop({ label, file, localUrl, onPick, inputRef }) {
-  return (
-    <div
-      className="min-h-[220px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-      onClick={() => inputRef.current?.click()}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          if (f) await onPick(f);
-        }}
-      />
-      {!localUrl ? (
-        <div className="text-center text-slate-500 text-sm">
-          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-slate-200">
-            ⬆
-          </div>
-          {label}: Click to choose
         </div>
-      ) : (
-        <img
-          src={localUrl}
-          alt={label}
-          className="max-w-full max-h-[45vh] object-contain rounded-xl"
-        />
-      )}
-    </div>
-  );
-}
 
-function PresetCard({ title, subtitle, onClick, preview, tag }) {
-  const [broken, setBroken] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  if (broken) return null;
-
-  return (
-    <button
-      onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-slate-200 hover:border-slate-300 bg-white shadow-sm transition text-left hover:shadow-md"
-    >
-      <div className="relative w-full aspect-[4/3] bg-slate-100">
-        {!loaded && (
-          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100" />
-        )}
-        <img
-          src={preview}
-          alt={title}
-          className="absolute inset-0 w-full h-full object-cover"
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          onError={() => setBroken(true)}
-        />
-        {tag && (
-          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 text-white shadow">
-            {tag}
-          </span>
-        )}
-        <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
-          Use preset
-        </div>
-      </div>
-      <div className="p-3">
-        <div className="font-semibold">{title}</div>
-        <div className="text-xs text-slate-500">{subtitle}</div>
-      </div>
-    </button>
-  );
-}
-
-function ModelCard({ model, active, onSelect }) {
-  return (
-    <button
-      onClick={onSelect}
-      className={[
-        'group relative rounded-2xl overflow-hidden border bg-white shadow-sm transition',
-        active
-          ? 'border-indigo-400 ring-2 ring-indigo-300'
-          : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
-      ].join(' ')}
-      title={model.name}
-    >
-      <div className="relative w-full aspect-[4/5] bg-slate-100">
-        <img
-          src={model.url}
-          alt={model.name}
-          className="absolute inset-0 w-full h-full object-cover"
-          loading="lazy"
-        />
-        <div className="absolute top-2 left-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
-          {active ? 'Selected' : 'Use model'}
-        </div>
-      </div>
-      <div className="p-3">
-        <div className="font-semibold truncate">{model.name}</div>
-        <div className="text-[11px] text-slate-500">Pose: {model.pose}</div>
-      </div>
-    </button>
-  );
-}
-
-/** Stepper أنيق لتدفق الـ Try-On */
-function TryOnStepper({ step, pieceType, modelPicked }) {
-  const map = { cloth: 0, piece: 1, model: 2 };
-  const idx = map[step] ?? 0;
-
-  const steps = [
-    { id: 'cloth', label: 'Upload clothing' },
-    { id: 'piece', label: pieceType ? `Type: ${pieceType}` : 'Choose type' },
-    { id: 'model', label: modelPicked ? 'Model selected' : 'Pick a model' },
-  ];
-
-  return (
-    <div className="w-full">
-      <div className="flex items-center justify-between gap-2">
-        {steps.map((s, i) => {
-          const done = i < idx;
-          const active = i === idx;
-          return (
-            <div key={s.id} className="flex-1">
-              <div className="flex items-center gap-2">
-                <motion.div
-                  layout
-                  className={[
-                    'size-6 rounded-full grid place-items-center border text-[11px] font-semibold',
-                    done
-                      ? 'bg-emerald-500 text-white border-emerald-500'
-                      : active
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-600 border-slate-300',
-                  ].join(' ')}
-                >
-                  {done ? '✓' : i + 1}
-                </motion.div>
-                <div
-                  className={[
-                    'text-xs sm:text-[13px]',
-                    done ? 'text-emerald-700' : active ? 'text-indigo-700' : 'text-slate-600',
-                  ].join(' ')}
-                >
-                  {s.label}
-                </div>
-              </div>
-              {i < steps.length - 1 && (
-                <motion.div
-                  layout
-                  className="h-1 mt-2 rounded-full bg-slate-200 overflow-hidden"
-                >
-                  <motion.div
-                    initial={false}
-                    animate={{ width: i < idx ? '100%' : '0%' }}
-                    transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-                    className="h-full bg-indigo-600"
-                  />
-                </motion.div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function StepBadge({ phase }) {
-  const map = {
-    idle: { label: 'Ready', color: 'bg-slate-200 text-slate-700 border-slate-300' },
-    processing: { label: 'Processing', color: 'bg-amber-200 text-amber-900 border-amber-300' },
-    ready: { label: 'Done', color: 'bg-emerald-200 text-emerald-900 border-emerald-300' },
-    error: { label: 'Error', color: 'bg-rose-200 text-rose-900 border-rose-300' },
-  };
-  const it = map[phase] || map.idle;
-  return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${it.color}`}>
-      <span
-        className={`inline-block size-2 rounded-full ${
-          phase === 'processing' ? 'bg-slate-700 animate-pulse' : 'bg-slate-600'
-        }`}
-      />
-      {it.label}
-    </span>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="flex items-center justify-between gap-3 text-xs text-slate-700">
-      <span className="min-w-28">{label}</span>
-      <div className="flex-1">{children}</div>
-    </label>
-  );
-}
-function Color({ value, onChange }) {
-  return (
-    <div className="flex items-center gap-2">
-      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
-      <input
-        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
-  );
-}
-function Range({ value, onChange, min, max, step = 1 }) {
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="range"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-indigo-600"
-      />
-      <span className="w-10 text-right">{typeof value === 'number' ? value : ''}</span>
-    </div>
-  );
-}
-
-function ModeTabs({ mode, setMode }) {
-  const tabs = [
-    { id: 'color', label: 'Color' },
-    { id: 'gradient', label: 'Gradient' },
-    { id: 'pattern', label: 'Pattern' },
-  ];
-  return (
-    <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => setMode(t.id)}
-          className={[
-            'px-3 py-1.5 text-xs rounded-lg transition',
-            mode === t.id ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:bg-white',
-          ].join(' ')}
+        {/* Right — interactive visual */}
+        <motion.div
+          id="live-demo"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="relative isolate mx-auto w-full max-w-[520px]"
         >
-          {t.label}
-        </button>
+          <TiltCard>
+            <CompareSlider
+              before={{ src: '/demo-before.jpg', alt: 'Before AI — raw product photo' }}
+              after={{ src: '/demo-after.jpg', alt: 'After AI — enhanced studio photo' }}
+              defaultPercent={64}
+              showLabels
+            />
+          </TiltCard>
+
+          {/* Stickers / floating labels */}
+          {!prefersReducedMotion && (
+            <>
+              <FloatSticker className="left-[-16px] top-[-14px] rotate-[-6deg] bg-amber-300">
+                no more photoshoots
+              </FloatSticker>
+              <FloatSticker className="right-[-18px] top-[18%] rotate-[7deg] bg-emerald-300">
+                try-on ready
+              </FloatSticker>
+              <FloatSticker className="left-[10%] bottom-[-20px] rotate-[3deg] bg-pink-300">
+                meme-friendly ✅
+              </FloatSticker>
+            </>
+          )}
+
+          <CornerBadge>AI Enhanced</CornerBadge>
+        </motion.div>
+      </motion.div>
+
+      <div className="pointer-events-none mt-10 flex items-center justify-center text-xs text-zinc-500">
+        <span className="animate-bounce">Scroll to see the weird ↓</span>
+      </div>
+    </div>
+  );
+}
+
+function BadgeRow() {
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2">
+      <span className="rounded-full border border-zinc-200 bg-white/90 px-3 py-1 text-[11px] font-semibold shadow-sm">
+        B2B serious • delightfully weird
+      </span>
+      <span className="text-[11px] text-zinc-500">Clarity • Speed • Conversion-first</span>
+    </div>
+  );
+}
+
+function WigglyTitle() {
+  const words = ['photos', 'listings', 'ads', 'sales'];
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((p) => (p + 1) % words.length), 1900);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl lg:text-7xl">
+      Turn{' '}
+      <span className="bg-[linear-gradient(120deg,#22d3ee,40%,#f472b6_60%,#f59e0b)] bg-clip-text text-transparent">
+        product {words[i]}
+      </span>{' '}
+      into revenue — <span className="whitespace-nowrap">no studio needed.</span>
+      <span
+        aria-hidden
+        className="ml-2 inline-block rotate-1 select-none rounded-md bg-lime-200 px-2 py-1 text-[16px] font-black leading-none shadow"
+      >
+        🚀💅
+      </span>
+    </h1>
+  );
+}
+
+/* ============================================================================
+   VISUAL FX
+============================================================================ */
+
+function BackgroundWhimsy() {
+  const prefersReducedMotion = useReducedMotion();
+  return (
+    <div className="absolute inset-0 -z-20">
+      {/* Soft candy gradient (non-dark!) */}
+      <div className="h-full w-full bg-[radial-gradient(75%_100%_at_50%_0%,#fff7ed_0%,#fdf4ff_42%,#ecfeff_70%)]" />
+      {/* Subtle grid */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:linear-gradient(to_right,#000_1px,transparent_1px),linear-gradient(to_bottom,#000_1px,transparent_1px)] [background-size:28px_28px]" />
+      {/* Blobs */}
+      <BlobCloud />
+      {/* Confetti aura */}
+      {!prefersReducedMotion && <ConfettiAura />}
+    </div>
+  );
+}
+
+function BlobCloud() {
+  return (
+    <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 0.65, scale: 1 }}
+        transition={{ duration: 1.2 }}
+        className="absolute -top-28 -left-20 h-[42rem] w-[42rem] rounded-full blur-3xl"
+        style={{ background: 'conic-gradient(from 120deg, #93c5fd33, #f472b633, #34d39933, #f59e0b33)' }}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 0.55, scale: 1 }}
+        transition={{ duration: 1.2, delay: 0.15 }}
+        className="absolute -bottom-24 -right-10 h-[36rem] w-[36rem] rounded-full blur-3xl"
+        style={{ background: 'conic-gradient(from 260deg, #22d3ee33, #a78bfa33, #f472b633)' }}
+      />
+    </div>
+  );
+}
+
+function ConfettiAura() {
+  const bits = new Array(24).fill(0).map((_, i) => i);
+  return (
+    <div className="pointer-events-none absolute inset-0 -z-10">
+      {bits.map((b) => (
+        <motion.span
+          key={b}
+          initial={{ opacity: 0, y: 10, rotate: 0 }}
+          animate={{ opacity: [0, 1, 0], y: [-10, -30, -60], rotate: [0, 15, -10, 20] }}
+          transition={{ duration: 7, delay: b * 0.12, repeat: Infinity }}
+          className="absolute text-xl"
+          style={{
+            left: `${(b * 37) % 100}%`,
+            top: `${(b * 19) % 100}%`,
+          }}
+        >
+          {['✨', '🫧', '🧃', '🦄', '⭐️'][b % 5]}
+        </motion.span>
       ))}
     </div>
   );
 }
 
-function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
-  const [active, setActive] = useState(initial);
-  const options = [
-    { id: 'upper', label: 'Upper (T-shirt/Shirt/Jacket)' },
-    { id: 'lower', label: 'Lower (Pants/Jeans/Skirt)' },
-    { id: 'dress', label: 'Full Dress (One-piece)' },
-  ];
+/* ============================================================================
+   CTAs & small UI
+============================================================================ */
+
+function Pill({ children }) {
+  return <span className="rounded-full bg-white/90 px-3 py-1">{children}</span>;
+}
+function Dot() {
+  return <span className="mx-1 inline-block h-1 w-1 rounded-full bg-zinc-400" />;
+}
+
+function MagnetCTA({ href, children, ariaLabel }) {
+  const [xy, setXy] = useState({ x: 0, y: 0 });
+  const onMove = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setXy({ x: (e.clientX - r.left - r.width / 2) / 6, y: (e.clientY - r.top - r.height / 2) / 6 });
+  };
+  const onLeave = () => setXy({ x: 0, y: 0 });
+
   return (
-    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border space-y-3">
-      <div className="text-sm font-semibold">Choose clothing type</div>
-      <div className="grid grid-cols-1 gap-2">
-        {options.map((o) => (
-          <button
-            key={o.id}
-            onClick={() => setActive(o.id)}
-            className={[
-              'w-full text-left rounded-xl border px-3 py-2 text-sm transition',
-              active === o.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50',
-            ].join(' ')}
-          >
-            {o.label}
-          </button>
-        ))}
+    <Link
+      href={href}
+      aria-label={ariaLabel}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      className="group inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-500 to-pink-500 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-pink-500/20 transition hover:from-pink-500 hover:to-amber-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
+      style={{ transform: `translate3d(${xy.x}px, ${xy.y}px, 0)` }}
+    >
+      {children}
+      <svg className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+        <path d="M13 5l7 7-7 7M5 12h14" />
+      </svg>
+    </Link>
+  );
+}
+
+function GhostCTA({ href, children }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 bg-white/70 px-6 py-3 text-base font-semibold text-zinc-900 backdrop-blur transition hover:bg-white"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function EarlyEmailCapture() {
+  const [email, setEmail] = useState('');
+  const [state, setState] = useState('idle'); // idle | loading | success | error
+  const [msg, setMsg] = useState('');
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (!/.+@.+\..+/.test(email)) {
+      setState('error');
+      setMsg('Please enter a valid email.');
+      return;
+    }
+    setState('loading');
+    setMsg('');
+    setTimeout(() => {
+      setState('success');
+      setMsg('Invite reserved! Redirecting…');
+      window.location.href = `/dashboard?email=${encodeURIComponent(email)}&source=hero-email`;
+    }, 500);
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="mt-6 flex w-full max-w-xl gap-2" aria-live="polite">
+      <div className="relative grow">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter your work email"
+          className="w-full rounded-2xl border border-zinc-200 bg-white/90 px-4 py-3 text-sm outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-pink-400"
+          aria-label="Work email"
+        />
+        <MailIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-60" />
       </div>
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={onCancel}>
-          Cancel
-        </button>
-        <button
-          className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs"
-          onClick={() => onConfirm(active)}
-        >
-          Continue
-        </button>
+      <button
+        type="submit"
+        disabled={state === 'loading'}
+        className="inline-flex items-center justify-center rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-60"
+      >
+        {state === 'loading' ? 'Reserving…' : 'Get beta invite'}
+      </button>
+      {msg && <div className={`ml-2 self-center text-xs ${state === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>{msg}</div>}
+    </form>
+  );
+}
+
+function MailIcon(props) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" {...props} aria-hidden>
+      <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+/* ============================================================================
+   INTERACTIVE DEMO
+============================================================================ */
+
+function TiltCard({ children }) {
+  const ref = useRef(null);
+  const [t, setT] = useState({ x: 0, y: 0 });
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const rx = ((e.clientX - r.left) / r.width) * 2 - 1;
+    const ry = ((e.clientY - r.top) / r.height) * 2 - 1;
+    setT({ x: ry * 6, y: rx * 6 });
+  };
+  const onLeave = () => setT({ x: 0, y: 0 });
+
+  return (
+    <div
+      ref={ref}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      className="relative rounded-3xl border border-zinc-200 bg-white/80 p-2 shadow-2xl backdrop-blur"
+      style={{ transform: `perspective(900px) rotateX(${t.x}deg) rotateY(${t.y}deg)` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function CompareSlider({ before, after, defaultPercent = 60, showLabels = true }) {
+  const trackRef = useRef(null);
+  const [pos, setPos] = useState(defaultPercent);
+  const clamp = (v) => Math.max(0, Math.min(100, v));
+
+  const moveToClientX = (clientX) => {
+    if (!trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const x = clamp(((clientX - rect.left) / rect.width) * 100);
+    setPos(x);
+  };
+
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    moveToClientX(e.clientX);
+  };
+
+  const onPointerMove = (e) => {
+    if (!(e.buttons & 1)) return;
+    moveToClientX(e.clientX);
+  };
+
+  return (
+    <div ref={trackRef} className="relative w-full overflow-hidden rounded-2xl">
+      {/* After (base) */}
+      <Image src={after.src} alt={after.alt} width={900} height={1200} priority className="h-auto w-full select-none object-cover" />
+      {/* Before overlay clipped */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ width: `${pos}%` }}>
+        <Image src={before.src} alt={before.alt} width={900} height={1200} className="h-full w-full object-cover" priority={false} />
+      </div>
+
+      {/* Labels */}
+      {showLabels && (
+        <>
+          <div className="pointer-events-none absolute left-3 top-3 select-none rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-zinc-800 shadow-sm">
+            Before
+          </div>
+          <div className="pointer-events-none absolute right-3 top-3 select-none rounded-full bg-pink-500/90 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+            After
+          </div>
+        </>
+      )}
+
+      {/* Handle/rail */}
+      <div
+        role="slider"
+        aria-label="Compare before and after"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pos)}
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') setPos((p) => clamp(p - 5));
+          if (e.key === 'ArrowRight') setPos((p) => clamp(p + 5));
+        }}
+        className="absolute top-0 cursor-ew-resize"
+        style={{ left: `calc(${pos}% - 1px)`, height: '100%' }}
+      >
+        <div className="h-full w-0.5 bg-white/90 mix-blend-difference shadow-[0_0_0_1px_rgba(0,0,0,.2)]" />
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-zinc-900/80 px-2 py-1 text-xs text-white shadow">
+          Drag
+        </div>
+      </div>
+
+      {/* Range fallback */}
+      <div className="absolute inset-x-0 bottom-0 z-10 m-0 flex items-center gap-2 bg-gradient-to-t from-black/10 to-transparent px-4 pb-3 pt-10">
+        <input
+          aria-label="Compare before and after"
+          className="h-1 w-full cursor-ew-resize appearance-none rounded-full bg-zinc-300 outline-none accent-pink-600"
+          type="range"
+          min={0}
+          max={100}
+          value={pos}
+          onChange={(e) => setPos(Number(e.target.value))}
+        />
       </div>
     </div>
   );
 }
 
-/* ----- Icons (SVG) ----- */
-function SparkleIcon(props) {
+function FloatSticker({ children, className = '' }) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" />
-    </svg>
+    <motion.div
+      initial={{ y: -10, opacity: 0 }}
+      animate={{ y: [0, -6, 0], opacity: 1 }}
+      transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut' }}
+      className={`pointer-events-none absolute z-20 select-none rounded-xl px-3 py-2 text-[11px] font-extrabold text-zinc-900 shadow ${className}`}
+      style={{ boxShadow: '0 6px 20px rgba(0,0,0,.08)' }}
+    >
+      {children}
+    </motion.div>
   );
 }
-function BoxIcon(props) {
+
+function CornerBadge({ children }) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z"
-        fill="currentColor"
-      />
-    </svg>
+    <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-1 rounded-full bg-zinc-900/80 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur">
+      <SparkleIcon /> {children}
+    </div>
   );
 }
-function PersonIcon(props) {
+function SparkleIcon() {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function ScissorsIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function RocketIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" />
-      <circle cx="15" cy="9" r="1.5" fill="#fff" />
-    </svg>
-  );
-}
-function SwapIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor" />
-    </svg>
-  );
-}
-function PlayIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M8 5v14l11-7z" fill="currentColor" />
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 2l1.6 4.4L18 8l-4.4 1.6L12 14l-1.6-4.4L6 8l4.4-1.6L12 2z" stroke="currentColor" strokeWidth="1.2" fill="currentColor" opacity="0.9" />
     </svg>
   );
 }
 
-/* -------------------------------------------------------
-   Export helpers
-------------------------------------------------------- */
-async function exportPng(url) {
-  const img = await fetch(url).then((r) => r.blob()).then(createImageBitmap);
-  const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
-  const ctx = canvas.getContext('2d', { alpha: true });
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0);
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = 'studio-output.png';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+/* ============================================================================
+   LOGOS MARQUEE
+============================================================================ */
+
+function LogosMarquee() {
+  const logos = ['brand-1.svg', 'brand-2.svg', 'brand-3.svg', 'brand-4.svg', 'brand-5.svg'];
+  return (
+    <div className="relative z-10 mx-auto mt-6 w-full max-w-7xl overflow-hidden px-6 py-6 md:px-10">
+      <div className="mb-3 text-center text-[11px] uppercase tracking-[0.2em] text-zinc-500">POWERING TEAMS AT</div>
+      <div className="[mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+        <div className="animate-marquee flex min-w-full items-center gap-10 opacity-70 hover:[animation-play-state:paused]">
+          {logos.concat(logos).map((src, i) => (
+            <div key={i} className="relative h-8 w-28 opacity-80">
+              <Image src={`/${src}`} alt="brand logo" fill className="object-contain" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <style jsx>{`
+        .animate-marquee { animation: marquee 26s linear infinite; }
+        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      `}</style>
+    </div>
+  );
 }
 
-/* -------------------------------------------------------
-   Simple customizer
-------------------------------------------------------- */
-function EnhanceCustomizer({ initial, onChange, onComplete }) {
+/* ============================================================================
+   PROOF PILLS
+============================================================================ */
+
+function ProofPills() {
+  const metrics = [
+    { label: 'Higher conversion', to: 32, suffix: '%' },
+    { label: 'Time saved per shoot', to: 90, suffix: '%' },
+    { label: 'Avg render', to: 15, suffix: 's', reverse: true },
+    { label: 'Uptime', to: 99.9, suffix: '%' },
+  ];
   return (
-    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
-      <div className="text-sm font-semibold">Enhance Settings</div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-        <label className="space-y-1">
-          <span className="text-slate-600">Style</span>
-          <input
-            defaultValue={initial?.photographyStyle || ''}
-            onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="studio product photography, 50mm"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600">Background</span>
-          <input
-            defaultValue={initial?.background || ''}
-            onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="white seamless"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600">Lighting</span>
-          <input
-            defaultValue={initial?.lighting || ''}
-            onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="softbox, gentle reflections"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600">Colors</span>
-          <input
-            defaultValue={initial?.colorStyle || ''}
-            onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="neutral whites, subtle grays"
-          />
-        </label>
+    <div className="relative z-10 mx-auto mt-2 max-w-7xl px-6 md:px-10">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {metrics.map((m, i) => (
+          <KPI key={i} label={m.label} to={m.to} suffix={m.suffix} reverse={m.reverse} />
+        ))}
       </div>
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onComplete(initial || {})}>
-          Run
-        </button>
+    </div>
+  );
+}
+
+function KPI({ label, to, suffix = '', reverse = false }) {
+  const ref = useRef(null);
+  const [val, setVal] = useState(reverse ? to : 0);
+  useEffect(() => {
+    let frame;
+    const el = ref.current;
+    if (!el) return;
+    let start = null;
+    const duration = 1000;
+    const startVal = reverse ? to : 0;
+    const endVal = reverse ? (to <= 15 ? to : 0) : to;
+    const step = (t) => {
+      if (!start) start = t;
+      const p = Math.min((t - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(Number((startVal + (endVal - startVal) * eased).toFixed(1)));
+      if (p < 1) frame = requestAnimationFrame(step);
+    };
+    const io = new IntersectionObserver((ents) => ents.forEach((e) => e.isIntersecting && requestAnimationFrame(step)), { threshold: 0.5 });
+    io.observe(el);
+    return () => {
+      cancelAnimationFrame(frame);
+      io.disconnect();
+    };
+  }, [to, reverse]);
+
+  return (
+    <div
+      ref={ref}
+      className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm"
+      style={{ boxShadow: '0 8px 30px rgba(0,0,0,.06)' }}
+    >
+      <div className="text-2xl font-extrabold">{val}{suffix}</div>
+      <div className="text-xs text-zinc-600">{label}</div>
+    </div>
+  );
+}
+
+/* ============================================================================
+   HOW IT WORKS — comic panels (weird & clear)
+============================================================================ */
+
+function ComicHowItWorks() {
+  const steps = [
+    { title: '1) Upload', desc: 'Drop a product photo (png/jpg)', icon: '📤' },
+    { title: '2) Enhance & Try-On', desc: 'AI does the heavy lifting', icon: '⚙️' },
+    { title: '3) Publish', desc: 'Export to your store/CMS', icon: '🚀' },
+  ];
+  return (
+    <div className="relative z-10 mt-10 bg-gradient-to-b from-[#fff7ed] to-[#fdf4ff] px-6 py-16 md:px-10 lg:px-20">
+      <motion.h2
+        initial={{ opacity: 0, y: 8 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.4 }}
+        transition={{ duration: 0.5 }}
+        className="mx-auto mb-10 text-center text-3xl font-extrabold md:text-4xl"
+      >
+        The 30-second workflow (your team will actually use)
+      </motion.h2>
+
+      <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
+        {steps.map((s, idx) => (
+          <motion.div
+            key={s.title}
+            whileHover={{ rotate: idx === 1 ? 1.5 : -1.5, y: -4, scale: 1.01 }}
+            className="relative rounded-3xl border border-zinc-200 bg-white p-6 shadow-lg"
+          >
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-cyan-400 text-2xl">{s.icon}</div>
+            <h3 className="text-xl font-semibold">{s.title}</h3>
+            <p className="mt-1 text-sm text-zinc-600">{s.desc}</p>
+            {idx < steps.length - 1 && (
+              <svg className="pointer-events-none absolute right-[-18px] top-1/2 hidden -translate-y-1/2 md:block" width="36" height="2" viewBox="0 0 36 2" fill="none" aria-hidden>
+                <path d="M0 1h36" stroke="currentColor" strokeOpacity="0.25" strokeDasharray="4 3" />
+              </svg>
+            )}
+            <CornerDoodle />
+          </motion.div>
+        ))}
       </div>
+
+      <div className="mt-10 text-center">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center justify-center rounded-2xl bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition hover:bg-zinc-800"
+        >
+          Start creating →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function CornerDoodle() {
+  return (
+    <svg className="pointer-events-none absolute -left-2 -top-2 h-10 w-10 opacity-70" viewBox="0 0 80 80" fill="none" aria-hidden>
+      <path d="M10 30 C20 10, 40 10, 50 30" stroke="#f472b6" strokeWidth="4" strokeLinecap="round" />
+      <path d="M20 45 C35 25, 55 25, 65 45" stroke="#22d3ee" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/* ============================================================================
+   MEME TICKER
+============================================================================ */
+
+function MemeTicker() {
+  const data = [
+    '“Our mug shot sold out.” — Some Store 😂',
+    '“Goodbye chaotic photoshoots.” — Ops Team 🧹',
+    '“CTR up 27%.” — UrbanWear 📈',
+    '“Try-on crushed returns.” — SneakLab 🧠',
+    '“Brand visuals = peace.” — M.J. 🧘‍♀️',
+  ];
+  return (
+    <div className="relative z-10 mx-auto mb-2 mt-2 max-w-7xl overflow-hidden px-6 py-6 md:px-10">
+      <div className="rounded-3xl border border-zinc-200 bg-white/80 p-4 backdrop-blur">
+        <div className="relative [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
+          <div className="animate-marquee2 flex min-w-full items-center gap-10">
+            {data.concat(data).map((t, i) => (
+              <div key={i} className="whitespace-nowrap text-sm text-zinc-700">
+                {t}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style jsx>{`
+        .animate-marquee2 { animation: marquee2 30s linear infinite; }
+        @keyframes marquee2 { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      `}</style>
+    </div>
+  );
+}
+
+/* ============================================================================
+   BOTTOM CTA
+============================================================================ */
+
+function BottomBlock() {
+  return (
+    <div className="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-10 text-center md:px-10">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.5 }}
+        className="rounded-3xl border border-zinc-200 bg-gradient-to-br from-white to-[#fff7ed] p-8 shadow-xl"
+      >
+        <h3 className="text-2xl font-extrabold">Your competitors are already here.</h3>
+        <p className="mt-2 text-zinc-600">
+          Join the beta, spend less time retouching, and more time selling. Limited invites this month.
+        </p>
+        <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <MagnetCTA href="/dashboard">Claim your invite</MagnetCTA>
+          <GhostCTA href="#features">Explore features</GhostCTA>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function StickyMobileCTA() {
+  return (
+    <div className="md:hidden">
+      <Link
+        href="/dashboard"
+        className="fixed bottom-4 right-4 z-[60] inline-flex items-center gap-2 rounded-full bg-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-cyan-700/20 transition hover:bg-pink-500"
+        aria-label="Try it now"
+      >
+        Try now <span aria-hidden>→</span>
+      </Link>
     </div>
   );
 }
