@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply font-sans bg-white text-gray-900 transition-colors duration-300;
-}
+/* Force light, remove dark from body */
+html { color-scheme: light; }
+body { @apply font-sans bg-white text-zinc-900 transition-colors duration-300; }
+
+/* لو فيه html.dark من مزوّد الثيمات—اقلبها */
+html.dark body { background-color:#ffffff !important; color:#0a0a0a !important; }
