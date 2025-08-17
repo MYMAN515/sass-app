@@ -1,482 +1,475 @@
-// components/HeroSection.jsx
+// HeroSection.jsx
 'use client';
 
 import Link from 'next/link';
-import { motion, useAnimation, useMotionValue, useTransform, useReducedMotion } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useRef } from 'react';
 
 /**
- * ──────────────────────────────────────────────────────────────────────────────
- *  "PORTAL: WEIRD MODE" — ultra-creative, mobile-first hero
- *  - Liquid goo portal (SVG goo filter + metaballs)
- *  - Conic rings + text ring orbit
- *  - Cursor-follow "eye" inside the portal
- *  - Tap to morph (circle ⇄ rounded-square) on mobile
- *  - Sticky mobile CTA
- *  - Reduced-motion aware
- * ──────────────────────────────────────────────────────────────────────────────
+ * B2B Landing — "COLOR FACTORY" concept
+ * Weird (but clean), bright palette, mobile-first, explains Try-On & Enhance
+ * - Hero = playful conveyor/factory line anim (no dark mode)
+ * - One-to-many grid explaining "1 photo → many assets"
+ * - Who it's for + How it works + Results
+ * - Sticky mobile CTA
+ *
+ * Tailwind & Framer Motion required.
  */
 
-export default function HeroSection() {
+export default function LandingPage() {
   return (
-    <section className="relative min-h-[100svh] w-full overflow-hidden bg-white text-zinc-900 dark:bg-[#07070b] dark:text-white">
-      <Backdrop />
-      <HeroCore />
+    <main className="min-h-screen w-full overflow-x-hidden bg-[#FFF7ED] text-zinc-900 selection:bg-lime-300 selection:text-zinc-900">
+      <HeroWeirdFactory />
+      <TrustLogos />
+      <OneToManyGrid />
+      <WhoFor />
+      <HowItWorks />
+      <Results />
+      <BottomCTA />
+      <Footer />
       <StickyMobileCTA />
+    </main>
+  );
+}
+
+/* ---------------------------------- HERO ----------------------------------- */
+
+function HeroWeirdFactory() {
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <section className="relative isolate w-full overflow-hidden px-5 pb-16 pt-24 sm:px-6 md:px-10 lg:px-16">
+      {/* Corner candy gradients */}
+      <div className="pointer-events-none absolute -left-28 -top-28 h-[28rem] w-[28rem] rounded-full bg-[conic-gradient(at_30%_30%,#f97316_0%,#fde047_25%,#22c55e_50%,#60a5fa_75%,#f97316_100%)] opacity-40 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-24 h-[26rem] w-[26rem] rounded-full bg-[conic-gradient(at_70%_70%,#84cc16_0%,#22c55e_25%,#f472b6_55%,#f97316_80%,#84cc16_100%)] opacity-40 blur-3xl" />
+      {/* Subtle speckles */}
+      <Noise />
+
+      <div className="mx-auto grid max-w-7xl items-center gap-10 md:grid-cols-2">
+        {/* Copy */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55 }}
+          className="order-2 md:order-1"
+        >
+          <Badge>WEIRD • BRIGHT • BUILT FOR E-COMMERCE</Badge>
+          <h1 className="mt-3 text-balance text-4xl font-extrabold leading-[1.04] tracking-tight md:text-5xl">
+            Turn <span className="bg-gradient-to-r from-rose-500 via-orange-500 to-lime-500 bg-clip-text text-transparent">one raw photo</span>{' '}
+            into scroll-stopping images and real model try-ons.
+          </h1>
+          <p className="mt-3 max-w-xl text-base md:text-lg">
+            Upload a product shot → get enhanced, on-brand backgrounds or place it on a realistic model. No studio. No retakes. All in seconds.
+          </p>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <PrimaryCTA href="/dashboard">Try a free demo</PrimaryCTA>
+            <GhostCTA href="#how">How it works</GhostCTA>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+            <Pill>No credit card</Pill>
+            <Pill>High-res exports</Pill>
+            <Pill>API for scale</Pill>
+          </div>
+        </motion.div>
+
+        {/* Weird factory line */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="order-1 md:order-2"
+          aria-label="Animated factory preview for Enhance & Try-On"
+        >
+          <FactoryCard />
+        </motion.div>
+      </div>
     </section>
   );
 }
 
-/* -------------------------------- Backdrop --------------------------------- */
-
-function Backdrop() {
+function FactoryCard() {
+  // Three colorful belts: Enhance, Backgrounds, Try-On
   return (
-    <>
-      <NoiseOverlay />
-      <StarDust />
-      <CornerGradients />
-    </>
+    <div className="relative mx-auto w-full max-w-[36rem] overflow-hidden rounded-3xl border border-orange-200 bg-white shadow-[0_20px_60px_rgba(249,115,22,0.12)]">
+      <div className="border-b border-orange-100 px-5 py-3 text-sm font-semibold text-orange-700">Live Preview</div>
+
+      {/* Track 1 — Enhance */}
+      <Track
+        title="Enhance"
+        colorRing="from-orange-400 to-rose-400"
+        chip="Sharper • Brighter • Cleaner"
+        items={[{ t: 'RAW' }, { t: 'ENHANCED' }, { t: 'RAW' }, { t: 'ENHANCED' }]}
+      />
+
+      {/* Track 2 — Background Generator */}
+      <Track
+        title="Backgrounds"
+        colorRing="from-lime-400 to-sky-400"
+        chip="Studio • Lifestyle • Seasonal"
+        items={[{ t: 'DESK' }, { t: 'BEACH' }, { t: 'URBAN' }, { t: 'FLATLAY' }]}
+        reverse
+      />
+
+      {/* Track 3 — Try-On */}
+      <Track
+        title="Try-On"
+        colorRing="from-fuchsia-400 to-amber-400"
+        chip="Realistic models • Sizes"
+        items={[{ t: 'XS' }, { t: 'M' }, { t: 'L' }, { t: 'XL' }]}
+      />
+
+      <div className="flex items-center justify-between border-t border-orange-100 px-5 py-3 text-xs">
+        <span className="text-zinc-500">Demo renders are simulated.</span>
+        <Link
+          href="/dashboard"
+          className="rounded-full bg-orange-500 px-3 py-1 font-semibold text-white transition hover:bg-orange-600"
+        >
+          Upload a photo →
+        </Link>
+      </div>
+    </div>
   );
 }
 
-function NoiseOverlay() {
+function Track({ title, colorRing, chip, items, reverse = false }) {
+  const prefersReducedMotion = useReducedMotion();
+  const speed = reverse ? 22 : 26;
+
+  return (
+    <div className="relative border-b border-orange-100 px-5 py-5 last:border-b-0">
+      <div className="mb-3 flex items-center gap-2">
+        <div className={`h-3 w-3 rounded-full bg-gradient-to-r ${colorRing}`} />
+        <div className="text-sm font-semibold">{title}</div>
+        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] text-orange-700">{chip}</span>
+      </div>
+
+      <div className="relative overflow-hidden">
+        <div className={`mask-fade pointer-events-none absolute inset-0`} aria-hidden />
+        <motion.div
+          className={`flex w-max items-center gap-3 ${reverse ? 'animate-marquee-reverse' : 'animate-marquee'}`}
+          style={{
+            animationPlayState: prefersReducedMotion ? 'paused' : 'running',
+            animationDuration: `${speed}s`,
+          }}
+        >
+          {[...items, ...items, ...items].map((it, i) => (
+            <div
+              key={i}
+              className="grid h-24 w-40 place-items-center rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-orange-50 text-xs font-bold shadow-sm"
+            >
+              <span className="rounded bg-zinc-900 px-2 py-1 text-white">{it.t}</span>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+
+      <style jsx>{`
+        .animate-marquee {
+          animation: marquee 26s linear infinite;
+        }
+        .animate-marquee-reverse {
+          animation: marquee-rev 22s linear infinite;
+        }
+        @keyframes marquee {
+          from {
+            transform: translateX(0);
+          }
+          to {
+            transform: translateX(-50%);
+          }
+        }
+        @keyframes marquee-rev {
+          from {
+            transform: translateX(-50%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+        .mask-fade {
+          -webkit-mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+                  mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function Badge({ children }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-3 py-1 text-[11px] font-medium">
+      {children}
+    </span>
+  );
+}
+
+function Pill({ children }) {
+  return <span className="rounded-full border border-zinc-200 bg-white px-3 py-1">{children}</span>;
+}
+
+function PrimaryCTA({ href, children }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition hover:bg-orange-700"
+    >
+      {children}
+      <span className="ml-1" aria-hidden>
+        →
+      </span>
+    </Link>
+  );
+}
+
+function GhostCTA({ href, children }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold transition hover:bg-zinc-50"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function Noise() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-0 -z-20 opacity-[0.045] mix-blend-soft-light"
+      className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-soft-light"
       style={{
         backgroundImage:
           'url("data:image/svg+xml;utf8,\
 <svg xmlns=\'http://www.w3.org/2000/svg\' width=\'1600\' height=\'900\'><filter id=\'n\'>\
 <feTurbulence type=\'fractalNoise\' baseFrequency=\'0.95\' numOctaves=\'4\'/></filter>\
-<rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' opacity=\'0.55\'/></svg>")',
+<rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' opacity=\'0.6\'/></svg>")',
       }}
     />
   );
 }
 
-function StarDust() {
+/* ------------------------------- TRUST LOGOS -------------------------------- */
+
+function TrustLogos() {
+  const logos = ['Shopify', 'Woo', 'BigCommerce', 'TikTok Shop', 'Meta Commerce', 'Magento'];
   return (
-    <div className="pointer-events-none absolute inset-0 -z-10">
-      <svg className="h-full w-full opacity-40 dark:opacity-25" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-        <defs>
-          <radialGradient id="sd" cx="50%" cy="50%">
-            <stop offset="0%" stopColor="white" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-        </defs>
-        {Array.from({ length: 36 }).map((_, i) => {
-          const r = Math.random() * 0.6 + 0.15;
-          const x = Math.random() * 100;
-          const y = Math.random() * 100;
-          const d = 8 + Math.random() * 18;
-          return (
-            <motion.circle
-              key={i}
-              cx={x}
-              cy={y}
-              r={r}
-              fill="url(#sd)"
-              initial={{ opacity: 0.2 }}
-              animate={{ opacity: [0.1, 0.7, 0.1] }}
-              transition={{ duration: d, repeat: Infinity, delay: Math.random() * 5 }}
-            />
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-function CornerGradients() {
-  return (
-    <>
-      <div className="pointer-events-none absolute -left-32 -top-32 -z-10 h-[32rem] w-[32rem] rounded-full blur-3xl [background:conic-gradient(from_0deg,rgba(99,102,241,.28),rgba(236,72,153,.28),rgba(34,197,94,.28),rgba(59,130,246,.28),rgba(99,102,241,.28))]" />
-      <div className="pointer-events-none absolute -bottom-24 -right-24 -z-10 h-[28rem] w-[28rem] rounded-full blur-3xl [background:conic-gradient(from_180deg,rgba(34,197,94,.25),rgba(244,63,94,.25),rgba(168,85,247,.25),rgba(34,197,94,.25))]" />
-    </>
-  );
-}
-
-/* --------------------------------- Core ------------------------------------ */
-
-function HeroCore() {
-  const prefersReducedMotion = useReducedMotion();
-  const wrapRef = useRef(null);
-
-  // Parallax tilt
-  const mx = useMotionValue(0);
-  const my = useMotionValue(0);
-  const rotY = useTransform(mx, [-60, 60], [-8, 8]);
-  const rotX = useTransform(my, [-60, 60], [8, -8]);
-
-  const onMove = (e) => {
-    const rect = wrapRef.current?.getBoundingClientRect?.();
-    if (!rect) return;
-    const x = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
-    const y = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
-    mx.set(x * 60);
-    my.set(y * 60);
-  };
-
-  const onLeave = () => {
-    mx.set(0);
-    my.set(0);
-  };
-
-  return (
-    <div
-      ref={wrapRef}
-      onMouseMove={!prefersReducedMotion ? onMove : undefined}
-      onMouseLeave={!prefersReducedMotion ? onLeave : undefined}
-      className="relative z-10 mx-auto flex min-h-[100svh] max-w-7xl flex-col items-center justify-center px-5 pb-24 pt-28 sm:px-8 md:pt-24"
-    >
-      {/* Header / tagline */}
-      <div className="mb-6 text-center text-[10px] tracking-[0.35em] text-zinc-600 dark:text-zinc-300">
-        WEIRD • CLEAN • CONVERTS
+    <section className="mx-auto max-w-7xl px-5 py-8 sm:px-6 md:px-10">
+      <div className="text-center text-[11px] uppercase tracking-[0.3em] text-zinc-500">Works with</div>
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+        {logos.map((l) => (
+          <div key={l} className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs">{l}</div>
+        ))}
       </div>
+    </section>
+  );
+}
 
-      <div className="flex w-full flex-col items-center gap-10 lg:flex-row">
-        {/* Copy */}
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55 }}
-          className="order-2 max-w-xl text-center lg:order-1 lg:text-left"
-        >
-          <WeirdHeadline />
-          <p className="mt-3 text-base text-zinc-700 dark:text-zinc-300 md:text-lg">
-            Upload any photo. Our portal liquifies it into studio-grade shots and try-ons. It’s odd, bold, and built to sell.
+/* ------------------------------ ONE → MANY GRID ----------------------------- */
+
+function OneToManyGrid() {
+  return (
+    <section className="relative mx-auto max-w-7xl px-5 py-16 sm:px-6 md:px-10">
+      <div className="grid items-start gap-8 md:grid-cols-[1.1fr_1.6fr]">
+        <div>
+          <h2 className="text-3xl font-extrabold tracking-tight md:text-4xl">One upload → infinite assets</h2>
+          <p className="mt-3 max-w-md text-zinc-700">
+            Start with a single product shot and generate enhanced packshots, lifestyle scenes, seasonal sets, and model try-ons—ready for
+            your store, socials, and ads.
           </p>
-          <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row lg:items-start">
-            <PrimaryCTA />
-            <Link
-              href="#how-it-works"
-              className="inline-flex items-center justify-center rounded-xl border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
-            >
-              How it works →
-            </Link>
+          <ul className="mt-6 grid gap-3 text-sm">
+            <li className="flex items-center gap-2">
+              <Dot color="bg-lime-500" /> Enhance & color-correct automatically
+            </li>
+            <li className="flex items-center gap-2">
+              <Dot color="bg-sky-500" /> Generate clean, on-brand backgrounds
+            </li>
+            <li className="flex items-center gap-2">
+              <Dot color="bg-fuchsia-500" /> Place garments on realistic models
+            </li>
+            <li className="flex items-center gap-2">
+              <Dot color="bg-orange-500" /> Export high-res for web & print
+            </li>
+          </ul>
+          <div className="mt-7">
+            <PrimaryCTA href="/dashboard">Upload a product photo</PrimaryCTA>
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-600 dark:text-zinc-400 lg:justify-start">
-            <Chip>Free starter credits</Chip>
-            <Chip>No card required</Chip>
-            <Chip>GDPR-friendly</Chip>
-          </div>
-        </motion.div>
-
-        {/* Portal */}
-        <motion.div
-          style={!prefersReducedMotion ? { rotateY: rotY, rotateX: rotX } : undefined}
-          className="order-1 mx-auto aspect-square w-[min(92vw,34rem)] max-w-none sm:w-[min(78vw,34rem)] lg:order-2"
-          aria-label="Weird animated portal"
-        >
-          <PortalWeird />
-        </motion.div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------ Weird Headline ------------------------------ */
-
-function WeirdHeadline() {
-  // Chromatic aberration layers + subtle glitch
-  return (
-    <div className="relative">
-      <h1 className="text-balance text-4xl font-extrabold leading-[1.04] tracking-tight md:text-5xl">
-        Make <span className="bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-rose-500 bg-clip-text text-transparent">strange</span> product
-        visuals that sell.
-      </h1>
-      {/* RGB ghost layers (aria-hidden) */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 select-none mix-blend-screen opacity-60"
-      >
-        <p className="text-balance translate-x-[1px] translate-y-[1px] text-4xl font-extrabold leading-[1.04] text-rose-500/60 md:text-5xl">
-          Make strange product visuals that sell.
-        </p>
-        <p className="text-balance -translate-x-[1px] -translate-y-[1px] text-4xl font-extrabold leading-[1.04] text-indigo-500/60 md:text-5xl">
-          Make strange product visuals that sell.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------- Portal Core -------------------------------- */
-
-function PortalWeird() {
-  const prefersReducedMotion = useReducedMotion();
-  const ringAnim = useAnimation();
-  const [morph, setMorph] = useState(false); // tap to morph for mobile
-
-  useEffect(() => {
-    if (prefersReducedMotion) return;
-    ringAnim.start({
-      rotate: 360,
-      transition: { duration: 30, repeat: Infinity, ease: 'linear' },
-    });
-  }, [prefersReducedMotion, ringAnim]);
-
-  return (
-    <div
-      role="button"
-      aria-label="Tap to morph portal"
-      onClick={() => setMorph((s) => !s)}
-      className="group relative h-full w-full"
-    >
-      {/* Outer energy ring */}
-      <motion.div
-        aria-hidden
-        animate={ringAnim}
-        className="absolute inset-0 rounded-[50%] border border-white/25 shadow-[inset_0_0_70px_rgba(255,255,255,.15),0_0_120px_rgba(168,85,247,.28)]"
-        style={{
-          background:
-            'conic-gradient(from_0deg,rgba(99,102,241,.45),rgba(236,72,153,.45),rgba(34,197,94,.45),rgba(59,130,246,.45),rgba(99,102,241,.45))',
-        }}
-      />
-
-      {/* Morphing inner mask (circle <-> rounded square) */}
-      <motion.div
-        className="absolute inset-2 p-[3px]"
-        animate={{ borderRadius: morph ? '28%' : '9999px' }}
-        transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-      >
-        <div className="relative h-full w-full overflow-hidden bg-black/80">
-          {/* Conic swirl */}
-          <motion.div
-            aria-hidden
-            animate={!prefersReducedMotion ? { rotate: 360 } : { rotate: 0 }}
-            transition={!prefersReducedMotion ? { duration: 60, repeat: Infinity, ease: 'linear' } : {}}
-            className="absolute inset-0 opacity-40"
-            style={{
-              background:
-                'conic-gradient(from_90deg_at_50%_50%,#a78bfa,#f472b6,#22c55e,#60a5fa,#a78bfa)',
-              mixBlendMode: 'screen',
-            }}
-          />
-
-          {/* Gooey metaballs */}
-          <GooeyField intensity={morph ? 1.2 : 1} />
-
-          {/* Text ring orbit */}
-          <TextRing text="ENTER • THE • PORTAL • MAKE • STRANGE • SELL • " speed={morph ? 9 : 14} />
-
-          {/* Cursor/Tap-follow eye */}
-          <PortalEye />
         </div>
-      </motion.div>
 
-      {/* Orbiting CTA satellite */}
-      <OrbitingCTA speed={morph ? 9 : 14} />
-    </div>
-  );
-}
-
-/* -------------------------------- Goo Field -------------------------------- */
-
-function GooeyField({ intensity = 1 }) {
-  const prefersReducedMotion = useReducedMotion();
-  const blobs = [
-    { size: 140, x: 16, y: 30, d: 7 },
-    { size: 110, x: 68, y: 42, d: 9 },
-    { size: 95, x: 42, y: 72, d: 6.5 },
-    { size: 120, x: 80, y: 70, d: 11 },
-  ];
-
-  return (
-    <div className="absolute inset-0" style={{ filter: 'url(#goo)' }}>
-      <svg width="0" height="0" aria-hidden className="absolute">
-        <defs>
-          <filter id="goo">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
-            <feColorMatrix
-              in="blur"
-              mode="matrix"
-              values="1 0 0 0 0
-                      0 1 0 0 0
-                      0 0 1 0 0
-                      0 0 0 18 -8"
-              result="goo"
+        {/* Mosaic (all CSS, no images) */}
+        <div className="grid grid-cols-3 grid-rows-3 gap-3">
+          {[
+            'from-orange-200 to-orange-50',
+            'from-lime-200 to-lime-50',
+            'from-sky-200 to-sky-50',
+            'from-fuchsia-200 to-pink-50',
+            'from-amber-200 to-yellow-50',
+            'from-teal-200 to-teal-50',
+            'from-rose-200 to-rose-50',
+            'from-violet-200 to-violet-50',
+            'from-emerald-200 to-emerald-50',
+          ].map((g, i) => (
+            <div
+              key={i}
+              className={`aspect-square rounded-2xl border border-zinc-200 bg-gradient-to-br ${g} shadow-sm`}
             />
-            <feBlend in="SourceGraphic" in2="goo" />
-          </filter>
-        </defs>
-      </svg>
-
-      {blobs.map((b, i) => (
-        <motion.div
-          key={i}
-          aria-hidden
-          className="absolute rounded-full opacity-80"
-          style={{
-            width: b.size,
-            height: b.size,
-            left: `${b.x}%`,
-            top: `${b.y}%`,
-            background:
-              'radial-gradient(circle at 30% 30%, rgba(255,255,255,.85), rgba(168,85,247,.6), rgba(236,72,153,.5), transparent 70%)',
-            mixBlendMode: 'screen',
-          }}
-          animate={
-            prefersReducedMotion
-              ? {}
-              : {
-                  x: [0, 12 * intensity, -6 * intensity, 0],
-                  y: [0, -10 * intensity, 8 * intensity, 0],
-                  scale: [1, 1.08, 0.96, 1],
-                }
-          }
-          transition={{
-            duration: b.d + i,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: i * 0.4,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/* -------------------------------- Text Ring -------------------------------- */
-
-function TextRing({ text, radius = 46, speed = 14 }) {
-  const prefersReducedMotion = useReducedMotion();
-  const repeated = (text + ' ').repeat(10);
-
-  return (
-    <motion.svg
-      viewBox="0 0 200 200"
-      className="pointer-events-none absolute left-1/2 top-1/2 h-[40%] w-[40%] -translate-x-1/2 -translate-y-1/2"
-      aria-hidden
-      initial={false}
-      animate={!prefersReducedMotion ? { rotate: 360 } : { rotate: 0 }}
-      transition={!prefersReducedMotion ? { duration: speed, repeat: Infinity, ease: 'linear' } : {}}
-    >
-      <defs>
-        <path id="circlePath" d={`M 100,100 m -${radius},0 a ${radius},${radius} 0 1,1 ${radius * 2},0 a ${radius},${radius} 0 1,1 -${radius * 2},0`} />
-      </defs>
-      <text fill="rgba(255,255,255,.85)" fontSize="9" fontWeight="700" letterSpacing="2px">
-        <textPath href="#circlePath" startOffset="0%">
-          {repeated}
-        </textPath>
-      </text>
-    </motion.svg>
-  );
-}
-
-/* --------------------------------- The Eye --------------------------------- */
-
-function PortalEye() {
-  const prefersReducedMotion = useReducedMotion();
-  const containerRef = useRef(null);
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    if (prefersReducedMotion) return;
-    const el = containerRef.current?.closest?.('[role="button"]');
-    if (!el) return;
-    const onMove = (e) => {
-      const rect = el.getBoundingClientRect();
-      const x = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
-      const y = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
-      setPos({ x, y });
-    };
-    el.addEventListener('mousemove', onMove);
-    return () => el.removeEventListener('mousemove', onMove);
-  }, [prefersReducedMotion]);
-
-  const px = Math.max(-0.7, Math.min(0.7, pos.x));
-  const py = Math.max(-0.7, Math.min(0.7, pos.y));
-
-  return (
-    <div ref={containerRef} className="pointer-events-none absolute inset-0">
-      {/* sclera */}
-      <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/90 blur-[1px]" />
-      {/* iris/pupil */}
-      <motion.div
-        className="absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{
-          background:
-            'radial-gradient(circle at 50% 40%, #1f2937 0%, #000 40%, #000 70%)',
-          boxShadow: '0 0 22px rgba(255,255,255,.25)',
-        }}
-        animate={{ x: px * 26, y: py * 26 }}
-        transition={{ type: 'spring', stiffness: 120, damping: 12 }}
-      />
-      {/* highlight */}
-      <motion.div
-        className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-[calc(50%-12px)] -translate-y-[calc(50%-12px)] rounded-full bg-white/70"
-        animate={{ x: px * 16, y: py * 10 }}
-        transition={{ type: 'spring', stiffness: 120, damping: 16 }}
-      />
-    </div>
-  );
-}
-
-/* ------------------------------ Orbiting CTA -------------------------------- */
-
-function OrbitingCTA({ speed = 14 }) {
-  const prefersReducedMotion = useReducedMotion();
-  return (
-    <motion.div
-      aria-hidden
-      className="pointer-events-none absolute left-1/2 top-1/2"
-      initial={{ rotate: 0 }}
-      animate={!prefersReducedMotion ? { rotate: 360 } : { rotate: 0 }}
-      transition={!prefersReducedMotion ? { duration: speed, repeat: Infinity, ease: 'linear' } : {}}
-      style={{ originX: 0.5, originY: 0.5 }}
-    >
-      <div className="pointer-events-auto relative -translate-x-1/2 -translate-y-[12.25rem] sm:-translate-y-[12.5rem] md:-translate-y-[13rem] lg:-translate-y-[12.5rem]">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/90 px-4 py-2 text-[12px] font-semibold text-zinc-900 shadow-sm transition hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-white"
-          aria-label="Try it now"
-        >
-          Try it now <span aria-hidden>→</span>
-        </Link>
+          ))}
+        </div>
       </div>
-    </motion.div>
+    </section>
   );
 }
 
-/* --------------------------------- Buttons --------------------------------- */
+function Dot({ color }) {
+  return <span className={`inline-block h-2.5 w-2.5 rounded-full ${color}`} aria-hidden />;
+}
 
-function PrimaryCTA() {
-  const [hover, setHover] = useState(false);
+/* -------------------------------- WHO FOR ----------------------------------- */
+
+function WhoFor() {
+  const chips = ['Social-first brands', 'DTC stores', 'Marketplaces', 'Agencies', 'Catalog teams', 'Photo-light ops'];
   return (
-    <Link
-      href="/dashboard"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className="group inline-flex items-center justify-center rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-100"
-      aria-label="Get started"
-    >
-      {hover ? 'Jump in →' : 'Enter the Portal'}
-    </Link>
+    <section className="mx-auto max-w-7xl px-5 py-14 sm:px-6 md:px-10">
+      <h3 className="text-center text-2xl font-extrabold">Built for teams that move fast</h3>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        {chips.map((c) => (
+          <span key={c} className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-sm">
+            {c}
+          </span>
+        ))}
+      </div>
+    </section>
   );
 }
+
+/* ------------------------------- HOW IT WORKS ------------------------------- */
+
+function HowItWorks() {
+  const steps = [
+    { title: 'Upload', desc: 'Drop your product or garment image.' },
+    { title: 'Choose', desc: 'Pick Enhance, Backgrounds, or Try-On.' },
+    { title: 'Preview', desc: 'See instant variations (sizes, scenes).' },
+    { title: 'Publish', desc: 'Export high-res. API sync to your store.' },
+  ];
+  return (
+    <section id="how" className="relative mx-auto max-w-7xl px-5 py-20 sm:px-6 md:px-10">
+      <div className="rounded-3xl border border-lime-200 bg-gradient-to-br from-lime-50 to-amber-50 p-6 md:p-10">
+        <h3 className="text-center text-3xl font-extrabold md:text-4xl">How it works</h3>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {steps.map((s, i) => (
+            <motion.div
+              key={s.title}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.45, delay: i * 0.05 }}
+              className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+            >
+              <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white">{i + 1}</div>
+              <div className="font-semibold">{s.title}</div>
+              <div className="mt-1 text-sm text-zinc-600">{s.desc}</div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="mt-8 flex items-center justify-center">
+          <Link
+            href="/dashboard"
+            className="rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
+          >
+            Start free →
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* --------------------------------- RESULTS ---------------------------------- */
+
+function Results() {
+  const cards = [
+    { k: '↑ 28%', d: 'Conversion uplift from better visuals' },
+    { k: '– 80%', d: 'Production time vs. manual photoshoots' },
+    { k: '15s', d: 'Average render preview time' },
+    { k: 'API', d: 'Sync to Shopify / Woo / custom' },
+  ];
+  return (
+    <section className="mx-auto max-w-7xl px-5 pb-16 sm:px-6 md:px-10">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {cards.map((c) => (
+          <motion.div
+            key={c.k}
+            initial={{ opacity: 0, y: 6 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.4 }}
+            className="rounded-2xl border border-zinc-200 bg-white p-5 text-center shadow-sm"
+          >
+            <div className="text-2xl font-extrabold">{c.k}</div>
+            <div className="mt-1 text-xs text-zinc-600">{c.d}</div>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------- BOTTOM CTA -------------------------------- */
+
+function BottomCTA() {
+  return (
+    <section className="mx-auto max-w-7xl px-5 pb-24 sm:px-6 md:px-10">
+      <div className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 to-fuchsia-50 p-8 text-center shadow-[0_20px_60px_rgba(249,115,22,0.12)]">
+        <h4 className="text-2xl font-extrabold">Ready to make weird, high-performing visuals?</h4>
+        <p className="mx-auto mt-2 max-w-xl text-zinc-700">
+          Join brands turning raw shots into studio-grade assets and realistic try-ons—without studios, models, or re-shoots.
+        </p>
+        <div className="mt-5 flex items-center justify-center gap-3">
+          <PrimaryCTA href="/dashboard">Try a free demo</PrimaryCTA>
+          <GhostCTA href="#how">See how it works</GhostCTA>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* --------------------------------- FOOTER ----------------------------------- */
+
+function Footer() {
+  return (
+    <footer className="border-t border-zinc-200 bg-white/70 px-5 py-8 text-sm sm:px-6 md:px-10">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 sm:flex-row">
+        <div className="text-zinc-600">© {new Date().getFullYear()} AI Store Assistant. All rights reserved.</div>
+        <div className="flex items-center gap-4">
+          <Link className="text-zinc-700 hover:underline" href="/terms">
+            Terms
+          </Link>
+          <Link className="text-zinc-700 hover:underline" href="/privacy">
+            Privacy
+          </Link>
+          <Link className="text-zinc-700 hover:underline" href="/contact">
+            Contact
+          </Link>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ----------------------------- STICKY MOBILE CTA ---------------------------- */
 
 function StickyMobileCTA() {
   return (
     <div className="lg:hidden">
       <Link
         href="/dashboard"
-        className="fixed inset-x-4 bottom-5 z-50 flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-indigo-700/20 transition hover:bg-fuchsia-600"
+        className="fixed inset-x-4 bottom-5 z-50 flex items-center justify-center rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-orange-500/30 transition hover:bg-orange-700"
         aria-label="Start now"
       >
         Start now →
       </Link>
     </div>
-  );
-}
-
-/* --------------------------------- Bits ------------------------------------ */
-
-function Chip({ children }) {
-  return (
-    <span className="rounded-full border border-zinc-300 bg-white px-3 py-1 dark:border-white/15 dark:bg-white/10">
-      {children}
-    </span>
   );
 }
