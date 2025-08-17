@@ -4,27 +4,18 @@ import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 
 /**
- * MintLemon AI — Fintech-style B2B SaaS Landing
- * - Keep <img> (no Next/Image) ✅
- * - Pricing removed ✅
- * - Footer removed ✅
- * - Logo removed from header ✅
- * - All "Try ..." CTAs removed (Hero + Sticky) ✅
- * - Sticky CTA (mobile) kept, now "Book a demo" + "Talk to sales" ✅
- * - More animations + reduced-motion friendly ✅
+ * MintLemon AI — Fintech-style B2B SaaS Landing (fixed navbar wrap)
+ * - Keep <img> (no Next/Image)
+ * - Pricing/Footer removed
+ * - Sticky CTA (mobile) kept
+ * - Navbar: no-wrap links + horizontal scroll on overflow (no scrollbar shown)
  */
 
-// --- SEO (App Router) ---
 export const metadata = {
   title: 'MintLemon AI — Product Enhance & Virtual Try-On for Teams',
   description:
     'B2B AI pipelines for product photo enhancement and virtual try-on. Book a demo to integrate secure, scalable workflows into your store.',
-  openGraph: {
-    title: 'MintLemon AI — Enhance & Try-On',
-    description:
-      'B2B AI pipelines for product photo enhancement and virtual try-on.',
-    type: 'website',
-  },
+  openGraph: { title: 'MintLemon AI — Enhance & Try-On', description: 'B2B AI pipelines for product photo enhancement and virtual try-on.', type: 'website' },
 }
 
 const ease = [0.22, 1, 0.36, 1]
@@ -46,32 +37,43 @@ export default function Page() {
 
 /* -------------------------- UI — HEADER -------------------------- */
 function Header() {
-  // No logo block per request
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-100/60 bg-white/60 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 md:py-4">
-        <nav className="flex items-center gap-6 text-sm text-zinc-700">
-          <a href="#features" className="hover:text-zinc-900">Features</a>
-          <a href="#how" className="hover:text-zinc-900">How it works</a>
-          <a href="#security" className="hover:text-zinc-900">Security</a>
-          <a href="#faq" className="hover:text-zinc-900">FAQ</a>
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:py-4">
+        {/* Nav links — hidden on small, scrollable horizontally on md if tight */}
+        <nav
+          className="
+            hidden md:flex md:flex-1 items-center gap-4 lg:gap-6 text-sm text-zinc-700
+            overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none]
+            [&::-webkit-scrollbar]:hidden
+          "
+        >
+          <a href="#features" className="hover:text-zinc-900 leading-none">Features</a>
+          <a href="#how" className="hover:text-zinc-900 leading-none">How it works</a>
+          <a href="#security" className="hover:text-zinc-900 leading-none">Security</a>
+          <a href="#faq" className="hover:text-zinc-900 leading-none">FAQ</a>
         </nav>
-        <div className="flex items-center gap-2">
+
+        {/* Desktop CTAs — never wrap */}
+        <div className="hidden md:flex items-center gap-2 shrink-0">
           <a
             href="#book"
-            className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+            className="whitespace-nowrap rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
             aria-label="Book a demo"
           >
             Book a demo
           </a>
           <a
             href="#sales"
-            className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50"
+            className="whitespace-nowrap rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50"
             aria-label="Talk to sales"
           >
             Talk to sales
           </a>
         </div>
+
+        {/* On small screens we don't show nav/CTAs here — rely on sticky CTA below */}
+        <div className="md:hidden h-6 w-6" aria-hidden />
       </div>
     </header>
   )
@@ -104,18 +106,17 @@ function Hero() {
             منصّة للفرق: تعزيز الصور وتجربة الملابس افتراضياً مع خصوصية عالية وتكامل مؤسسي.
           </p>
 
-          {/* B2B CTAs — no "Try" wording */}
           <div className="mt-6 flex flex-wrap gap-3">
             <a
               href="#book"
-              className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-5 py-3 font-medium text-zinc-900 shadow-sm transition hover:shadow-md"
+              className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-5 py-3 font-medium text-zinc-900 shadow-sm transition hover:shadow-md whitespace-nowrap"
             >
               Book a demo
               <svg className="h-4 w-4 transition group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </a>
             <a
               href="#sales"
-              className="inline-flex items-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-medium shadow-sm transition hover:bg-zinc-50"
+              className="inline-flex items-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-medium shadow-sm transition hover:bg-zinc-50 whitespace-nowrap"
             >
               Talk to sales
             </a>
@@ -141,7 +142,6 @@ function Hero() {
           transition={{ duration: 0.7, ease, delay: 0.05 }}
         >
           <HeroDemos />
-          {/* Floating badges */}
           {!rm && (
             <>
               <motion.div
@@ -311,14 +311,13 @@ function FAQ() {
 
 /* ---------------------- UI — MOBILE STICKY CTA ------------------- */
 function MobileStickyCTA() {
-  // Keep sticky; swap "Enhance / Try-On" with B2B CTAs
   return (
     <div className="fixed inset-x-0 bottom-3 z-40 mx-auto block w-[92%] rounded-2xl border border-zinc-200 bg-white/90 p-2 shadow-md backdrop-blur md:hidden">
       <div className="flex items-center justify-between gap-2">
-        <a href="#book" className="flex-1 rounded-xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-4 py-2 text-center font-medium text-zinc-900">
+        <a href="#book" className="flex-1 rounded-xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-4 py-2 text-center font-medium text-zinc-900 whitespace-nowrap">
           Book a demo
         </a>
-        <a href="#sales" className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-center font-medium">
+        <a href="#sales" className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-center font-medium whitespace-nowrap">
           Talk to sales
         </a>
       </div>
@@ -422,7 +421,7 @@ function Chip({ icon, children }) {
       transition={{ duration: 0.5, ease }}
     >
       {icon}
-      <span>{children}</span>
+      <span className="whitespace-nowrap">{children}</span>
     </motion.div>
   )
 }
