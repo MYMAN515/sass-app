@@ -11,26 +11,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
  * - Mobile-first, responsive, reduced-motion friendly
  * - Visual explanations with pictures (placeholders), animated accents only on transform/opacity
  * - Bright surreal gradients, blob morphs, glitch-on-press, sticky mobile CTA
+ * - B2B focus: benefits, trust logos, API-ready messaging
  */
 
 export default function Page() {
   return (
     <main className="relative min-h-screen w-full overflow-clip bg-[#FFF7ED] text-zinc-900">
       <CornerGradients />
+      <BlobField />
       <NoiseOverlay />
 
       <HeroCollider />
-
       <HowItWorks />
-
       <WeirdGallery />
-
       <B2BBenefits />
-
       <LogosAndTrust />
-
       <BottomCTA />
-
       <StickyMobileCTA />
 
       <StyleKeyframes />
@@ -59,7 +55,7 @@ function HeroCopy() {
       <h1 className="mt-3 text-balance text-4xl font-extrabold leading-[1.04] tracking-tight md:text-5xl">
         Two superpowers for your catalog:{" "}
         <span className="bg-gradient-to-r from-lime-500 via-orange-500 to-fuchsia-500 bg-clip-text text-transparent">
-          Enhance
+          {" "}Enhance
         </span>{" "}
         &{" "}
         <span className="bg-gradient-to-r from-fuchsia-500 via-orange-500 to-lime-500 bg-clip-text text-transparent">
@@ -101,7 +97,7 @@ function PrimaryCTA({ href, children }) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition hover:bg-orange-700"
+      className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition hover:bg-orange-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
     >
       {children}
       <span className="ml-1" aria-hidden>
@@ -114,7 +110,7 @@ function GhostCTA({ href, children }) {
   return (
     <a
       href={href}
-      className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold transition hover:bg-zinc-50"
+      className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300"
     >
       {children}
     </a>
@@ -170,7 +166,7 @@ function ColliderScene() {
           aria-hidden
           animate={ringControls}
           className={[
-            "absolute left-1/2 top-1/2 h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full",
+            "absolute left-1/2 top-1/2 h:[72%] w:[72%] h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full",
             "bg-[conic-gradient(from_0deg,#f97316,#22c55e,#38bdf8,#f472b6,#f97316)] opacity-70",
             "blur-xl",
           ].join(" ")}
@@ -230,8 +226,14 @@ function ColliderScene() {
 
         {/* Press & hold to glitch */}
         <div className="pointer-events-none absolute inset-0 rounded-3xl [--g:0] group-active:[--g:1]">
-          <div className="absolute inset-0 rounded-3xl opacity-0 blur-sm transition-opacity duration-150 group-active:opacity-100"
-               style={{ background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px)" }} />
+          {/* why: tiny visible glitch hint only on intent (press) */}
+          <div
+            className="absolute inset-0 rounded-3xl opacity-0 blur-sm transition-opacity duration-150 group-active:opacity-100"
+            style={{
+              background:
+                "repeating-linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px)",
+            }}
+          />
         </div>
       </div>
 
@@ -286,7 +288,7 @@ function EntryCapsule() {
       <div className="relative h-24 w-32 rounded-xl border border-zinc-200 bg-gradient-to-br from-white to-orange-50">
         {/* abstract product box */}
         <div className="absolute inset-0 grid place-items-center">
-          <svg width="80" height="60" viewBox="0 0 80 60">
+          <svg width="80" height="60" viewBox="0 0 80 60" aria-hidden>
             <rect x="10" y="16" width="60" height="28" rx="6" fill="#fde68a" />
             <rect x="16" y="22" width="48" height="16" rx="4" fill="#fb923c" />
           </svg>
@@ -301,7 +303,6 @@ function EntryCapsule() {
 
 function Beam({ start, end, gradient, paused }) {
   const prefersReducedMotion = paused;
-  const dx = useMemo(() => 0, []);
   return (
     <motion.div
       aria-hidden
@@ -350,7 +351,7 @@ function EnhancePreview({ active }) {
     <>
       {/* base abstract product */}
       <div className="absolute inset-0 grid place-items-center">
-        <svg width="96" height="72" viewBox="0 0 96 72" className="opacity-90">
+        <svg width="96" height="72" viewBox="0 0 96 72" className="opacity-90" aria-hidden>
           <rect x="10" y="18" width="76" height="36" rx="8" fill="#fde68a" />
           <rect x="18" y="26" width="60" height="20" rx="6" fill="#fb923c" />
         </svg>
@@ -381,7 +382,7 @@ function TryOnPreview({ active }) {
     <>
       {/* mannequin */}
       <div className="absolute inset-0 grid place-items-center">
-        <svg width="110" height="140" viewBox="0 0 110 140" className="opacity-90">
+        <svg width="110" height="140" viewBox="0 0 110 140" className="opacity-90" aria-hidden>
           <defs>
             <linearGradient id="skin" x1="0" x2="1">
               <stop offset="0%" stopColor="#fde68a" />
@@ -477,14 +478,26 @@ function HowItWorks() {
                 <div>
                   <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
                     <img src={s.img} alt={`${s.title} example`} className="h-full w-full object-cover" />
-                    <div className="pointer-events-none absolute inset-0 rounded-2xl mix-blend-overlay" style={{ background: "radial-gradient(120px 80px at 80% 20%, rgba(255,255,255,0.5), transparent 60%)" }} />
+                    <div
+                      className="pointer-events-none absolute inset-0 rounded-2xl mix-blend-overlay"
+                      style={{
+                        background:
+                          "radial-gradient(120px 80px at 80% 20%, rgba(255,255,255,0.5), transparent 60%)",
+                      }}
+                    />
                   </div>
                 </div>
               </div>
             </div>
 
             {/* decorative gradient ring per card */}
-            <div className={["pointer-events-none absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br opacity-10", s.hue].join(" ")} aria-hidden />
+            <div
+              className={[
+                "pointer-events-none absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br opacity-10",
+                s.hue,
+              ].join(" ")}
+              aria-hidden
+            />
           </motion.div>
         ))}
       </div>
@@ -523,10 +536,22 @@ function WeirdGallery() {
             <img src={src} alt={`Sample ${i + 1}`} className="h-full w-full object-cover transition group-active:scale-[1.04]" />
             {/* surreal overlay */}
             <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100">
-              <div className="absolute inset-0 animate-hue rounded-3xl mix-blend-color" style={{ background: "conic-gradient(from 0deg, rgba(249,115,22,.25), rgba(132,204,22,.25), rgba(99,102,241,.25), rgba(236,72,153,.25), rgba(249,115,22,.25))" }} />
+              <div
+                className="absolute inset-0 animate-hue rounded-3xl mix-blend-color"
+                style={{
+                  background:
+                    "conic-gradient(from 0deg, rgba(249,115,22,.25), rgba(132,204,22,.25), rgba(99,102,241,.25), rgba(236,72,153,.25), rgba(249,115,22,.25))",
+                }}
+              />
             </div>
             {/* glitch on press */}
-            <div className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 blur-[1px] transition group-active:opacity-100" style={{ background: "repeating-linear-gradient(0deg, rgba(255,255,255,0.25), rgba(255,255,255,0.25) 1px, transparent 1px, transparent 3px)" }} />
+            <div
+              className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 blur-[1px] transition group-active:opacity-100"
+              style={{
+                background:
+                  "repeating-linear-gradient(0deg, rgba(255,255,255,0.25), rgba(255,255,255,0.25) 1px, transparent 1px, transparent 3px)",
+              }}
+            />
           </motion.div>
         ))}
       </div>
@@ -594,10 +619,6 @@ function LogosAndTrust() {
           ))}
         </div>
       </div>
-      <style jsx>{`
-        .animate-marquee { animation: marquee 26s linear infinite; }
-        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-      `}</style>
     </section>
   );
 }
@@ -659,6 +680,35 @@ function CornerGradients() {
   );
 }
 
+function BlobField() {
+  const prefersReducedMotion = useReducedMotion();
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+      <div
+        className={[
+          "absolute left-[10%] top-[25%] h-40 w-40 rounded-full blur-2xl",
+          "bg-gradient-to-br from-emerald-300 to-lime-300",
+          prefersReducedMotion ? "opacity-20" : "animate-blob",
+        ].join(" ")}
+      />
+      <div
+        className={[
+          "absolute right-[12%] top-[20%] h-52 w-52 rounded-full blur-2xl",
+          "bg-gradient-to-br from-fuchsia-300 to-rose-300",
+          prefersReducedMotion ? "opacity-20" : "animate-blob-slow",
+        ].join(" ")}
+      />
+      <div
+        className={[
+          "absolute bottom-[10%] left-[25%] h-48 w-48 rounded-full blur-2xl",
+          "bg-gradient-to-br from-sky-300 to-indigo-300",
+          prefersReducedMotion ? "opacity-20" : "animate-blob",
+        ].join(" ")}
+      />
+    </div>
+  );
+}
+
 function NoiseOverlay() {
   return (
     <div
@@ -689,6 +739,17 @@ function StyleKeyframes() {
 
       @keyframes hue { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
       .animate-hue { animation: hue 8s linear infinite; }
+
+      @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      .animate-marquee { animation: marquee 26s linear infinite; }
+
+      @keyframes blob {
+        0%, 100% { transform: translate(0,0) scale(1); }
+        33%      { transform: translate(10px,-18px) scale(1.06); }
+        66%      { transform: translate(-12px,10px) scale(0.96); }
+      }
+      .animate-blob { animation: blob 14s ease-in-out infinite; }
+      .animate-blob-slow { animation: blob 22s ease-in-out infinite; }
     `}</style>
   );
 }
