@@ -211,8 +211,8 @@ function ProductDemo() {
       <div className="grid gap-6 md:grid-cols-2">
         <DemoCard title="Product Enhance" subtitle="Before / After slider">
           <BeforeAfter
-            beforeUrl="https://images.unsplash.com/photo-1600180758890-6b94519a8ba6?q=80&w=1200&auto=format&fit=crop"
-            afterUrl="https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?q=80&w=1200&auto=format&fit=crop"
+            beforeUrl="/demo-before.jpg"
+            afterUrl="/demo-after.jpg"
           />
         </DemoCard>
         <DemoCard title="Try-On" subtitle="Place garment on model">
