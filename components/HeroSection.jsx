@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
+import { useRouter } from 'next/router';
 
 /**
  * MintLemon AI — Full-width, responsive landing
