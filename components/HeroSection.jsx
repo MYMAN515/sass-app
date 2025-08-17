@@ -4,25 +4,31 @@ import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 
 /**
- * MintLemon AI — Fintech-style B2B SaaS Landing (fixed navbar wrap)
- * - Keep <img> (no Next/Image)
- * - Pricing/Footer removed
- * - Sticky CTA (mobile) kept
- * - Navbar: no-wrap links + horizontal scroll on overflow (no scrollbar shown)
+ * MintLemon AI — Full-width, responsive landing
+ * - <img> only (no Next/Image)
+ * - Removed all "Book a demo / Talk to sales" buttons
+ * - Removed mobile sticky CTA
+ * - Containers are FULL WIDTH (no max-w center)
+ * - Header links are visible on mobile (scrollable row)
  */
 
 export const metadata = {
   title: 'MintLemon AI — Product Enhance & Virtual Try-On for Teams',
   description:
-    'B2B AI pipelines for product photo enhancement and virtual try-on. Book a demo to integrate secure, scalable workflows into your store.',
-  openGraph: { title: 'MintLemon AI — Enhance & Try-On', description: 'B2B AI pipelines for product photo enhancement and virtual try-on.', type: 'website' },
+    'B2B AI pipelines for product photo enhancement and virtual try-on. Secure and scalable workflows.',
+  openGraph: {
+    title: 'MintLemon AI — Enhance & Try-On',
+    description:
+      'B2B AI pipelines for product photo enhancement and virtual try-on.',
+    type: 'website',
+  },
 }
 
 const ease = [0.22, 1, 0.36, 1]
 
 export default function Page() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#F3FFF8] via-[#FFFCE8] to-white text-zinc-900">
+    <main className="min-h-screen w-full bg-gradient-to-b from-[#F3FFF8] via-[#FFFCE8] to-white text-zinc-900">
       <BackgroundAuras />
       <Header />
       <Hero />
@@ -30,7 +36,7 @@ export default function Page() {
       <HowItWorks />
       <ProductDemo />
       <FAQ />
-      <MobileStickyCTA />
+      {/* Sticky CTA removed as requested */}
     </main>
   )
 }
@@ -38,12 +44,16 @@ export default function Page() {
 /* -------------------------- UI — HEADER -------------------------- */
 function Header() {
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-100/60 bg-white/60 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:py-4">
-        {/* Nav links — hidden on small, scrollable horizontally on md if tight */}
+    <header className="sticky top-0 z-40 border-b border-zinc-100/60 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/70">
+      <div
+        className="
+          flex w-full items-center justify-between gap-3 px-4 py-3 md:py-4
+        "
+      >
+        {/* Nav links — visible on all sizes; scrollable on narrow widths */}
         <nav
           className="
-            hidden md:flex md:flex-1 items-center gap-4 lg:gap-6 text-sm text-zinc-700
+            flex flex-1 items-center gap-4 lg:gap-6 text-sm text-zinc-700
             overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none]
             [&::-webkit-scrollbar]:hidden
           "
@@ -54,26 +64,8 @@ function Header() {
           <a href="#faq" className="hover:text-zinc-900 leading-none">FAQ</a>
         </nav>
 
-        {/* Desktop CTAs — never wrap */}
-        <div className="hidden md:flex items-center gap-2 shrink-0">
-          <a
-            href="#book"
-            className="whitespace-nowrap rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-            aria-label="Book a demo"
-          >
-            Book a demo
-          </a>
-          <a
-            href="#sales"
-            className="whitespace-nowrap rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50"
-            aria-label="Talk to sales"
-          >
-            Talk to sales
-          </a>
-        </div>
-
-        {/* On small screens we don't show nav/CTAs here — rely on sticky CTA below */}
-        <div className="md:hidden h-6 w-6" aria-hidden />
+        {/* No CTAs here per request */}
+        <div className="h-6 w-6 shrink-0" aria-hidden />
       </div>
     </header>
   )
@@ -83,7 +75,7 @@ function Header() {
 function Hero() {
   const rm = useReducedMotion()
   return (
-    <section className="relative mx-auto max-w-7xl px-4 pb-10 pt-12 sm:pt-16 md:pb-16 md:pt-24">
+    <section className="relative w-full px-4 sm:px-6 md:px-10 xl:px-16 pb-10 pt-12 sm:pt-16 md:pb-16 md:pt-24">
       <div className="grid items-center gap-10 md:grid-cols-2">
         <motion.div
           initial={rm ? { opacity: 1 } : { opacity: 0, y: 18 }}
@@ -99,28 +91,14 @@ function Hero() {
             AI Enhance & Virtual Try-On — built for teams
           </motion.h1>
 
-          <p className="mt-4 max-w-xl text-lg text-zinc-700">
+          <p className="mt-4 max-w-[70ch] text-lg text-zinc-700">
             Premium product images in seconds. Clean backgrounds, upscale, and place garments on studio-ready models — with audit logs and SSO.
           </p>
           <p className="mt-1 text-zinc-600">
             منصّة للفرق: تعزيز الصور وتجربة الملابس افتراضياً مع خصوصية عالية وتكامل مؤسسي.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <a
-              href="#book"
-              className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-5 py-3 font-medium text-zinc-900 shadow-sm transition hover:shadow-md whitespace-nowrap"
-            >
-              Book a demo
-              <svg className="h-4 w-4 transition group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </a>
-            <a
-              href="#sales"
-              className="inline-flex items-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-medium shadow-sm transition hover:bg-zinc-50 whitespace-nowrap"
-            >
-              Talk to sales
-            </a>
-          </div>
+          {/* No hero buttons per request */}
 
           <motion.div
             className="mt-6 flex flex-wrap items-center gap-3 text-sm text-zinc-700"
@@ -188,7 +166,7 @@ function HeroDemos() {
 /* ----------------------- UI — LOGOS STRIP ------------------------ */
 function LogosStrip() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10">
+    <section className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-10">
       <div className="rounded-3xl border border-zinc-200 bg-white/70 p-5 text-zinc-500 shadow-sm">
         <p className="mb-4 text-center text-xs uppercase tracking-wider">Trusted by product teams</p>
         <div className="grid grid-cols-2 place-items-center gap-6 sm:grid-cols-3 md:grid-cols-6">
@@ -217,7 +195,7 @@ function HowItWorks() {
   ]
 
   return (
-    <section id="how" className="mx-auto max-w-7xl px-4 py-12 md:py-16">
+    <section id="how" className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-12 md:py-16">
       <motion.h2
         id="features"
         className="text-center text-2xl font-semibold tracking-tight md:text-3xl"
@@ -228,7 +206,9 @@ function HowItWorks() {
       >
         How it works
       </motion.h2>
-      <p className="mx-auto mt-2 max-w-2xl text-center text-zinc-600">ثلاث خطوات بسيطة لنتائج احترافية.</p>
+      <p className="mx-auto mt-2 max-w-[70ch] text-center text-zinc-600">
+        ثلاث خطوات بسيطة لنتائج احترافية.
+      </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         {steps.map((it, idx) => (
@@ -255,7 +235,7 @@ function HowItWorks() {
 /* ------------------------- UI — PRODUCT DEMO --------------------- */
 function ProductDemo() {
   return (
-    <section id="demo" className="mx-auto max-w-7xl px-4 py-12 md:py-16">
+    <section id="demo" className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-12 md:py-16">
       <div className="grid gap-6 md:grid-cols-2">
         <DemoCard title="Product Enhance" subtitle="Before / After slider">
           <BeforeAfter
@@ -280,7 +260,7 @@ function FAQ() {
   ]
 
   return (
-    <section id="faq" className="mx-auto max-w-7xl px-4 py-12 md:py-16">
+    <section id="faq" className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-12 md:py-16">
       <motion.h2
         className="text-center text-3xl font-semibold tracking-tight"
         initial={{ opacity: 0, y: 10 }}
@@ -290,7 +270,7 @@ function FAQ() {
       >
         FAQ
       </motion.h2>
-      <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
         {qa.map((item, idx) => (
           <motion.div
             key={item.q}
@@ -306,22 +286,6 @@ function FAQ() {
         ))}
       </div>
     </section>
-  )
-}
-
-/* ---------------------- UI — MOBILE STICKY CTA ------------------- */
-function MobileStickyCTA() {
-  return (
-    <div className="fixed inset-x-0 bottom-3 z-40 mx-auto block w-[92%] rounded-2xl border border-zinc-200 bg-white/90 p-2 shadow-md backdrop-blur md:hidden">
-      <div className="flex items-center justify-between gap-2">
-        <a href="#book" className="flex-1 rounded-xl bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] px-4 py-2 text-center font-medium text-zinc-900 whitespace-nowrap">
-          Book a demo
-        </a>
-        <a href="#sales" className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-center font-medium whitespace-nowrap">
-          Talk to sales
-        </a>
-      </div>
-    </div>
   )
 }
 
