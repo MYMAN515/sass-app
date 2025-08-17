@@ -3,16 +3,15 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion, useAnimation, useReducedMotion } from 'framer-motion';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 
 /**
- * Weird AF • Bright, playful, undeniably B2B
- * - Non-dark palette (pastels & candy gradients)
- * - Instantly clear value prop (Enhance + Try-On for products)
- * - Heavy micro-interactions: magnets, parallax, marquee, blobs, stickers
- * - Meme-friendly copy, but conversion-first CTAs
- * - No navbar / no footer
+ * Candy-Factory OS 🍬 — Weird AF, bright, B2B-clear
+ * - Non-dark palette (pastels)
+ * - Instant clarity (Enhance + Try-On)
+ * - Micro-interactions & stickers (memes but clean)
+ * - No navbar / no footer here
  */
 
 export default function HeroSection() {
@@ -212,10 +211,7 @@ function ConfettiAura() {
           animate={{ opacity: [0, 1, 0], y: [-10, -30, -60], rotate: [0, 15, -10, 20] }}
           transition={{ duration: 7, delay: b * 0.12, repeat: Infinity }}
           className="absolute text-xl"
-          style={{
-            left: `${(b * 37) % 100}%`,
-            top: `${(b * 19) % 100}%`,
-          }}
+          style={{ left: `${(b * 37) % 100}%`, top: `${(b * 19) % 100}%` }}
         >
           {['✨', '🫧', '🧃', '🦄', '⭐️'][b % 5]}
         </motion.span>
