@@ -3,349 +3,189 @@
 
 import Link from "next/link";
 import { motion, useAnimation, useReducedMotion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * MIRAGE FORGE — Super-Weird B2B Landing (from scratch)
- * Goal: shockingly modern, very weird visuals, yet clear value in < 1 minute.
- * What it is: AI visuals for catalogs — Enhance (retouch/upscale) + Try‑On (on-model preview) for B2B teams.
- * Constraints: no navbar/footer, mobile-first, accessible, reduced-motion friendly.
+ * HOLOGRID REEL — Ultra-Weird, Modern, Image-First B2B Landing (from scratch)
+ * — No navbar/footer. Mobile-first. High motion (but reduced-motion friendly).
+ * — Goal: User understands in < 60s via images + micro captions.
+ * — Features shown only with visuals: Upload → Enhance → Try‑On → Export.
  */
 
 export default function Page() {
   return (
-    <main className="relative min-h-screen w-full overflow-clip bg-[#FFFDF7] text-zinc-900">
-      <BackStage />
+    <main className="relative min-h-screen w-full overflow-clip bg-[#FFFCF6] text-zinc-900">
+      <Backdrop />
 
-      <HeroPortal />
-      <OneMinuteExplainer />
-      <FeatureShowcase />
-      <ProofOfValue />
-      <TrustMarquee />
-      <FinalCTA />
+      <SnapRail>
+        <HeroFrame />
+        <UploadFrame />
+        <EnhanceFrame />
+        <TryOnFrame />
+        <ExportFrame />
+      </SnapRail>
+
       <StickyMobileCTA />
-
       <GlobalStyles />
       <SvgDefs />
     </main>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                      HERO                                   */
-/* -------------------------------------------------------------------------- */
-
-function HeroPortal() {
+/* ------------------------------- SNAP CONTAINER ---------------------------- */
+function SnapRail({ children }) {
   return (
-    <section className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-5 pb-14 pt-10 sm:px-6 md:grid-cols-2 md:px-10 lg:px-16">
-      <div className="relative z-10">
-        <Badge>AI VISUALS • B2B • RESPONSIVE</Badge>
-        <h1 className="mt-3 text-balance text-4xl font-extrabold leading-[1.04] tracking-tight md:text-5xl">
-          Mirage Forge
-          <span className="ml-2 inline-block align-middle text-base font-semibold text-orange-500">β</span>
-        </h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-700 md:text-base">
-          Enhance products to crisp high‑res and preview garments on models — without studios or reshoots. Made for
-          catalogs, marketplaces, and agencies.
-        </p>
+    <div className="snap-y snap-mandatory h-[100svh] overflow-y-scroll [&>*]:snap-start">
+      {children}
+    </div>
+  );
+}
 
-        <ul className="mt-4 grid max-w-md grid-cols-1 gap-2 text-sm">
-          <li className="flex items-center gap-2"><Dot className="bg-emerald-500" /> Retouch, upscale, color‑correct</li>
-          <li className="flex items-center gap-2"><Dot className="bg-fuchsia-500" /> On‑model try‑on in multiple sizes</li>
-          <li className="flex items-center gap-2"><Dot className="bg-orange-500" /> API & bulk pipelines for teams</li>
-        </ul>
-
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
-          <GhostCTA href="#explainer">60‑sec explainer</GhostCTA>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-600">
-          <Pill>No credit card</Pill>
-          <Pill>High‑res exports</Pill>
-          <Pill>SLA & SSO</Pill>
-        </div>
+/* ----------------------------------- HERO --------------------------------- */
+function HeroFrame() {
+  return (
+    <section className="relative grid h-[100svh] place-items-center px-5">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <CornerBursts />
+        <NoiseOverlay />
       </div>
 
-      <PortalScene />
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="mx-auto max-w-3xl text-center"
+      >
+        <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-3 py-1 text-[11px] font-semibold">
+          WEIRD • MODERN • B2B
+        </div>
+        <h1 className="mt-4 text-balance text-4xl font-extrabold leading-[1.04] tracking-tight md:text-6xl">
+          AI visuals for catalogs — explained by pictures
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-700 md:text-base">
+          Enhance to high‑res and try garments on models. No studio. No reshoots. Built for teams.
+        </p>
+        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
+          <GhostCTA href="#upload">See the reel</GhostCTA>
+        </div>
+        <ScrollHint />
+      </motion.div>
+
+      <GooHalo />
     </section>
   );
 }
 
-function PortalScene() {
+/* --------------------------------- UPLOAD ---------------------------------- */
+function UploadFrame() {
   const prefersReducedMotion = useReducedMotion();
   const orbit = useAnimation();
   useEffect(() => {
     if (prefersReducedMotion) return;
-    orbit.start({ rotate: 360, transition: { duration: 40, repeat: Infinity, ease: "linear" } });
+    orbit.start({ rotate: 360, transition: { duration: 30, repeat: Infinity, ease: "linear" } });
   }, [prefersReducedMotion, orbit]);
 
   return (
-    <div className="relative mx-auto w-[min(92vw,40rem)]">
-      <div
-        className="relative aspect-square w-full overflow-visible rounded-[2rem] border border-zinc-200 bg-white/80 p-4 shadow-[0_30px_80px_rgba(249,115,22,0.12)] backdrop-blur-md"
-        style={{ filter: "url(#goo)" }}
-        aria-label="Visual portal"
-      >
-        {/* spinning conic halo */}
+    <section id="upload" className="relative grid h-[100svh] place-items-center px-5">
+      <FrameCaption icon="📤" title="Upload shots" subtitle="Drop product photos or garment flats." />
+
+      {/* Orbital stack of images */}
+      <div className="relative h-[56svh] w-[min(92vw,50rem)]">
         <motion.div
           aria-hidden
           animate={orbit}
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl"
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[82%] w-[82%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl"
           style={{ background: "conic-gradient(from 0deg,#f97316,#22c55e,#38bdf8,#f472b6,#f97316)" }}
         />
 
-        {/* core plate */}
-        <div className="absolute left-1/2 top-1/2 h-[56%] w-[56%] -translate-x-1/2 -translate-y-1/2 rounded-[1.8rem] bg-white/80 ring-1 ring-zinc-200" />
+        <StackedImg idx={1} src="https://images.unsplash.com/photo-1556905055-8f358a7a47b2?q=80&w=1400&auto=format&fit=crop" x="12%" y="18%" r={-6} />
+        <StackedImg idx={2} src="https://images.unsplash.com/photo-1562158070-4b69b9a39a8a?q=80&w=1400&auto=format&fit=crop" x="70%" y="30%" r={8} />
+        <StackedImg idx={3} src="https://images.unsplash.com/photo-1610395219791-24f9f2c8b447?q=80&w=1400&auto=format&fit=crop" x="38%" y="68%" r={4} />
 
-        {/* goo blobs */}
-        <GooBlob className="left-[18%] top-[38%] from-emerald-300 to-lime-300" delay={0} />
-        <GooBlob className="right-[16%] top-[28%] from-fuchsia-300 to-rose-300" delay={6} />
-        <GooBlob className="left-[30%] bottom-[18%] from-sky-300 to-indigo-300" delay={12} />
-
-        {/* tokens (enhance / try-on) */}
-        <Token label="Enhance" hue="from-lime-400 to-emerald-400" x="12%" y="12%" />
-        <Token label="Try‑On" hue="from-fuchsia-400 to-amber-400" x="76%" y="70%" />
-
-        {/* product plate sample */}
-        <div className="absolute left-6 top-1/2 -translate-y-1/2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
-          <div className="relative h-24 w-32 rounded-xl border border-zinc-200 bg-gradient-to-br from-white to-orange-50">
-            <div className="absolute inset-0 grid place-items-center" aria-hidden>
-              <svg width="80" height="60" viewBox="0 0 80 60">
-                <rect x="10" y="16" width="60" height="28" rx="6" fill="#fde68a" />
-                <rect x="16" y="22" width="48" height="16" rx="4" fill="#fb923c" />
-              </svg>
-            </div>
-            <div className="pointer-events-none absolute inset-0 animate-shimmer bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.6),transparent)] bg-[length:180%_100%]" />
-          </div>
-          <div className="mt-1 text-center text-[10px] text-zinc-500">Product (sample)</div>
-        </div>
-
-        {/* beams */}
-        <Beam x1="48%" y1="48%" x2="86%" y2="20%" gradient="linear-gradient(90deg,#A3E635,#ffffff)" />
-        <Beam x1="50%" y1="52%" x2="83%" y2="78%" gradient="linear-gradient(90deg,#F472B6,#ffffff)" />
-
-        {/* press to glitch hint */}
-        <div className="pointer-events-none absolute inset-0 rounded-[2rem] opacity-0 blur-[1px] transition group-active:opacity-100" style={{ background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px)" }} />
+        <div className="pointer-events-none absolute inset-0 rounded-[2rem] ring-1 ring-zinc-200" />
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-zinc-600">
-        <span className="inline-flex items-center gap-2"><Dot className="bg-lime-500" /> Enhance</span>
-        <span className="inline-flex items-center gap-2"><Dot className="bg-fuchsia-500" /> Try‑On</span>
-        <span aria-hidden className="inline-flex items-center gap-1">•</span>
-        <span>Tap & hold portal for micro‑glitch.</span>
-      </div>
-    </div>
+    </section>
   );
 }
 
-function GooBlob({ className = "", delay = 0 }) {
-  const prefersReducedMotion = useReducedMotion();
-  return (
-    <div
-      aria-hidden
-      className={["absolute h-40 w-40 rounded-full blur-2xl bg-gradient-to-br", className, prefersReducedMotion ? "opacity-30" : "animate-blob"].join(" ")}
-      style={{ animationDelay: `${delay}s` }}
-    />
-  );
-}
-
-function Token({ label, hue, x, y }) {
-  return (
-    <div
-      className="absolute"
-      style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}
-    >
-      <div className="rounded-xl border border-zinc-200 bg-white p-2 shadow-sm">
-        <div className="relative aspect-[4/5] w-24 overflow-hidden rounded-lg bg-gradient-to-br from-white to-zinc-50">
-          <div className={["absolute inset-0 rounded-lg bg-gradient-to-r opacity-50", hue].join(" ")} aria-hidden />
-        </div>
-        <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold">
-          <span className={["inline-block h-2 w-2 rounded-full bg-gradient-to-r", hue].join(" ")} aria-hidden />
-          {label}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Beam({ x1, y1, x2, y2, gradient }) {
+function StackedImg({ idx, src, x, y, r = 0 }) {
   const prefersReducedMotion = useReducedMotion();
   return (
     <motion.div
-      aria-hidden
-      className="absolute h-1 origin-left rounded-md"
-      style={{ left: x1, top: y1, width: "38%", transform: "translate(-50%,-50%)", background: gradient, boxShadow: "0 0 18px rgba(0,0,0,0.08)" }}
-      animate={prefersReducedMotion ? { opacity: 0.6 } : { opacity: [0.3, 0.85, 0.3] }}
-      transition={prefersReducedMotion ? {} : { duration: 3.4, repeat: Infinity, repeatType: "mirror" }}
-    />
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                              60-SECOND EXPLAINER                            */
-/* -------------------------------------------------------------------------- */
-
-function OneMinuteExplainer() {
-  const steps = [
-    { h: "Upload", p: "Drop product shots or garment flats.", icon: "📤" },
-    { h: "Enhance", p: "AI retouch + upscale to crisp high‑res.", icon: "✨" },
-    { h: "Try‑On", p: "Preview garments on models in sizes.", icon: "🧍" },
-    { h: "Export", p: "Publish‑ready assets & API delivery.", icon: "🚀" },
-  ];
-  const prefersReducedMotion = useReducedMotion();
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setI((v) => (v + 1) % steps.length), prefersReducedMotion ? 4000 : 6000);
-    return () => clearInterval(t);
-  }, [prefersReducedMotion, steps.length]);
-
-  return (
-    <section id="explainer" className="relative mx-auto max-w-6xl px-5 pb-12 pt-4 sm:px-6 md:px-10 lg:px-16">
-      <div className="mx-auto grid gap-4 md:grid-cols-[1fr_1fr]">
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm"
-          aria-live="polite"
-        >
-          <div className="mb-3 inline-flex items-center gap-2 text-[12px] font-semibold">
-            <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-white">{i + 1}/4</span>
-            <span className="text-zinc-600">60‑sec explainer</span>
-          </div>
-          <div className="text-2xl font-extrabold leading-tight">
-            {steps[i].icon} {steps[i].h}
-          </div>
-          <p className="mt-1 text-zinc-700">{steps[i].p}</p>
-          <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-            <motion.div
-              key={`bar-${i}`}
-              className="h-full w-full origin-left bg-gradient-to-r from-orange-400 via-fuchsia-400 to-lime-400"
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: 1 }}
-              transition={{ duration: prefersReducedMotion ? 3.6 : 5.6, ease: "linear" }}
-            />
-          </div>
-        </motion.div>
-
-        <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <div className="mb-2 text-[12px] font-semibold text-zinc-600">Why teams pick Mirage Forge</div>
-          <ul className="space-y-2 text-sm">
-            <li className="flex items-center gap-2"><Dot className="bg-emerald-500" /> 10× faster launches</li>
-            <li className="flex items-center gap-2"><Dot className="bg-fuchsia-500" /> 99.9% consistency at scale</li>
-            <li className="flex items-center gap-2"><Dot className="bg-orange-500" /> −70% cost vs. reshoots</li>
-            <li className="flex items-center gap-2"><Dot className="bg-sky-500" /> API & SSO, SOC2 path</li>
-          </ul>
-          <div className="mt-5 grid grid-cols-2 gap-3 text-[11px] text-zinc-600 md:grid-cols-4">
-            {[
-              "Marketplaces",
-              "Social Commerce",
-              "D2C Brands",
-              "Agencies",
-            ].map((t) => (
-              <div key={t} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-center">{t}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                               FEATURE SHOWCASE                              */
-/* -------------------------------------------------------------------------- */
-
-function FeatureShowcase() {
-  const [mode, setMode] = useState("enhance");
-  const prefersReducedMotion = useReducedMotion();
-
-  return (
-    <section className="relative mx-auto max-w-7xl px-5 pb-12 pt-4 sm:px-6 md:px-10 lg:px-16">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-extrabold md:text-3xl">What it actually does</h2>
-        <div className="flex items-center gap-2">
-          <ModeChip active={mode === "enhance"} onClick={() => setMode("enhance")} label="Enhance" dot="bg-lime-500" />
-          <ModeChip active={mode === "tryon"} onClick={() => setMode("tryon")} label="Try‑On" dot="bg-fuchsia-500" />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Visual */}
-        <motion.div
-          key={mode}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
-          className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm"
-        >
-          {mode === "enhance" ? <EnhanceVisual /> : <TryOnVisual />}
-        </motion.div>
-
-        {/* Copy */}
-        <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-          {mode === "enhance" ? (
-            <>
-              <h3 className="text-xl font-extrabold">Enhance</h3>
-              <p className="mt-1 text-sm text-zinc-700">Auto retouch & upscale to high‑res. Better lighting, color, and clarity.</p>
-              <ul className="mt-3 space-y-2 text-sm">
-                <li className="flex items-center gap-2"><Dot className="bg-emerald-500" /> High‑res export</li>
-                <li className="flex items-center gap-2"><Dot className="bg-orange-500" /> Color‑correct</li>
-                <li className="flex items-center gap-2"><Dot className="bg-sky-500" /> Fast previews</li>
-              </ul>
-            </>
-          ) : (
-            <>
-              <h3 className="text-xl font-extrabold">Try‑On</h3>
-              <p className="mt-1 text-sm text-zinc-700">Realistic on‑model previews for garments. Size & fit awareness.</p>
-              <ul className="mt-3 space-y-2 text-sm">
-                <li className="flex items-center gap-2"><Dot className="bg-fuchsia-500" /> Multiple sizes</li>
-                <li className="flex items-center gap-2"><Dot className="bg-amber-500" /> Skin‑tone friendly</li>
-                <li className="flex items-center gap-2"><Dot className="bg-emerald-500" /> Export‑ready</li>
-              </ul>
-            </>
-          )}
-          <div className="mt-5">
-            <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ModeChip({ active, onClick, label, dot }) {
-  return (
-    <button
-      onClick={onClick}
-      className={[
-        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-        active ? "border-zinc-300 bg-white shadow-sm" : "border-zinc-200 bg-white/70 hover:bg-white",
-      ].join(" ")}
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ duration: 0.5, delay: idx * 0.08 }}
+      className="absolute"
+      style={{ left: x, top: y, transform: `translate(-50%,-50%) rotate(${r}deg)` }}
     >
-      <span className={["h-2 w-2 rounded-full", dot].join(" ")} aria-hidden />
-      {label}
-    </button>
+      <div className="group relative h-44 w-60 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm md:h-56 md:w-72">
+        <img src={src} alt={`Upload sample ${idx}`} className="h-full w-full object-cover transition group-active:scale-[1.04]" />
+        <div className={"pointer-events-none absolute inset-0 rounded-2xl " + (prefersReducedMotion ? "" : "animate-hue")} style={{ background: "conic-gradient(from 0deg, rgba(249,115,22,.18), rgba(132,204,22,.18), rgba(99,102,241,.18), rgba(236,72,153,.18), rgba(249,115,22,.18))", mixBlendMode: "color" }} />
+        <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 blur-[1px] transition group-active:opacity-100" style={{ background: "repeating-linear-gradient(0deg, rgba(255,255,255,0.3), rgba(255,255,255,0.3) 1px, transparent 1px, transparent 3px)" }} />
+      </div>
+    </motion.div>
   );
 }
 
-function EnhanceVisual() {
+/* -------------------------------- ENHANCE ---------------------------------- */
+function EnhanceFrame() {
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
-      <img
-        src="https://images.unsplash.com/photo-1556905055-8f358a7a47b2?q=80&w=1400&auto=format&fit=crop"
-        alt="Sample product before/after"
-        className="h-full w-full object-cover"
-      />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white/0 via-white/0 to-white/0" />
-      <div className="pointer-events-none absolute inset-0 animate-hue mix-blend-color" style={{ background: "conic-gradient(from 0deg, rgba(249,115,22,.12), rgba(132,204,22,.12), rgba(99,102,241,.12), rgba(236,72,153,.12), rgba(249,115,22,.12))" }} />
-      <div className="pointer-events-none absolute inset-0 animate-shimmer bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.6),transparent)] bg-[length:200%_100%]" />
+    <section className="relative grid h-[100svh] place-items-center px-5">
+      <FrameCaption icon="✨" title="Enhance" subtitle="AI retouch + upscale to crisp high‑res." />
+      <div className="relative w-[min(92vw,52rem)]">
+        <ImageRevealSlider
+          before="https://images.unsplash.com/photo-1556905055-8f358a7a47b2?q=80&w=1400&auto=format&fit=crop"
+          after="https://images.unsplash.com/photo-1520975682031-5f1b1a3bb0de?q=80&w=1400&auto=format&fit=crop"
+        />
+      </div>
+    </section>
+  );
+}
+
+function ImageRevealSlider({ before, after }) {
+  const prefersReducedMotion = useReducedMotion();
+  const [p, setP] = useState(60);
+  return (
+    <div className="relative overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-3 shadow-[0_20px_60px_rgba(249,115,22,0.12)]">
+      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl">
+        <img src={before} alt="Before" className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={after}
+          alt="After"
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ clipPath: `inset(0 ${(100 - p).toFixed(1)}% 0 0)` }}
+        />
+        <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-zinc-200" />
+
+        {/* handle */}
+        <motion.div
+          className="absolute top-1/2 z-10 h-16 w-16 -translate-y-1/2 rounded-full border border-zinc-200 bg-white shadow-md"
+          style={{ left: `${p}%`, transform: `translate(-50%, -50%)` }}
+          initial={false}
+          animate={prefersReducedMotion ? { scale: 1 } : { scale: [1, 1.04, 1] }}
+          transition={prefersReducedMotion ? {} : { duration: 2, repeat: Infinity }}
+        >
+          <div className="absolute inset-0 grid place-items-center text-xl">↔</div>
+        </motion.div>
+
+        <input
+          aria-label="Reveal"
+          type="range"
+          min={0}
+          max={100}
+          value={p}
+          onChange={(e) => setP(Number(e.target.value))}
+          className="absolute inset-x-4 bottom-4 z-20 h-1 cursor-ew-resize appearance-none rounded-full bg-zinc-200 [accent-color:#f97316]"
+        />
+      </div>
     </div>
   );
 }
 
-function TryOnVisual() {
+/* --------------------------------- TRY-ON ---------------------------------- */
+function TryOnFrame() {
   const prefersReducedMotion = useReducedMotion();
   const [flip, setFlip] = useState(false);
   useEffect(() => {
@@ -355,142 +195,126 @@ function TryOnVisual() {
   }, [prefersReducedMotion]);
 
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
-      <div className="absolute inset-0 grid place-items-center">
-        <svg width="120" height="160" viewBox="0 0 120 160" className="opacity-90" aria-hidden>
-          <defs>
-            <linearGradient id="skin2" x1="0" x2="1">
-              <stop offset="0%" stopColor="#fde68a" /><stop offset="100%" stopColor="#fca5a5" />
-            </linearGradient>
-          </defs>
-          <circle cx="60" cy="24" r="12" fill="url(#skin2)" />
-          <rect x="35" y="42" width="50" height="48" rx="10" fill="#e5e7eb" />
-          <rect x="26" y="92" width="68" height="38" rx="14" fill="#e5e7eb" />
-        </svg>
-      </div>
-      <motion.div
-        className="absolute left-1/2 top-[48%] h-28 w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-md"
-        animate={{ opacity: flip ? 0.95 : 0.7, scale: flip ? 1 : 0.98 }}
-        transition={{ duration: 0.6 }}
-        style={{ background: "linear-gradient(135deg,#c084fc,#f472b6)" }}
-      />
-      <div className="pointer-events-none absolute inset-0 rounded-2xl shadow-[inset_0_0_44px_rgba(0,0,0,0.12)]" />
-    </div>
-  );
-}
+    <section className="relative grid h-[100svh] place-items-center px-5">
+      <FrameCaption icon="🧍" title="Try‑On" subtitle="Preview garments on models in sizes." />
 
-/* -------------------------------------------------------------------------- */
-/*                                  PROOF / B2B                                */
-/* -------------------------------------------------------------------------- */
-
-function ProofOfValue() {
-  const items = [
-    { kpi: "×10", title: "Speed to Launch", desc: "From concept to publish‑ready in minutes." },
-    { kpi: "99.9%", title: "Consistency at Scale", desc: "On‑brand lighting & angles across catalogs." },
-    { kpi: "−70%", title: "Lower Cost", desc: "No studios. No reshoots. Predictable pricing." },
-    { kpi: "REST", title: "API Ready", desc: "Plug your DAM, PIM, Shopify, or internal tools." },
-  ];
-
-  return (
-    <section className="relative mx-auto max-w-7xl px-5 pb-10 pt-6 sm:px-6 md:px-10 lg:px-16">
-      <h2 className="text-center text-3xl font-extrabold md:text-4xl">Built for B2B teams</h2>
-      <p className="mx-auto mt-2 max-w-2xl text-center text-zinc-700">
-        For social‑first brands, marketplaces, and agencies that need fast, consistent, on‑brand visuals.
-      </p>
-
-      <div className="mx-auto mt-8 grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((it) => (
-          <motion.div
-            key={it.title}
-            initial={{ opacity: 0, y: 8 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.45 }}
-            className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
-          >
-            <div className="text-2xl font-extrabold">{it.kpi}</div>
-            <div className="mt-1 text-lg font-semibold">{it.title}</div>
-            <p className="mt-1 text-sm text-zinc-700">{it.desc}</p>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                                   TRUST / LOGOS                             */
-/* -------------------------------------------------------------------------- */
-
-function TrustMarquee() {
-  const logos = ["Shopify", "TikTok Shop", "Meta", "Woo", "Klaviyo", "GA4"];
-  return (
-    <section className="relative mx-auto max-w-7xl px-5 pb-8 pt-6 sm:px-6 md:px-10 lg:px-16">
-      <div className="mb-3 text-center text-[11px] uppercase tracking-widest text-zinc-600">EXPORT‑READY FOR</div>
-      <div className="[mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-        <div className="animate-marquee flex min-w-full items-center gap-6 opacity-80 hover:[animation-play-state:paused]">
-          {logos.concat(logos).map((name, i) => (
-            <div key={`${name}-${i}`} className="relative h-8 w-32 rounded-xl border border-zinc-200 bg-white text-center text-xs font-semibold text-zinc-700 shadow-sm">
-              <div className="absolute inset-0 grid place-items-center">{name}</div>
+      <div className="relative grid w-[min(92vw,52rem)] grid-cols-1 items-center gap-4 md:grid-cols-[1.1fr_.9fr]">
+        {/* visual mannequin */}
+        <div className="relative overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl">
+            <div className="absolute inset-0 grid place-items-center">
+              <svg width="140" height="180" viewBox="0 0 140 180" className="opacity-90" aria-hidden>
+                <defs>
+                  <linearGradient id="skin3" x1="0" x2="1">
+                    <stop offset="0%" stopColor="#fde68a" />
+                    <stop offset="100%" stopColor="#fca5a5" />
+                  </linearGradient>
+                </defs>
+                <circle cx="70" cy="26" r="14" fill="url(#skin3)" />
+                <rect x="40" y="46" width="60" height="56" rx="12" fill="#e5e7eb" />
+                <rect x="30" y="104" width="80" height="44" rx="16" fill="#e5e7eb" />
+              </svg>
             </div>
+            <motion.div
+              className="absolute left-1/2 top-[48%] h-32 w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-md"
+              animate={{ opacity: flip ? 0.96 : 0.72, scale: flip ? 1 : 0.98 }}
+              transition={{ duration: 0.6 }}
+              style={{ background: "linear-gradient(135deg,#c084fc,#f472b6)" }}
+            />
+            <div className="pointer-events-none absolute inset-0 rounded-xl shadow-[inset_0_0_44px_rgba(0,0,0,0.12)]" />
+          </div>
+        </div>
+
+        {/* copy tiles */}
+        <div className="grid gap-3">
+          {["Pick size", "Skin‑tone friendly", "Consistent lighting"].map((t, i) => (
+            <motion.div
+              key={t}
+              initial={{ opacity: 0, y: 8 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.45, delay: i * 0.05 }}
+              className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm shadow-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-fuchsia-500" /> {t}
+              </div>
+            </motion.div>
           ))}
+          <div className="pt-1">
+            <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                     CTA                                     */
-/* -------------------------------------------------------------------------- */
-
-function FinalCTA() {
+/* --------------------------------- EXPORT --------------------------------- */
+function ExportFrame() {
+  const channels = ["Shopify", "TikTok Shop", "Meta", "Woo", "Klaviyo", "GA4"];
   return (
-    <section className="relative mx-auto max-w-6xl px-5 pb-24 pt-8 text-center sm:px-6 md:px-10">
-      <div className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 to-fuchsia-50 p-8 shadow-[0_20px_60px_rgba(249,115,22,0.12)]">
-        <h3 className="text-2xl font-extrabold">Ready to orbit your visuals?</h3>
-        <p className="mx-auto mt-2 max-w-xl text-zinc-700">
-          Enhance products and try garments on models without studios or reshoots. Faster launches, lower cost.
-        </p>
-        <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+    <section className="relative grid h-[100svh] place-items-center px-5">
+      <FrameCaption icon="🚀" title="Export" subtitle="Publish‑ready assets & API delivery." />
+
+      <div className="mx-auto w-[min(92vw,56rem)]">
+        <div className="relative overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-[0_20px_60px_rgba(249,115,22,0.12)]">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+            {channels.map((c, i) => (
+              <motion.div
+                key={c}
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.45, delay: i * 0.04 }}
+                className="relative h-14 rounded-xl border border-zinc-200 bg-zinc-50 text-center text-xs font-semibold text-zinc-700 shadow-sm"
+              >
+                <div className="absolute inset-0 grid place-items-center">{c}</div>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {[
+              { kpi: "×10", t: "Speed to Launch" },
+              { kpi: "99.9%", t: "Consistency" },
+              { kpi: "−70%", t: "Lower Cost" },
+            ].map((it, i) => (
+              <motion.div
+                key={it.t}
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.45, delay: i * 0.05 }}
+                className="rounded-2xl border border-zinc-200 bg-white p-5 text-center"
+              >
+                <div className="text-2xl font-extrabold">{it.kpi}</div>
+                <div className="text-sm text-zinc-700">{it.t}</div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 text-center">
           <PrimaryCTA href="/dashboard">Start free</PrimaryCTA>
-          <a href="#explainer" className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold transition hover:bg-zinc-50">
-            See the 60‑sec tour
-          </a>
         </div>
       </div>
     </section>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                 STICKY CTA (M)                              */
-/* -------------------------------------------------------------------------- */
-
-function StickyMobileCTA() {
+/* ------------------------------- SHARED BITS ------------------------------- */
+function FrameCaption({ icon, title, subtitle }) {
   return (
-    <div className="md:hidden">
-      <Link href="/dashboard" className="fixed inset-x-4 bottom-4 z-50 flex items-center justify-center rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-orange-500/30 transition hover:bg-orange-700" aria-label="Start now">
-        Start now →
-      </Link>
+    <div className="pointer-events-none absolute top-8 z-10 mx-auto w-full max-w-4xl px-5 text-center">
+      <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold shadow-sm">
+        <span aria-hidden>{icon}</span> {title}
+      </div>
+      <div className="mt-2 text-xs text-zinc-600 md:text-sm">{subtitle}</div>
     </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                  SHARED UI                                  */
-/* -------------------------------------------------------------------------- */
-
-function Badge({ children }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-3 py-1 text-[11px] font-semibold">
-      {children}
-    </span>
-  );
-}
-function Pill({ children }) {
-  return <span className="rounded-full border border-zinc-200 bg-white px-3 py-1">{children}</span>;
-}
 function PrimaryCTA({ href, children }) {
   return (
     <Link href={href} className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(249,115,22,0.3)] transition hover:bg-orange-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
@@ -506,24 +330,25 @@ function GhostCTA({ href, children }) {
     </a>
   );
 }
-function Dot({ className = "" }) {
-  return <span className={["inline-block h-2 w-2 rounded-full", className].join(" ")} aria-hidden />;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                                    BACKSTAGE                                */
-/* -------------------------------------------------------------------------- */
-
-function BackStage() {
+function ScrollHint() {
   return (
-    <>
-      <CornerGradients />
-      <NoiseOverlay />
-    </>
+    <div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-600">
+      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-400" /> Scroll / Swipe
+    </div>
   );
 }
 
-function CornerGradients() {
+/* -------------------------------- BACKDROP --------------------------------- */
+function Backdrop() {
+  return (
+    <>
+      <CornerBursts />
+      <NoiseOverlay />
+      <GooField />
+    </>
+  );
+}
+function CornerBursts() {
   return (
     <>
       <div className="pointer-events-none absolute -left-28 -top-28 h-[28rem] w-[28rem] rounded-full bg-[conic-gradient(at_30%_30%,#f97316_0%,#fde047_25%,#22c55e_50%,#60a5fa_75%,#f97316_100%)] opacity-40 blur-3xl" />
@@ -531,7 +356,6 @@ function CornerGradients() {
     </>
   );
 }
-
 function NoiseOverlay() {
   return (
     <div
@@ -549,33 +373,55 @@ function NoiseOverlay() {
     />
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/*                                  GLOBAL CSS                                 */
-/* -------------------------------------------------------------------------- */
-
-function GlobalStyles() {
+function GooField() {
+  const prefersReducedMotion = useReducedMotion();
   return (
-    <style jsx global>{`
-      @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-      .animate-shimmer { animation: shimmer 2.2s linear infinite; }
-
-      @keyframes hue { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
-      .animate-hue { animation: hue 8s linear infinite; }
-
-      @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-      .animate-marquee { animation: marquee 26s linear infinite; }
-
-      @keyframes blob {
-        0%, 100% { transform: translate(0,0) scale(1); }
-        33%      { transform: translate(10px,-18px) scale(1.06); }
-        66%      { transform: translate(-12px,10px) scale(0.96); }
-      }
-      .animate-blob { animation: blob 16s ease-in-out infinite; }
-    `}</style>
+    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+      {[
+        ["18%","28%","from-emerald-300 to-lime-300",0],
+        ["76%","22%","from-fuchsia-300 to-rose-300",6],
+        ["24%","78%","from-sky-300 to-indigo-300",12],
+      ].map(([x,y,grad,d],i)=> (
+        <div key={i} className={["absolute h-40 w-40 rounded-full blur-2xl bg-gradient-to-br",grad, prefersReducedMotion?"opacity-25":"animate-blob"].join(" ")} style={{ left:x, top:y, transform:"translate(-50%,-50%)", animationDelay:`${d}s` }} />
+      ))}
+    </div>
+  );
+}
+function GooHalo() {
+  const prefersReducedMotion = useReducedMotion();
+  const orbit = useAnimation();
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    orbit.start({ rotate: 360, transition: { duration: 38, repeat: Infinity, ease: "linear" } });
+  }, [prefersReducedMotion, orbit]);
+  return (
+    <motion.div aria-hidden animate={orbit} className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl" style={{ background: "conic-gradient(from 0deg,#f97316,#22c55e,#38bdf8,#f472b6,#f97316)" }} />
   );
 }
 
+/* --------------------------------- STICKY CTA ------------------------------ */
+function StickyMobileCTA() {
+  return (
+    <div className="md:hidden">
+      <Link href="/dashboard" className="fixed inset-x-4 bottom-4 z-50 flex items-center justify-center rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-orange-500/30 transition hover:bg-orange-700" aria-label="Start now">
+        Start now →
+      </Link>
+    </div>
+  );
+}
+
+/* -------------------------------- UTIL/STYLE ------------------------------- */
+function GlobalStyles() {
+  return (
+    <style jsx global>{`
+      @keyframes hue { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+      .animate-hue { animation: hue 8s linear infinite; }
+
+      @keyframes blob { 0%, 100% { transform: translate(0,0) scale(1); } 33%{ transform: translate(10px,-18px) scale(1.06);} 66%{ transform: translate(-12px,10px) scale(0.96);} }
+      .animate-blob { animation: blob 18s ease-in-out infinite; }
+    `}</style>
+  );
+}
 function SvgDefs() {
   return (
     <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
@@ -589,3 +435,4 @@ function SvgDefs() {
     </svg>
   );
 }
+
