@@ -6,6 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
 /* -------------------------------------------------------
+   Theme Notes (Luxe Mint–Lemon)
+   - Bright, airy gradients
+   - Glass cards with soft shadows
+   - Subtle motion (no jank)
+   - Mobile-first with generous touch targets
+------------------------------------------------------- */
+
+/* -------------------------------------------------------
    Small helpers
 ------------------------------------------------------- */
 const STORAGE_BUCKET = 'img';
@@ -140,9 +148,10 @@ function ToastHost({ items, onClose }) {
         {items.map((t) => (
           <motion.div
             key={t.id}
-            initial={{ y: 16, opacity: 0, scale: 0.98 }}
+            initial={{ y: 18, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 16, opacity: 0, scale: 0.98 }}
+            exit={{ y: 18, opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
             className="rounded-2xl border border-emerald-200/70 bg-white/90 backdrop-blur shadow-lg p-3"
           >
             <div className="flex items-center justify-between gap-3">
@@ -165,7 +174,7 @@ function ToastHost({ items, onClose }) {
 }
 
 /* -------------------------------------------------------
-   Dashboard
+   Dashboard — Luxe Layout
 ------------------------------------------------------- */
 const GROUPS = [
   { id: 'product', label: 'Product', icon: BoxIcon },
@@ -345,9 +354,14 @@ export default function Dashboard() {
     const region =
       pieceType === 'upper' ? 'the TOP' :
       pieceType === 'lower' ? 'the BOTTOM' :
+      pieceType === 'dress' ? 'the FULL DRESS' :
       'the FULL OUTFIT';
+
+    // Strong, deterministic instruction to preserve sleeves/length and fill occlusions
     return [
-      `Make the model wear the cloth , make it fit and look exatilcy as the cloth photo , make 2 virions of the photo with same cloth in the another pic ,Put the cloth  on ${region} of the person `
+      'Make the model wear the garment from the clothing photo on the person image; align scale and pose; preserve original garment structure (sleeves, collar, length, waistband, hem);',
+      'respect body occlusions and inpaint hidden areas naturally; keep hands and hair realistic; coherent lighting & shadows; photorealistic fabric drape & seams; 4k output;',
+      `place the garment on ${region}; avoid crop; center the person; maintain realistic body proportions.`
     ].join(' ');
   };
 
@@ -437,7 +451,8 @@ export default function Dashboard() {
           image2: clothUrl,
           pieceType,
           plan,
-          user_email: user.email
+          user_email: user.email,
+          prompt
         })
       });
 
@@ -545,16 +560,21 @@ export default function Dashboard() {
   })();
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(120deg,#ecfeff_0%,#f0fdf4_45%,#fefce8_100%)] text-emerald-950">
-      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
+    <main className="relative min-h-screen text-emerald-950 overflow-clip">
+      <AmbientOrbs />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_-10%,#d9f99d_0%,transparent_60%),radial-gradient(40%_40%_at_0%_0%,#a7f3d0_0%,transparent_55%),radial-gradient(30%_30%_at_100%_10%,#fef9c3_0%,transparent_55%)] opacity-60" />
 
+      <div className="relative mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
         {/* Sidebar — glassy, mint/lemon */}
         <aside className="rounded-3xl border border-emerald-200/70 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm sticky top-3 md:top-4 self-start h-fit">
           <div className="px-4 py-4 flex items-center gap-3 border-b border-emerald-100/80">
-            <div className="grid place-items-center size-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-lime-400 text-white shadow">
-              <SparkleIcon className="w-4 h-4" />
+            <div className="grid place-items-center size-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-lime-400 text-white shadow">
+              <SparkleIcon className="w-5 h-5" />
             </div>
-            <div className="font-semibold tracking-tight text-emerald-900">AI Studio</div>
+            <div>
+              <div className="font-semibold tracking-tight text-emerald-900 text-[15px]">AI Studio</div>
+              <div className="text-[11px] text-emerald-600">Luxe • Simple • Modern</div>
+            </div>
           </div>
 
           <div className="px-3 py-3">
@@ -598,6 +618,7 @@ export default function Dashboard() {
                   >
                     <Icon className={['size-4', Active ? 'text-emerald-600' : 'text-emerald-500 group-hover:text-emerald-700'].join(' ')} />
                     <span className="truncate">{t.label}</span>
+                    {!Active && <motion.span layoutId={`dot-${t.id}`} className="ml-auto size-1.5 rounded-full bg-emerald-300" />}
                   </button>
                 );
               })}
@@ -609,6 +630,7 @@ export default function Dashboard() {
               <div className="grid place-items-center size-10 rounded-full bg-emerald-50 text-emerald-800 font-bold">{initials}</div>
               <div className="text-sm">
                 <div className="font-medium leading-tight text-emerald-900">{user.user_metadata?.name || user.email}</div>
+                <div className="text-[11px] text-emerald-600">Plan: {plan}</div>
               </div>
             </div>
           </div>
@@ -616,9 +638,11 @@ export default function Dashboard() {
 
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
-
           {/* Presets / Model Flow */}
-          <div className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
+          <motion.div
+            layout
+            className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm"
+          >
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-emerald-900">
@@ -697,11 +721,10 @@ export default function Dashboard() {
                 <div className="text-xs text-emerald-700/80">Upload two images below and write a short instruction.</div>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Workbench */}
-          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_340px]">
-
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_360px]">
             {/* Canvas Panel */}
             <section className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur relative shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
@@ -829,7 +852,7 @@ export default function Dashboard() {
                 {resultUrl && (
                   <>
                     <button
-                      onClick={() => exportPng(resultUrl)}
+                      onClick={() => exportPngSafe(resultUrl)}
                       className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-emerald-50 text-emerald-900"
                     >
                       ⬇ Download PNG
@@ -1130,7 +1153,6 @@ export default function Dashboard() {
             <div className="relative w-full max-w-3xl mx-3">
               <EnhanceCustomizer
                 initial={pendingEnhancePreset || undefined}
-                onChange={() => {}}
                 onComplete={(form) => {
                   setShowEnhance(false);
                   setPendingEnhancePreset(null);
@@ -1173,6 +1195,25 @@ export default function Dashboard() {
 /* -------------------------------------------------------
    Reusable UI widgets
 ------------------------------------------------------- */
+function AmbientOrbs() {
+  return (
+    <div className="pointer-events-none absolute inset-0 -z-10 overflow-clip">
+      <motion.div
+        className="absolute -top-16 -left-16 w-[36rem] h-[36rem] rounded-full blur-3xl"
+        style={{ background: 'radial-gradient(closest-side, #a7f3d0 0%, transparent 70%)' }}
+        animate={{ y: [0, 20, 0], x: [0, 10, 0] }}
+        transition={{ repeat: Infinity, duration: 14, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute -bottom-24 -right-24 w-[40rem] h-[40rem] rounded-full blur-3xl"
+        style={{ background: 'radial-gradient(closest-side, #fde68a 0%, transparent 70%)' }}
+        animate={{ y: [0, -18, 0], x: [0, -10, 0] }}
+        transition={{ repeat: Infinity, duration: 16, ease: 'easeInOut' }}
+      />
+    </div>
+  );
+}
+
 function FileDrop({ label, file, localUrl, onPick, inputRef }) {
   return (
     <div
@@ -1213,8 +1254,10 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
   if (broken) return null;
 
   return (
-    <button
+    <motion.button
       onClick={onClick}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
       className="group relative rounded-2xl overflow-hidden border border-emerald-200 hover:border-emerald-300 bg-white/80 backdrop-blur shadow-sm transition text-left hover:shadow-md"
     >
       <div className="relative w-full aspect-[4/3] bg-emerald-50/60">
@@ -1242,14 +1285,16 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
         <div className="font-semibold text-emerald-900">{title}</div>
         <div className="text-xs text-emerald-700">{subtitle}</div>
       </div>
-    </button>
+    </motion.button>
   );
 }
 
 function ModelCard({ model, active, onSelect }) {
   return (
-    <button
+    <motion.button
       onClick={onSelect}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
       className={[
         'group relative rounded-2xl overflow-hidden border bg-white/80 backdrop-blur shadow-sm transition',
         active
@@ -1273,7 +1318,7 @@ function ModelCard({ model, active, onSelect }) {
         <div className="font-semibold truncate text-emerald-900">{model.name}</div>
         <div className="text-[11px] text-emerald-600">Pose: {model.pose}</div>
       </div>
-    </button>
+    </motion.button>
   );
 }
 
@@ -1463,14 +1508,14 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
 /* ----- Icons (SVG) ----- */
 function SparkleIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" />
     </svg>
   );
 }
 function BoxIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path
         d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z"
         fill="currentColor"
@@ -1480,7 +1525,7 @@ function BoxIcon(props) {
 }
 function PersonIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path
         d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z"
         fill="currentColor"
@@ -1490,7 +1535,7 @@ function PersonIcon(props) {
 }
 function ScissorsIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path
         d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"
         fill="currentColor"
@@ -1500,7 +1545,7 @@ function ScissorsIcon(props) {
 }
 function RocketIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" />
       <circle cx="15" cy="9" r="1.5" fill="#fff" />
     </svg>
@@ -1508,43 +1553,60 @@ function RocketIcon(props) {
 }
 function SwapIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor" />
     </svg>
   );
 }
 function PlayIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path d="M8 5v14l11-7z" fill="currentColor" />
     </svg>
   );
 }
 
 /* -------------------------------------------------------
-   Export helpers
+   Export helpers — safe (handles CORS fallback)
 ------------------------------------------------------- */
-async function exportPng(url) {
-  const img = await fetch(url).then((r) => r.blob()).then(createImageBitmap);
-  const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
-  const ctx = canvas.getContext('2d', { alpha: true });
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0);
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = 'studio-output.png';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+async function exportPngSafe(url) {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    const blob = await res.blob();
+    const img = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width; canvas.height = img.height;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0);
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'studio-output.png';
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch {
+    // Fallback: direct download (may fail to set filename)
+    const a = document.createElement('a');
+    a.href = url; a.download = 'studio-output.png';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
 }
 
 /* -------------------------------------------------------
-   Simple customizer
+   Enhance Customizer — controlled form
 ------------------------------------------------------- */
-function EnhanceCustomizer({ initial, onChange, onComplete }) {
+function EnhanceCustomizer({ initial, onComplete }) {
+  const [form, setForm] = useState({
+    photographyStyle: initial?.photographyStyle || '',
+    background: initial?.background || '',
+    lighting: initial?.lighting || '',
+    colorStyle: initial?.colorStyle || '',
+    realism: initial?.realism || 'photorealistic',
+    outputQuality: initial?.outputQuality || '4k',
+  });
+
+  const update = (k, v) => setForm((s) => ({ ...s, [k]: v }));
+
   return (
     <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border border-emerald-200 space-y-3">
       <div className="text-sm font-semibold text-emerald-900">Enhance Settings</div>
@@ -1552,8 +1614,8 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         <label className="space-y-1">
           <span className="text-emerald-700">Style</span>
           <input
-            defaultValue={initial?.photographyStyle || ''}
-            onChange={() => {}}
+            value={form.photographyStyle}
+            onChange={(e) => update('photographyStyle', e.target.value)}
             className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="studio product photography, 50mm"
           />
@@ -1561,8 +1623,8 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         <label className="space-y-1">
           <span className="text-emerald-700">Background</span>
           <input
-            defaultValue={initial?.background || ''}
-            onChange={() => {}}
+            value={form.background}
+            onChange={(e) => update('background', e.target.value)}
             className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="white seamless"
           />
@@ -1570,8 +1632,8 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         <label className="space-y-1">
           <span className="text-emerald-700">Lighting</span>
           <input
-            defaultValue={initial?.lighting || ''}
-            onChange={() => {}}
+            value={form.lighting}
+            onChange={(e) => update('lighting', e.target.value)}
             className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="softbox, gentle reflections"
           />
@@ -1579,15 +1641,36 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         <label className="space-y-1">
           <span className="text-emerald-700">Colors</span>
           <input
-            defaultValue={initial?.colorStyle || ''}
-            onChange={() => {}}
+            value={form.colorStyle}
+            onChange={(e) => update('colorStyle', e.target.value)}
             className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="neutral whites, subtle grays"
           />
         </label>
+        <label className="space-y-1">
+          <span className="text-emerald-700">Realism</span>
+          <input
+            value={form.realism}
+            onChange={(e) => update('realism', e.target.value)}
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
+            placeholder="photorealistic details"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-emerald-700">Output</span>
+          <input
+            value={form.outputQuality}
+            onChange={(e) => update('outputQuality', e.target.value)}
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
+            placeholder="4k sharp"
+          />
+        </label>
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs bg-white hover:bg-emerald-50 text-emerald-900" onClick={() => onComplete(initial || {})}>
+        <button
+          className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 text-xs"
+          onClick={() => onComplete(form)}
+        >
           Run
         </button>
       </div>
