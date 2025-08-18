@@ -5,6 +5,9 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
+/* -------------------------------------------------------
+   Small helpers
+------------------------------------------------------- */
 const STORAGE_BUCKET = 'img';
 
 const hexToRGBA = (hex, a = 1) => {
@@ -97,19 +100,22 @@ const ENHANCE_PRESETS = [
   }
 ];
 
-/* -------------------------------------------------------
-   Archetypes (no human photos — illustrative cards only)
-------------------------------------------------------- */
-const ARCHETYPES = [
-  { id: 'female-catalog-front', label: 'Female • Catalog • Front', spec: { gender: 'Female', Age: 'Adult', bodyType: 'Average', style: 'Catalog', angle: 'Front', background: 'Beige Studio' }, ar: '3:4' },
-  { id: 'female-editorial-34',  label: 'Female • Editorial • 3/4', spec: { gender: 'Female', Age: 'Adult', bodyType: 'Slim',    style: 'Editorial', angle: 'Three-Quarter', background: 'Matte Beige' }, ar: '3:4' },
-  { id: 'male-catalog-front',   label: 'Male • Catalog • Front',   spec: { gender: 'Male',   Age: 'Adult', bodyType: 'Athletic', style: 'Catalog', angle: 'Front', background: 'Neutral Gray' }, ar: '3:4' },
-  { id: 'male-sport-side',      label: 'Male • Sport • Side',      spec: { gender: 'Male',   Age: 'Adult', bodyType: 'Fit',     style: 'Sport',    angle: 'Side', background: 'Slate Studio' }, ar: '3:4' },
-  { id: 'female-modest-front',  label: 'Female • Modest • Front',  spec: { gender: 'Female', Age: 'Adult', bodyType: 'Average', style: 'Catalog', angle: 'Front', background: 'Soft White', modest: true }, ar: '3:4' },
+/** مكتبة المودلز */
+const MODELS = [
+  { id: 'm01', name: 'Ava — Studio Front', pose: 'front', url: '/models/m01.webp' },
+  { id: 'm02', name: 'Maya — Side Pose', pose: 'side', url: '/models/m02.webp' },
+  { id: 'm03', name: 'Lina — Half Body', pose: 'half', url: '/models/m03.webp' },
+  { id: 'm04', name: 'Zoe — Studio 3/4', pose: '34', url: '/models/m04.webp' },
+  { id: 'm05', name: 'Noah — Casual Front', pose: 'front', url: '/models/m05.webp' },
+  { id: 'm06', name: 'Omar — Studio Side', pose: 'side', url: '/models/m06.webp' },
+  { id: 'm07', name: 'Yara — Full Body', pose: 'full', url: '/models/m07.webp' },
+  { id: 'm08', name: 'Sara — 3/4 Smile', pose: '34', url: '/models/m08.webp' },
+  { id: 'm09', name: 'Jude — Front Studio', pose: 'front', url: '/models/m09.webp' },
+  { id: 'm10', name: 'Ali — Casual Half', pose: 'half', url: '/models/m10.webp' },
 ];
 
 /* -------------------------------------------------------
-   Toast system with progress — mint/lemon styling
+   Toast system with progress
 ------------------------------------------------------- */
 function useToasts() {
   const [items, setItems] = useState([]);
@@ -137,16 +143,16 @@ function ToastHost({ items, onClose }) {
             initial={{ y: 16, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 16, opacity: 0, scale: 0.98 }}
-            className="rounded-xl border border-zinc-200 bg-white/90 backdrop-blur p-3 shadow-[0_10px_30px_-10px_rgba(16,185,129,.18)]"
+            className="rounded-2xl border border-emerald-200/70 bg-white/90 backdrop-blur shadow-lg p-3"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-zinc-800">{t.msg}</div>
-              <button className="text-xs text-zinc-500 hover:text-zinc-800" onClick={() => onClose(t.id)}>✕</button>
+              <div className="text-sm text-emerald-900">{t.msg}</div>
+              <button className="text-xs text-emerald-600 hover:text-emerald-900" onClick={() => onClose(t.id)}>✕</button>
             </div>
             {typeof t.progress === 'number' && (
-              <div className="mt-2 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+              <div className="mt-2 h-1.5 rounded-full bg-emerald-100 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] transition-all"
+                  className="h-full bg-emerald-600 transition-all"
                   style={{ width: `${Math.min(Math.max(t.progress, 0), 100)}%` }}
                 />
               </div>
@@ -184,8 +190,8 @@ export default function Dashboard() {
 
   /* ---------- app state ---------- */
   const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState('product');
-  const [tool, setTool]   = useState('enhance');
+  const [group, setGroup] = useState('product');     // product | people
+  const [tool, setTool]   = useState('enhance');     // active tool per group
   const [plan, setPlan]   = useState('Free');
 
   // single-file work area
@@ -193,35 +199,40 @@ export default function Dashboard() {
   const [localUrl, setLocalUrl] = useState('');
   const [imageData, setImageData] = useState('');
   const [resultUrl, setResultUrl] = useState('');
-  const [variants, setVariants] = useState([]);
 
-  // model swap (two images)
+  // model swap
   const [file1, setFile1] = useState(null);
   const [file2, setFile2] = useState(null);
   const [local1, setLocal1] = useState('');
   const [local2, setLocal2] = useState('');
   const [swapPrompt, setSwapPrompt] = useState('');
 
-  // Try-On specific (stepper)
-  const [selectedArch, setSelectedArch] = useState(null);
+  // Try-On (stepper)
+  const [selectedModel, setSelectedModel] = useState(null);
   const [pieceType, setPieceType] = useState(null);
   const [tryonStep, setTryonStep] = useState('cloth');
   const [showPieceType, setShowPieceType] = useState(false);
-
-  const [tryonOptions, setTryonOptions] = useState({
-    aspect_ratio: '3:4',
-    num_images: 1,
-    seed: null,
-    seedLock: false,
-    guidance_scale: 3.5,
-    safety_tolerance: 2,
-  });
 
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [history, setHistory] = useState([]);
 
+  // compare overlay
+  const [compare, setCompare] = useState(false);
+  const [compareOpacity, setCompareOpacity] = useState(50);
+
+  // remove/bg frame
+  const [bgMode, setBgMode] = useState('color');   // color | gradient | pattern
+  const [color, setColor] = useState('#ffffff');
+  const [color2, setColor2] = useState('#ecfccb'); // lime-100
+  const [angle, setAngle] = useState(35);
+  const [radius, setRadius] = useState(22);
+  const [padding, setPadding] = useState(24);
+  const [shadow, setShadow] = useState(true);
+  const [patternOpacity, setPatternOpacity] = useState(0.06);
+
+  // enhance modal
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [showEnhance, setShowEnhance] = useState(false);
 
@@ -245,12 +256,12 @@ export default function Dashboard() {
           .single();
         if (!mounted) return;
         setPlan(data?.plan || 'Free');
-      } catch {/* ignore */ }
+      } catch {/* ignore */}
 
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [user,router, supabase]);
+  }, [user, router, supabase]);
 
   /* ---------- drag & drop / paste (single file area) ---------- */
   useEffect(() => {
@@ -275,52 +286,41 @@ export default function Dashboard() {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
     setResultUrl('');
-    setVariants([]);
     setErr(''); setPhase('idle');
     if (tool === 'removeBg') setImageData(await fileToDataURL(f));
-
     if (tool === 'tryon') {
       setTryonStep('piece');
       setShowPieceType(true);
     }
   };
 
-  /* ----- Remove BG inspector state ----- */
-  const [bgMode, setBgMode] = useState('color');
-  const [primaryColor, setColor] = useState('#ffffff');
-  const [secondaryColor, setColor2] = useState('#f1f5f9');
-  const [angle, setAngle] = useState(35);
-  const [radius, setRadius] = useState(18);
-  const [padding, setPadding] = useState(20);
-  const [shadow, setShadow] = useState(true);
-  const [patternOpacity, setPatternOpacity] = useState(0.06);
-
-  const frameStyleComputed = useMemo(() => {
+  /* ---------- computed styles ---------- */
+  const frameStyle = useMemo(() => {
     let bgStyle;
     if (bgMode === 'color') {
-      bgStyle = { background: primaryColor };
+      bgStyle = { background: color };
     } else if (bgMode === 'gradient') {
-      bgStyle = { background: `linear-gradient(${angle}deg, ${primaryColor}, ${secondaryColor})` };
+      bgStyle = { background: `linear-gradient(${angle}deg, ${color}, ${color2})` };
     } else {
       const svg = encodeURIComponent(
         `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'>
           <defs><pattern id='p' width='24' height='24' patternUnits='userSpaceOnUse'>
-            <path d='M0 12h24M12 0v24' stroke='${hexToRGBA('#000000', patternOpacity)}' stroke-width='1' opacity='0.2'/>
+            <path d='M0 12h24M12 0v24' stroke='${hexToRGBA('#000000', patternOpacity)}' stroke-width='1' opacity='0.18'/>
           </pattern></defs>
-          <rect width='100%' height='100%' fill='${primaryColor}'/>
+          <rect width='100%' height='100%' fill='${color}'/>
           <rect width='100%' height='100%' fill='url(#p)'/>
         </svg>`
       );
-      bgStyle = { backgroundColor: primaryColor, backgroundImage: `url("data:image/svg+xml;utf8,${svg}")`, backgroundSize: '24px 24px' };
+      bgStyle = { backgroundColor: color, backgroundImage: `url("data:image/svg+xml;utf8,${svg}")`, backgroundSize: '24px 24px' };
     }
     return {
       ...bgStyle,
       borderRadius: `${radius}px`,
       padding: `${padding}px`,
-      boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.10), 0 6px 18px rgba(0,0,0,.06)' : 'none',
+      boxShadow: shadow ? '0 18px 50px rgba(16,185,129,.12), 0 6px 18px rgba(16,185,129,.06)' : 'none',
       transition: 'all .25s ease'
     };
-  }, [bgMode, primaryColor, secondaryColor, angle, radius, padding, shadow, patternOpacity]);
+  }, [bgMode, color, color2, angle, radius, padding, shadow, patternOpacity]);
 
   /* ---------- storage ---------- */
   const uploadToStorage = useCallback(async (f) => {
@@ -341,23 +341,14 @@ export default function Dashboard() {
     [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
       .filter(Boolean).join(', ');
 
-  const buildKontextPrompt = ({ pieceType, archetypeSpec, hints }) => {
-    const region = pieceType === 'upper' ? 'top' : pieceType === 'lower' ? 'bottom' : 'full outfit';
-    const { gender='Female', Age='Adult', bodyType='Average', style='Catalog', angle='Front', background='Beige Studio', modest=false } = archetypeSpec || {};
-
-    const fitHints = [];
-    if (hints?.sleeve) fitHints.push(`${hints.sleeve} sleeves`);
-    if (hints?.neckline) fitHints.push(`${hints.neckline} neckline`);
-    if (hints?.length) fitHints.push(`${hints.length} length`);
-
-    return (
-      `Generate a high-resolution studio-quality image of a realistic ${Age.toLowerCase()} ${gender.toLowerCase()} fashion model ` +
-      `with a ${bodyType.toLowerCase()} body, wearing the uploaded garment on the ${region}. ` +
-      `Angle: ${angle}. Style: ${style} shoot. Background: ${background}. ` +
-      `${modest ? 'Ensure modest coverage if garment allows. ' : ''}` +
-      `${fitHints.length ? `Fit details: ${fitHints.join(', ')}. ` : ''}` +
-      `Preserve fabric details, textures, seams, and prints. Soft studio lighting. No text or watermarks.`
-    ).trim();
+  const buildTryOnPrompt = (pieceType) => {
+    const region =
+      pieceType === 'upper' ? 'the TOP' :
+      pieceType === 'lower' ? 'the BOTTOM' :
+      'the FULL OUTFIT';
+    return [
+      `Make the model wear the cloth , make it fit and look exatilcy as the cloth photo , make 2 virions of the photo with same cloth in the another pic ,Put the cloth  on ${region} of the person `
+    ].join(' ');
   };
 
   /* ---------- runners ---------- */
@@ -410,57 +401,67 @@ export default function Dashboard() {
 
   const runTryOn = useCallback(async () => {
     if (!file)              { setErr('Please upload a clothing image first.'); return; }
+    if (!selectedModel?.url){ setErr('Please select a model first.'); return; }
     if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
-    if (!selectedArch)      { setErr('Please select a model archetype.'); return; }
+
+    const origin =
+      (typeof window !== 'undefined' && window.location?.origin) ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      'https://aistoreassistant.app';
+
+    const modelUrlAbs = selectedModel.url.startsWith('http')
+      ? selectedModel.url
+      : new URL(selectedModel.url, origin).toString();
 
     setBusy(true);
     setErr('');
     setPhase('processing');
 
+    const prompt = buildTryOnPrompt(pieceType);
+
     const toast = toasts.push('Generating try-on…', { progress: 10 });
     let progress = 10;
-    const iv = setInterval(() => { progress = Math.min(progress + 6, 88); toast.update({ progress }); }, 500);
+    const iv = setInterval(() => {
+      progress = Math.min(progress + 6, 88);
+      toast.update({ progress });
+    }, 500);
 
     try {
       const clothUrl = await uploadToStorage(file);
-      const prompt = buildKontextPrompt({ pieceType, archetypeSpec: selectedArch.spec, hints: tryonOptions.hints });
-
-      let seedToUse = tryonOptions.seedLock
-        ? (typeof tryonOptions.seed === 'number' ? tryonOptions.seed : Math.floor(Math.random() * 1e9))
-        : undefined;
-      if (tryonOptions.seedLock && typeof seedToUse === 'number' && tryonOptions.seed !== seedToUse) {
-        setTryonOptions((s) => ({ ...s, seed: seedToUse }));
-      }
 
       const r = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageUrl: clothUrl,
-          prompt,
+          image1: modelUrlAbs,
+          image2: clothUrl,
+          pieceType,
           plan,
-          user_email: user.email,
-          num_images: tryonOptions.num_images,
-          seed: seedToUse,
-          aspect_ratio: tryonOptions.aspect_ratio || selectedArch.ar || '3:4',
-          guidance_scale: tryonOptions.guidance_scale,
-          safety_tolerance: tryonOptions.safety_tolerance,
+          user_email: user.email
         })
       });
 
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        const msg = j?.error || (r.status === 401 ? 'Unauthorized.' : 'Generation failed.');
+        const msg =
+          j?.error ||
+          (r.status === 400 ? 'Missing required fields.' :
+           r.status === 401 ? 'Unauthorized.' :
+           r.status === 403 ? 'No credits left.' :
+           r.status === 404 ? 'User not found.' :
+           r.status === 500 ? 'Generation failed on the server.' :
+           `Unexpected error (${r.status}).`);
         throw new Error(msg);
       }
 
-      const main = j?.image || j?.url || j?.result || (Array.isArray(j?.output) ? j.output[0] : '');
-      if (!main) throw new Error('No output image returned from the API.');
+      const out = j?.image || j?.url || j?.result || (Array.isArray(j?.output) ? j.output[0] : '');
+      if (!out) throw new Error('No output image returned from the API.');
 
-      const all = j?.variants && Array.isArray(j.variants) ? j.variants : [main];
-      setResultUrl(main);
-      setVariants(all);
-      setHistory(h => [ { tool: 'Try-On', inputThumb: localUrl, outputUrl: main, ts: Date.now() }, ...h ].slice(0, 24));
+      setResultUrl(out);
+      setHistory(h => [
+        { tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() },
+        ...h
+      ].slice(0, 24));
 
       setPhase('ready');
       toast.update({ progress: 100, msg: 'Try-On ✓' });
@@ -475,7 +476,7 @@ export default function Dashboard() {
       clearInterval(iv);
       setBusy(false);
     }
-  }, [file, pieceType, selectedArch, uploadToStorage, plan, user, tryonOptions, localUrl, toasts]);
+  }, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
 
   const runModelSwap = useCallback(async () => {
     if (!file1 || !file2) return setErr('Pick both images.');
@@ -503,18 +504,18 @@ export default function Dashboard() {
 
   /* ---------- handlers ---------- */
   const resetAll = () => {
-    setFile(null); setLocalUrl(''); setResultUrl(''); setVariants([]);
+    setFile(null); setLocalUrl(''); setResultUrl('');
     setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
     setErr(''); setPhase('idle'); setCompare(false);
-    setSelectedArch(null); setPieceType(null); setTryonStep('cloth');
+    setSelectedModel(null); setPieceType(null); setTryonStep(tool==='tryon' ? 'cloth' : 'cloth');
   };
 
   const switchTool = (nextId) => {
     setTool(nextId);
-    setResultUrl(''); setVariants([]); setErr(''); setPhase('idle'); setCompare(false);
+    setResultUrl(''); setErr(''); setPhase('idle'); setCompare(false);
     setFile(null); setLocalUrl('');
     setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
-    setSelectedArch(null); setPieceType(null); setTryonStep(nextId==='tryon' ? 'cloth' : 'cloth');
+    setSelectedModel(null); setPieceType(null); setTryonStep(nextId==='tryon' ? 'cloth' : 'cloth');
   };
 
   const handleRun = () => {
@@ -530,8 +531,8 @@ export default function Dashboard() {
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
     return (
-      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-[#F3FFF8] to-[#FFFCE8] text-zinc-700">
-        <div className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 border border-zinc-200 shadow-sm text-sm">Loading…</div>
+      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-emerald-50 via-lime-50 to-white text-emerald-700">
+        <div className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 border border-emerald-200 shadow-sm text-sm">Loading…</div>
       </main>
     );
   }
@@ -543,53 +544,22 @@ export default function Dashboard() {
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
 
-  const setOption = (k, v) => setTryonOptions((s) => ({ ...s, [k]: v }));
-
-  /* ----- Compare overlay ----- */
-  const [compare, setCompare] = useState(false);
-  const [compareOpacity, setCompareOpacity] = useState(50);
-
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#F3FFF8] via-[#FFFCE8] to-white text-zinc-900">
-      {/* subtle auras */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#D8FFEA] blur-3xl" />
-        <div className="absolute top-24 -right-24 h-72 w-72 rounded-full bg-[#FFF7B3] blur-3xl" />
-      </div>
+    <main className="min-h-screen bg-[linear-gradient(120deg,#ecfeff_0%,#f0fdf4_45%,#fefce8_100%)] text-emerald-950">
+      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
 
-      {/* Page header (with Home) */}
-      <div className="mx-auto max-w-7xl px-3 md:px-6 pt-4 md:pt-6">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-white transition"
-          >
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-            Home
-          </Link>
-
-          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 text-xs">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-zinc-900 border border-zinc-200 font-bold">
-              {initials}
-            </span>
-            <span className="hidden sm:block">{user.user_metadata?.name || user.email}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 pb-6">
-        {/* Sidebar */}
-        <aside className="rounded-2xl border border-zinc-200 bg-white/80 backdrop-blur shadow-sm sticky top-20 self-start h-fit">
-          <div className="px-4 py-4 flex items-center gap-3 border-b border-zinc-200">
-            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-[#B9F7D6] to-[#FFF39C] text-zinc-900 shadow">
+        {/* Sidebar — glassy, mint/lemon */}
+        <aside className="rounded-3xl border border-emerald-200/70 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm sticky top-3 md:top-4 self-start h-fit">
+          <div className="px-4 py-4 flex items-center gap-3 border-b border-emerald-100/80">
+            <div className="grid place-items-center size-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-lime-400 text-white shadow">
               <SparkleIcon className="w-4 h-4" />
             </div>
-            <div className="font-semibold tracking-tight">Studio</div>
+            <div className="font-semibold tracking-tight text-emerald-900">AI Studio</div>
           </div>
 
           <div className="px-3 py-3">
-            <div className="text-[11px] font-semibold text-zinc-500 mb-1">Workspace</div>
-            <div className="inline-flex rounded-full border border-zinc-300 bg-white p-1">
+            <div className="text-[11px] font-semibold text-emerald-600 mb-1">Workspace</div>
+            <div className="inline-flex rounded-full border border-emerald-200 bg-white p-1">
               {GROUPS.map((g) => {
                 const Active = group === g.id;
                 const Icon = g.icon;
@@ -597,8 +567,10 @@ export default function Dashboard() {
                   <button
                     key={g.id}
                     onClick={() => { setGroup(g.id); switchTool(g.id === 'product' ? 'enhance' : 'tryon'); }}
-                    className={[`inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition`,
-                      Active ? 'bg-zinc-900 text-white shadow' : 'text-zinc-700 hover:bg-zinc-100'].join(' ')}
+                    className={[
+                      'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
+                      Active ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 hover:bg-emerald-50'
+                    ].join(' ')}
                   >
                     <Icon className="size-4" /> {g.label}
                   </button>
@@ -608,7 +580,7 @@ export default function Dashboard() {
           </div>
 
           <div className="px-3 pb-3">
-            <div className="text-[11px] font-semibold text-zinc-500 mb-1">Tools</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mb-1">Tools</div>
             <div className="space-y-1">
               {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((t) => {
                 const Active = tool === t.id;
@@ -618,12 +590,13 @@ export default function Dashboard() {
                     key={t.id}
                     onClick={() => switchTool(t.id)}
                     className={[
-                      'w-full group flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition',
-                      Active ? 'bg-[#F3FFF8] text-emerald-700 border border-emerald-200'
-                             : 'text-zinc-700 hover:bg-zinc-100 border border-transparent'
+                      'w-full group flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm transition border',
+                      Active
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'text-emerald-900 hover:bg-emerald-50 border-transparent'
                     ].join(' ')}
                   >
-                    <Icon className={['size-4', Active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-zinc-700'].join(' ')} />
+                    <Icon className={['size-4', Active ? 'text-emerald-600' : 'text-emerald-500 group-hover:text-emerald-700'].join(' ')} />
                     <span className="truncate">{t.label}</span>
                   </button>
                 );
@@ -631,12 +604,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="px-4 py-3 border-t border-zinc-200">
+          <div className="px-4 py-3 border-t border-emerald-100/80">
             <div className="flex items-center gap-3">
-              <div className="grid place-items-center size-10 rounded-full bg-white text-zinc-900 border border-zinc-200 font-bold">{initials}</div>
+              <div className="grid place-items-center size-10 rounded-full bg-emerald-50 text-emerald-800 font-bold">{initials}</div>
               <div className="text-sm">
-                <div className="font-medium leading-tight truncate max-w-[160px]">{user.user_metadata?.name || user.email}</div>
-                <div className="text-[11px] text-emerald-700 mt-0.5">Plan: {plan}</div>
+                <div className="font-medium leading-tight text-emerald-900">{user.user_metadata?.name || user.email}</div>
               </div>
             </div>
           </div>
@@ -644,26 +616,27 @@ export default function Dashboard() {
 
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
-          {/* Presets / Try-On Flow */}
-          <div className="rounded-2xl md:rounded-3xl border border-zinc-200 bg-white/80 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
+
+          {/* Presets / Model Flow */}
+          <div className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-                  {group === 'product' ? 'Quick Presets' : (tool === 'tryon' ? 'Try-On Flow' : 'Model Swap')}
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-emerald-900">
+                  {group === 'product' ? 'Quick Presets' : (tool === 'tryon' ? 'Try-On Flow' : 'Pick a Model')}
                 </h1>
-                <p className="text-zinc-600 text-xs sm:text-sm">
+                <p className="text-emerald-700/80 text-xs sm:text-sm">
                   {group === 'product'
-                    ? <>Pick a preset or open <span className="font-semibold">Customize</span>.</>
+                    ? <>Pick a preset or open <span className="font-semibold text-emerald-900">Customize</span>.</>
                     : tool === 'tryon'
-                      ? <>Step 1: upload clothing → Step 2: choose type → Step 3: pick an archetype → Run.</>
-                      : <>Choose two images and run <span className="font-semibold">Model Swap</span>.</>}
+                      ? <>Step 1: upload clothing → Step 2: choose type → Step 3: pick a model → Run.</>
+                      : <>Choose two images and run <span className="font-semibold text-emerald-900">Model Swap</span>.</>}
                 </p>
               </div>
 
               {group === 'product' ? (
                 <button
                   onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
-                  className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-zinc-50"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-emerald-50 text-emerald-900"
                 >
                   ✨ Customize Enhance
                 </button>
@@ -671,7 +644,7 @@ export default function Dashboard() {
                 pieceType ? (
                   <button
                     onClick={() => setShowPieceType(true)}
-                    className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-zinc-50"
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-emerald-50 text-emerald-900"
                   >
                     Change clothing type
                   </button>
@@ -681,7 +654,7 @@ export default function Dashboard() {
 
             {group === 'product' ? (
               <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-zinc-700">Enhance</div>
+                <div className="mb-2 text-[12px] font-semibold text-emerald-700">Enhance</div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {ENHANCE_PRESETS.map((p) => (
                     <PresetCard
@@ -697,42 +670,42 @@ export default function Dashboard() {
               </div>
             ) : tool === 'tryon' ? (
               <div className="mt-4">
-                <TryOnStepper step={tryonStep} pieceType={pieceType} archetypePicked={!!selectedArch} />
-
-                {tryonStep === 'archetype' ? (
+                <TryOnStepper step={tryonStep} pieceType={pieceType} modelPicked={!!selectedModel} />
+                {tryonStep === 'model' ? (
                   <div className="mt-3">
-                    <div className="mb-2 text-[12px] font-semibold text-zinc-700">Model Archetypes <span className="ml-1 text-[10px] text-zinc-500">Illustrative only</span></div>
+                    <div className="mb-2 text-[12px] font-semibold text-emerald-700">Models</div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      {ARCHETYPES.map((a) => (
-                        <ArchetypeCard
-                          key={a.id}
-                          archetype={a}
-                          active={selectedArch?.id === a.id}
-                          onSelect={() => { setSelectedArch(a); if (!tryonOptions.aspect_ratio) setOption('aspect_ratio', a.ar || '3:4'); }}
+                      {MODELS.map((m) => (
+                        <ModelCard
+                          key={m.id}
+                          model={m}
+                          active={selectedModel?.id === m.id}
+                          onSelect={() => setSelectedModel(m)}
                         />
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-3 rounded-xl border border-dashed border-zinc-300 p-4 text-xs text-zinc-600 bg-white/70">
-                    Upload clothing first, then choose type. Archetypes will appear next.
+                  <div className="mt-3 rounded-2xl border border-dashed border-emerald-300/70 p-4 text-xs text-emerald-700 bg-emerald-50/50">
+                    Upload clothing first, then choose type. Models will appear next.
                   </div>
                 )}
               </div>
             ) : (
               <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-zinc-700">Model Swap</div>
-                <div className="text-xs text-zinc-600">Upload two images below and write a short instruction.</div>
+                <div className="mb-2 text-[12px] font-semibold text-emerald-700">Model Swap</div>
+                <div className="text-xs text-emerald-700/80">Upload two images below and write a short instruction.</div>
               </div>
             )}
           </div>
 
           {/* Workbench */}
-          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_360px]">
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_340px]">
+
             {/* Canvas Panel */}
-            <section className="rounded-2xl md:rounded-3xl border border-zinc-200 bg-white/80 backdrop-blur relative shadow-sm">
+            <section className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur relative shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
-                <div className="inline-flex rounded-full border border-zinc-300 bg-white p-1">
+                <div className="inline-flex rounded-full border border-emerald-200 bg-white p-1">
                   {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((it) => {
                     const Active = tool === it.id;
                     const Icon = it.icon;
@@ -742,7 +715,7 @@ export default function Dashboard() {
                         onClick={() => switchTool(it.id)}
                         className={[
                           'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                          Active ? 'bg-zinc-900 text-white shadow' : 'text-zinc-700 hover:bg-zinc-100'
+                          Active ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-900 hover:bg-emerald-50'
                         ].join(' ')}
                       >
                         <Icon className="size-4" />
@@ -753,7 +726,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StepBadge phase={phase} />
-                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50">Reset</button>
+                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-900">Reset</button>
                 </div>
               </div>
 
@@ -761,7 +734,7 @@ export default function Dashboard() {
               {tool !== 'modelSwap' ? (
                 <div
                   ref={dropRef}
-                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-zinc-300/80 bg-white/70 hover:bg-white transition cursor-pointer"
+                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-3xl border-2 border-dashed border-emerald-300/80 bg-emerald-50/40 hover:bg-emerald-50 transition cursor-pointer"
                   onClick={() => inputRef.current?.click()}
                   title="Drag & drop / Click / Paste (Ctrl+V)"
                 >
@@ -771,8 +744,8 @@ export default function Dashboard() {
                     onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
                   />
                   {!localUrl && !resultUrl ? (
-                    <div className="text-center text-zinc-500 text-sm">
-                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-zinc-200">⬆</div>
+                    <div className="text-center text-emerald-700 text-sm">
+                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-emerald-200">⬆</div>
                       {tool === 'tryon'
                         ? 'Upload a clothing image (PNG/JPG). Transparent PNG preferred.'
                         : 'Drag & drop an image here, click to choose, or paste (Ctrl+V)'}
@@ -781,15 +754,15 @@ export default function Dashboard() {
                     <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
                       {compare && localUrl && resultUrl ? (
                         <div className="relative max-w-full max-h-[70vh]">
-                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-2xl" />
                           <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
-                               className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
+                               className="absolute inset-0 w-full h-full object-contain rounded-2xl pointer-events-none" />
                         </div>
                       ) : (
                         <img
                           src={resultUrl || localUrl}
                           alt="preview"
-                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                          className="max-w-full max-h-[70vh] object-contain rounded-2xl"
                           draggable={false}
                           loading="lazy"
                         />
@@ -800,6 +773,7 @@ export default function Dashboard() {
               ) : (
                 <div className="m-3 sm:m-4 md:m-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Image 1 */}
                     <FileDrop
                       label="Image 1"
                       file={file1}
@@ -807,6 +781,7 @@ export default function Dashboard() {
                       onPick={async (f) => { setFile1(f); setLocal1(URL.createObjectURL(f)); setResultUrl(''); setPhase('idle'); }}
                       inputRef={inputRef1}
                     />
+                    {/* Image 2 */}
                     <FileDrop
                       label="Image 2"
                       file={file2}
@@ -816,19 +791,19 @@ export default function Dashboard() {
                     />
                   </div>
                   <div className="mt-3">
-                    <label className="text-xs text-zinc-600">Prompt</label>
+                    <label className="text-xs text-emerald-700">Prompt</label>
                     <input
                       value={swapPrompt} onChange={(e)=>setSwapPrompt(e.target.value)}
                       placeholder="Describe how to combine or arrange the two images…"
-                      className="mt-1 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm"
+                      className="mt-1 w-full rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm"
                     />
                   </div>
 
                   {resultUrl && (
                     <div className="mt-4">
-                      <div className="text-xs text-zinc-600 mb-2">Result</div>
-                      <div className="w-full rounded-xl border bg-white/70 p-2 grid place-items-center">
-                        <img src={resultUrl} alt="result" className="max-w-full max-h-[60vh] object-contain rounded-lg" />
+                      <div className="text-xs text-emerald-700 mb-2">Result</div>
+                      <div className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/40 p-2 grid place-items-center">
+                        <img src={resultUrl} alt="result" className="max-w-full max-h-[60vh] object-contain rounded-xl" />
                       </div>
                     </div>
                   )}
@@ -842,11 +817,11 @@ export default function Dashboard() {
                   disabled={
                     busy || (
                       tool === 'modelSwap' ? (!file1 || !file2) :
-                      tool === 'tryon' ? (!file || !selectedArch || !pieceType) :
+                      tool === 'tryon' ? (!file || !selectedModel || !pieceType) :
                       !file
                     )
                   }
-                  className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-[0_10px_24px_rgba(0,0,0,.14)] transition disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                 >
                   {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On')}</>)}
                 </button>
@@ -855,33 +830,33 @@ export default function Dashboard() {
                   <>
                     <button
                       onClick={() => exportPng(resultUrl)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-emerald-50 text-emerald-900"
                     >
                       ⬇ Download PNG
                     </button>
                     <a
                       href={resultUrl} target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-emerald-50 text-emerald-900"
                     >
                       ↗ Open
                     </a>
                     <button
                       onClick={() => { navigator.clipboard.writeText(resultUrl).catch(()=>{}); }}
-                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-emerald-50 text-emerald-900"
                     >
                       🔗 Copy URL
                     </button>
 
                     {tool !== 'modelSwap' && localUrl && (
                       <>
-                        <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2">
+                        <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2 text-emerald-900">
                           <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
                           Compare
                         </label>
                         {compare && (
                           <div className="flex items-center gap-2">
                             <input type="range" min={0} max={100} value={compareOpacity}
-                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} className="accent-emerald-500" />
+                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} className="accent-emerald-600"/>
                             <span className="text-xs w-8 text-right">{compareOpacity}%</span>
                           </div>
                         )}
@@ -898,124 +873,63 @@ export default function Dashboard() {
                 {busy && (
                   <motion.div
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="pointer-events-none absolute inset-0 rounded-2xl md:rounded-3xl grid place-items-center bg-white/60"
+                    className="pointer-events-none absolute inset-0 rounded-3xl grid place-items-center bg-white/60"
                   >
-                    <div className="text-xs px-3 py-2 rounded-lg bg-white border shadow">Working…</div>
+                    <div className="text-xs px-3 py-2 rounded-lg bg-white border border-emerald-200 shadow">Working…</div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </section>
 
             {/* Inspector */}
-            <aside className="rounded-2xl md:rounded-3xl border border-zinc-200 bg-white/80 backdrop-blur p-4 md:pb-5 shadow-sm">
+            <aside className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur p-4 md:pb-5 shadow-sm">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-zinc-900">Inspector</div>
-                <span className="text-xs text-zinc-500">Tool: {tool}</span>
+                <div className="text-sm font-semibold text-emerald-900">Inspector</div>
+                <span className="text-xs text-emerald-700">Tool: {tool}</span>
               </div>
 
-              {/* Try-On inspector */}
+              {/* Try-On summary */}
               {tool === 'tryon' && (
                 <div className="space-y-3 mt-3 text-xs">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-zinc-600 mb-1">Clothing</div>
+                  <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                    <div className="text-emerald-700 mb-1">Clothing</div>
                     {localUrl ? (
-                      <img src={localUrl} alt="cloth" className="w-full max-h-48 object-contain rounded-md border bg-white/70" />
+                      <img src={localUrl} alt="cloth" className="w-full max-h-48 object-contain rounded-lg border border-emerald-100 bg-emerald-50/40" />
                     ) : (
-                      <div className="text-zinc-400">— Upload a clothing image —</div>
+                      <div className="text-emerald-400">— Upload a clothing image —</div>
                     )}
                   </div>
 
-                  <div className="rounded-lg border p-3">
-                    <div className="text-zinc-600 mb-1">Type</div>
+                  <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                    <div className="text-emerald-700 mb-1">Type</div>
                     <div className="flex items-center justify-between">
-                      <div className="text-zinc-800">{pieceType ? pieceType : '—'}</div>
-                      <button className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => setShowPieceType(true)}>Change</button>
+                      <div className="text-emerald-900">{pieceType ? pieceType : '—'}</div>
+                      <button className="rounded-lg border border-emerald-200 px-2 py-1 text-[11px] bg-white hover:bg-emerald-50" onClick={() => setShowPieceType(true)}>Change</button>
                     </div>
                   </div>
 
-                  <div className="rounded-lg border p-3">
-                    <div className="text-zinc-600 mb-1">Selected Archetype</div>
-                    {selectedArch ? (
+                  <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                    <div className="text-emerald-700 mb-1">Selected Model</div>
+                    {selectedModel ? (
                       <div className="flex items-center gap-2">
-                        <ArchetypeChip label={selectedArch.label} />
+                        <img src={selectedModel.url} alt={selectedModel.name} className="w-10 h-10 rounded-md object-cover border border-emerald-100" />
+                        <div>
+                          <div className="font-semibold text-emerald-900">{selectedModel.name}</div>
+                          <div className="text-[11px] text-emerald-600">Pose: {selectedModel.pose}</div>
+                        </div>
                       </div>
                     ) : (
-                      <div className="text-zinc-400">— Pick an archetype above —</div>
+                      <div className="text-emerald-400">— Pick a model above —</div>
                     )}
                   </div>
-
-                  <div className="rounded-lg border p-3">
-                    <div className="text-zinc-600 mb-2">Try-On Options</div>
-
-                    <Field label="Aspect Ratio">
-                      <select
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
-                        value={tryonOptions.aspect_ratio}
-                        onChange={(e)=>setOption('aspect_ratio', e.target.value)}
-                      >
-                        {['3:4','4:3','1:1','2:3','3:2','16:9','9:16'].map((r)=>(<option key={r} value={r}>{r}</option>))}
-                      </select>
-                    </Field>
-
-                    <Field label="Variants">
-                      <div className="flex items-center gap-2">
-                        <input type="range" min={1} max={3} value={tryonOptions.num_images}
-                          onChange={(e)=>setOption('num_images', Number(e.target.value))} className="w-full accent-emerald-500" />
-                        <span className="w-6 text-right">{tryonOptions.num_images}</span>
-                      </div>
-                    </Field>
-
-                    <Field label="Seed Lock">
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" checked={tryonOptions.seedLock} onChange={(e)=>setOption('seedLock', e.target.checked)} />
-                        {tryonOptions.seedLock && (
-                          <input type="number" className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
-                            value={tryonOptions.seed ?? ''}
-                            onChange={(e)=>setOption('seed', e.target.value === '' ? null : Number(e.target.value))}
-                            placeholder="auto" />
-                        )}
-                      </div>
-                    </Field>
-
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-zinc-700">Advanced</summary>
-                      <div className="mt-2 space-y-2">
-                        <Field label="Guidance">
-                          <input type="number" step="0.1" min={1} max={12} className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
-                            value={tryonOptions.guidance_scale}
-                            onChange={(e)=>setOption('guidance_scale', Number(e.target.value))} />
-                        </Field>
-                        <Field label="Safety">
-                          <input type="number" min={1} max={6} className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
-                            value={tryonOptions.safety_tolerance}
-                            onChange={(e)=>setOption('safety_tolerance', Number(e.target.value))} />
-                        </Field>
-                      </div>
-                    </details>
-                  </div>
-
-                  {variants?.length > 1 && (
-                    <div className="rounded-lg border p-3">
-                      <div className="text-zinc-600 mb-2">Variants</div>
-                      <div className="flex gap-2 overflow-x-auto pb-1">
-                        {variants.map((v,i)=>(
-                          <button key={i} onClick={()=>setResultUrl(v)}
-                            className={`shrink-0 rounded-lg border ${resultUrl===v ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-200'} bg-white/70`}
-                          >
-                            <img src={v} alt={`v${i+1}`} className="h-20 w-20 object-cover rounded-md" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {resultUrl && (
-                    <div className="rounded-lg border p-3">
-                      <div className="text-zinc-600 mb-2">Result</div>
+                    <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                      <div className="text-emerald-700 mb-2">Result</div>
                       <img
                         src={resultUrl}
                         alt="final"
-                        className="w-full max-h-64 object-contain rounded-md border bg-white/70"
+                        className="w-full max-h-64 object-contain rounded-md border border-emerald-100 bg-emerald-50/40"
                       />
                     </div>
                   )}
@@ -1027,13 +941,13 @@ export default function Dashboard() {
                 <div className="space-y-3 mt-3">
                   <ModeTabs mode={bgMode} setMode={setBgMode} />
                   <Field label="Primary">
-                    <Color value={primaryColor} onChange={setColor} />
+                    <Color value={color} onChange={setColor} />
                   </Field>
 
                   {bgMode === 'gradient' && (
                     <>
                       <Field label="Secondary">
-                        <Color value={secondaryColor} onChange={setColor2} />
+                        <Color value={color2} onChange={setColor2} />
                       </Field>
                       <Field label="Angle">
                         <Range value={angle} onChange={setAngle} min={0} max={360} />
@@ -1060,7 +974,7 @@ export default function Dashboard() {
                     <Range value={padding} onChange={setPadding} min={0} max={64} />
                   </Field>
 
-                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-zinc-700">
+                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-emerald-800">
                     <input
                       type="checkbox"
                       checked={shadow}
@@ -1070,10 +984,10 @@ export default function Dashboard() {
                   </label>
 
                   <div className="mt-3">
-                    <div className="text-xs text-zinc-500 mb-2">Final Preview</div>
+                    <div className="text-xs text-emerald-700 mb-2">Final Preview</div>
                     <div
-                      style={frameStyleComputed}
-                      className="relative rounded-xl overflow-hidden border border-zinc-200"
+                      style={frameStyle}
+                      className="relative rounded-xl overflow-hidden border border-emerald-200"
                     >
                       <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
                         {resultUrl ? (
@@ -1083,7 +997,7 @@ export default function Dashboard() {
                             className="max-w-full max-h-[38vh] object-contain"
                           />
                         ) : (
-                          <div className="grid place-items-center h-[140px] text-xs text-zinc-400">
+                          <div className="grid place-items-center h-[140px] text-xs text-emerald-400">
                             — Run Remove BG first —
                           </div>
                         )}
@@ -1095,12 +1009,12 @@ export default function Dashboard() {
 
               {/* Enhance inspector */}
               {tool === 'enhance' && (
-                <div className="space-y-2 text-xs text-zinc-600 mt-3">
+                <div className="space-y-2 text-xs text-emerald-700 mt-3">
                   <div>
-                    Choose a preset above or press <span className="font-semibold">Customize</span>.
+                    Choose a preset above or press <span className="font-semibold text-emerald-900">Customize</span>.
                   </div>
                   {resultUrl && (
-                    <div className="mt-2 rounded-xl overflow-hidden border border-zinc-200 bg-white/70">
+                    <div className="mt-2 rounded-2xl overflow-hidden border border-emerald-200 bg-emerald-50/40">
                       <div className="relative w-full min-h-[140px] grid place-items-center">
                         <img
                           src={resultUrl}
@@ -1115,18 +1029,18 @@ export default function Dashboard() {
 
               {/* Model Swap inspector */}
               {tool === 'modelSwap' && (
-                <div className="text-xs text-zinc-600 mt-3 space-y-3">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-zinc-600 mb-1">Inputs</div>
+                <div className="text-xs text-emerald-700 mt-3 space-y-3">
+                  <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                    <div className="text-emerald-700 mb-1">Inputs</div>
                     <div className="grid grid-cols-2 gap-2">
                       {local1 ? (
                         <img
                           src={local1}
                           alt="image1"
-                          className="w-full h-24 object-cover rounded-md border bg-white/70"
+                          className="w-full h-24 object-cover rounded-md border border-emerald-100 bg-emerald-50/40"
                         />
                       ) : (
-                        <div className="h-24 grid place-items-center text-zinc-400 border rounded-md bg-white/70">
+                        <div className="h-24 grid place-items-center text-emerald-400 border border-emerald-100 rounded-md bg-emerald-50/40">
                           — Image 1 —
                         </div>
                       )}
@@ -1134,28 +1048,28 @@ export default function Dashboard() {
                         <img
                           src={local2}
                           alt="image2"
-                          className="w-full h-24 object-cover rounded-md border bg-white/70"
+                          className="w-full h-24 object-cover rounded-md border border-emerald-100 bg-emerald-50/40"
                         />
                       ) : (
-                        <div className="h-24 grid place-items-center text-zinc-400 border rounded-md bg-white/70">
+                        <div className="h-24 grid place-items-center text-emerald-400 border border-emerald-100 rounded-md bg-emerald-50/40">
                           — Image 2 —
                         </div>
                       )}
                     </div>
                     {swapPrompt && (
-                      <div className="mt-2 text-[11px] text-zinc-500">
-                        Prompt: <span className="text-zinc-700">{swapPrompt}</span>
+                      <div className="mt-2 text-[11px] text-emerald-600">
+                        Prompt: <span className="text-emerald-800">{swapPrompt}</span>
                       </div>
                     )}
                   </div>
 
                   {resultUrl && (
-                    <div className="rounded-lg border p-3">
-                      <div className="text-zinc-600 mb-2">Result</div>
+                    <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                      <div className="text-emerald-700 mb-2">Result</div>
                       <img
                         src={resultUrl}
                         alt="model-swap-result"
-                        className="w-full max-h-64 object-contain rounded-md border bg-white/70"
+                        className="w-full max-h-64 object-contain rounded-md border border-emerald-100 bg-emerald-50/40"
                       />
                     </div>
                   )}
@@ -1165,16 +1079,16 @@ export default function Dashboard() {
           </div>
 
           {/* History */}
-          <div className="rounded-2xl md:rounded-3xl border border-zinc-200 bg-white/80 backdrop-blur p-4 md:p-5 shadow-sm">
-            <div className="text-sm font-semibold text-zinc-900 mb-2">History</div>
+          <div className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur p-4 md:p-5 shadow-sm">
+            <div className="text-sm font-semibold text-emerald-900 mb-2">History</div>
             {history.length === 0 ? (
-              <div className="text-xs text-zinc-500 px-1 py-4">— No renders yet —</div>
+              <div className="text-xs text-emerald-600 px-1 py-4">— No renders yet —</div>
             ) : (
               <>
                 <div className="mb-2">
                   <button
                     onClick={() => setHistory([])}
-                    className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50"
+                    className="text-xs px-2 py-1 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-900"
                   >
                     Clear history
                   </button>
@@ -1184,14 +1098,14 @@ export default function Dashboard() {
                     <button
                       key={i}
                       onClick={() => setResultUrl(h.outputUrl)}
-                      className="group relative rounded-xl overflow-hidden border border-zinc-200 hover:border-zinc-300 transition bg-white/70"
+                      className="group relative rounded-2xl overflow-hidden border border-emerald-200 hover:border-emerald-300 transition bg-emerald-50/40"
                     >
                       <img
                         src={h.outputUrl || h.inputThumb}
                         alt="hist"
                         className="w-full h-28 object-cover"
                       />
-                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
+                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-emerald-700/50 text-white backdrop-blur">
                         {h.tool} • {new Date(h.ts).toLocaleTimeString()}
                       </div>
                     </button>
@@ -1212,7 +1126,7 @@ export default function Dashboard() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="absolute inset-0 bg-black/55" onClick={() => setShowEnhance(false)} />
+            <div className="absolute inset-0 bg-emerald-900/40" onClick={() => setShowEnhance(false)} />
             <div className="relative w-full max-w-3xl mx-3">
               <EnhanceCustomizer
                 initial={pendingEnhancePreset || undefined}
@@ -1234,7 +1148,7 @@ export default function Dashboard() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="absolute inset-0 bg-black/55" onClick={() => setShowPieceType(false)} />
+            <div className="absolute inset-0 bg-emerald-900/40" onClick={() => setShowPieceType(false)} />
             <div className="relative w-full max-w-md mx-3">
               <PieceTypeModal
                 initial={pieceType || 'upper'}
@@ -1242,7 +1156,7 @@ export default function Dashboard() {
                 onConfirm={(type) => {
                   setPieceType(type);
                   setShowPieceType(false);
-                  setTryonStep('archetype');
+                  setTryonStep('model');
                 }}
               />
             </div>
@@ -1262,7 +1176,7 @@ export default function Dashboard() {
 function FileDrop({ label, file, localUrl, onPick, inputRef }) {
   return (
     <div
-      className="min-h-[220px] grid place-items-center rounded-2xl border-2 border-dashed border-zinc-300/80 bg-white/70 hover:bg-white transition cursor-pointer"
+      className="min-h-[220px] grid place-items-center rounded-2xl border-2 border-dashed border-emerald-300/80 bg-emerald-50/40 hover:bg-emerald-50 transition cursor-pointer"
       onClick={() => inputRef.current?.click()}
     >
       <input
@@ -1276,8 +1190,8 @@ function FileDrop({ label, file, localUrl, onPick, inputRef }) {
         }}
       />
       {!localUrl ? (
-        <div className="text-center text-zinc-500 text-sm">
-          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-zinc-200">
+        <div className="text-center text-emerald-700 text-sm">
+          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-emerald-200">
             ⬆
           </div>
           {label}: Click to choose
@@ -1301,11 +1215,11 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
   return (
     <button
       onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-zinc-200 hover:border-zinc-300 bg-white shadow-sm transition text-left hover:shadow-md"
+      className="group relative rounded-2xl overflow-hidden border border-emerald-200 hover:border-emerald-300 bg-white/80 backdrop-blur shadow-sm transition text-left hover:shadow-md"
     >
-      <div className="relative w-full aspect-[4/3] bg-zinc-100">
+      <div className="relative w-full aspect-[4/3] bg-emerald-50/60">
         {!loaded && (
-          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-zinc-100 via-white to-zinc-100" />
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-emerald-50 via-white to-lime-50" />
         )}
         <img
           src={preview}
@@ -1316,7 +1230,7 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
           onError={() => setBroken(true)}
         />
         {tag && (
-          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-zinc-900/80 text-white shadow">
+          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-700/80 text-white shadow">
             {tag}
           </span>
         )}
@@ -1325,65 +1239,53 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
         </div>
       </div>
       <div className="p-3">
-        <div className="font-semibold">{title}</div>
-        <div className="text-xs text-zinc-500">{subtitle}</div>
+        <div className="font-semibold text-emerald-900">{title}</div>
+        <div className="text-xs text-emerald-700">{subtitle}</div>
       </div>
     </button>
   );
 }
 
-function ArchetypeChip({ label }) {
-  return (
-    <span className="inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-zinc-200 bg-white/70 text-[11px]">
-      <span className="size-2 rounded-full bg-emerald-500" /> {label}
-    </span>
-  );
-}
-
-function ArchetypeCard({ archetype, active, onSelect }) {
-  const colors = [
-    'from-indigo-500 to-fuchsia-500',
-    'from-emerald-500 to-lime-500',
-    'from-sky-500 to-indigo-500',
-    'from-amber-500 to-rose-500',
-    'from-zinc-500 to-gray-700',
-  ];
-  const grad = colors[Math.abs(archetype.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % colors.length];
-
+function ModelCard({ model, active, onSelect }) {
   return (
     <button
       onClick={onSelect}
       className={[
-        'group relative rounded-2xl overflow-hidden border bg-white shadow-sm transition text-left',
-        active ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-md',
+        'group relative rounded-2xl overflow-hidden border bg-white/80 backdrop-blur shadow-sm transition',
+        active
+          ? 'border-emerald-400 ring-2 ring-emerald-300'
+          : 'border-emerald-200 hover:border-emerald-300 hover:shadow-md',
       ].join(' ')}
-      title={archetype.label}
+      title={model.name}
     >
-      <div className={`relative w-full aspect-[4/5] bg-gradient-to-br ${grad}`}>
-        <div className="absolute inset-3 rounded-xl bg-white/70 backdrop-blur border border-white/60 grid place-items-center">
-          <div className="w-12 h-16 rounded-md border-2 border-dashed border-zinc-400/80 bg-white/60" />
-        </div>
+      <div className="relative w-full aspect-[4/5] bg-emerald-50/60">
+        <img
+          src={model.url}
+          alt={model.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
         <div className="absolute top-2 left-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
-          {active ? 'Selected' : 'Use archetype'}
+          {active ? 'Selected' : 'Use model'}
         </div>
       </div>
       <div className="p-3">
-        <div className="font-semibold truncate">{archetype.label}</div>
-        <div className="text-[11px] text-zinc-500">AR: {archetype.ar || '3:4'}</div>
+        <div className="font-semibold truncate text-emerald-900">{model.name}</div>
+        <div className="text-[11px] text-emerald-600">Pose: {model.pose}</div>
       </div>
     </button>
   );
 }
 
-/** Stepper لتدفق الـ Try-On (cloth → piece → archetype) */
-function TryOnStepper({ step, pieceType, archetypePicked }) {
-  const map = { cloth: 0, piece: 1, archetype: 2 };
+/** Stepper */
+function TryOnStepper({ step, pieceType, modelPicked }) {
+  const map = { cloth: 0, piece: 1, model: 2 };
   const idx = map[step] ?? 0;
 
   const steps = [
     { id: 'cloth', label: 'Upload clothing' },
     { id: 'piece', label: pieceType ? `Type: ${pieceType}` : 'Choose type' },
-    { id: 'archetype', label: archetypePicked ? 'Archetype selected' : 'Pick an archetype' },
+    { id: 'model', label: modelPicked ? 'Model selected' : 'Pick a model' },
   ];
 
   return (
@@ -1402,8 +1304,8 @@ function TryOnStepper({ step, pieceType, archetypePicked }) {
                     done
                       ? 'bg-emerald-500 text-white border-emerald-500'
                       : active
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-zinc-600 border-zinc-300',
+                      ? 'bg-lime-500 text-emerald-950 border-lime-500'
+                      : 'bg-white text-emerald-700 border-emerald-200',
                   ].join(' ')}
                 >
                   {done ? '✓' : i + 1}
@@ -1411,19 +1313,22 @@ function TryOnStepper({ step, pieceType, archetypePicked }) {
                 <div
                   className={[
                     'text-xs sm:text-[13px]',
-                    done ? 'text-emerald-700' : active ? 'text-indigo-700' : 'text-zinc-600',
+                    done ? 'text-emerald-700' : active ? 'text-emerald-900' : 'text-emerald-700/80',
                   ].join(' ')}
                 >
                   {s.label}
                 </div>
               </div>
               {i < steps.length - 1 && (
-                <motion.div layout className="h-1 mt-2 rounded-full bg-zinc-200 overflow-hidden">
+                <motion.div
+                  layout
+                  className="h-1 mt-2 rounded-full bg-emerald-100 overflow-hidden"
+                >
                   <motion.div
                     initial={false}
                     animate={{ width: i < idx ? '100%' : '0%' }}
                     transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-                    className="h-full bg-indigo-600"
+                    className="h-full bg-emerald-600"
                   />
                 </motion.div>
               )}
@@ -1437,15 +1342,19 @@ function TryOnStepper({ step, pieceType, archetypePicked }) {
 
 function StepBadge({ phase }) {
   const map = {
-    idle: { label: 'Ready', color: 'bg-zinc-200 text-zinc-700 border-zinc-300' },
-    processing: { label: 'Processing', color: 'bg-amber-200 text-amber-900 border-amber-300' },
-    ready: { label: 'Done', color: 'bg-emerald-200 text-emerald-900 border-emerald-300' },
-    error: { label: 'Error', color: 'bg-rose-200 text-rose-900 border-rose-300' },
+    idle: { label: 'Ready', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    processing: { label: 'Processing', color: 'bg-lime-100 text-lime-800 border-lime-200' },
+    ready: { label: 'Done', color: 'bg-teal-100 text-teal-800 border-teal-200' },
+    error: { label: 'Error', color: 'bg-rose-100 text-rose-800 border-rose-200' },
   };
   const it = map[phase] || map.idle;
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${it.color}`}>
-      <span className={`inline-block size-2 rounded-full ${phase === 'processing' ? 'bg-zinc-700 animate-pulse' : 'bg-zinc-600'}`} />
+      <span
+        className={`inline-block size-2 rounded-full ${
+          phase === 'processing' ? 'bg-emerald-700 animate-pulse' : 'bg-emerald-700'
+        }`}
+      />
       {it.label}
     </span>
   );
@@ -1453,7 +1362,7 @@ function StepBadge({ phase }) {
 
 function Field({ label, children }) {
   return (
-    <label className="flex items-center justify-between gap-3 text-xs text-zinc-700">
+    <label className="flex items-center justify-between gap-3 text-xs text-emerald-800">
       <span className="min-w-28">{label}</span>
       <div className="flex-1">{children}</div>
     </label>
@@ -1464,7 +1373,7 @@ function Color({ value, onChange }) {
     <div className="flex items-center gap-2">
       <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
       <input
-        className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
+        className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -1481,7 +1390,7 @@ function Range({ value, onChange, min, max, step = 1 }) {
         max={max}
         step={step}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-emerald-500"
+        className="w-full accent-emerald-600"
       />
       <span className="w-10 text-right">{typeof value === 'number' ? value : ''}</span>
     </div>
@@ -1495,14 +1404,14 @@ function ModeTabs({ mode, setMode }) {
     { id: 'pattern', label: 'Pattern' },
   ];
   return (
-    <div className="inline-flex rounded-xl border border-zinc-200 bg-zinc-50 p-1">
+    <div className="inline-flex rounded-xl border border-emerald-200 bg-emerald-50/50 p-1">
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => setMode(t.id)}
           className={[
             'px-3 py-1.5 text-xs rounded-lg transition',
-            mode === t.id ? 'bg-white shadow text-zinc-900' : 'text-zinc-600 hover:bg-white',
+            mode === t.id ? 'bg-white shadow text-emerald-900' : 'text-emerald-700 hover:bg-white'
           ].join(' ')}
         >
           {t.label}
@@ -1520,8 +1429,8 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
     { id: 'dress', label: 'Full Dress (One-piece)' },
   ];
   return (
-    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border space-y-3">
-      <div className="text-sm font-semibold">Choose clothing type</div>
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border border-emerald-200 space-y-3">
+      <div className="text-sm font-semibold text-emerald-900">Choose clothing type</div>
       <div className="grid grid-cols-1 gap-2">
         {options.map((o) => (
           <button
@@ -1529,7 +1438,7 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
             onClick={() => setActive(o.id)}
             className={[
               'w-full text-left rounded-xl border px-3 py-2 text-sm transition',
-              active === o.id ? 'border-emerald-400 bg-emerald-50' : 'border-zinc-200 hover:bg-zinc-50',
+              active === o.id ? 'border-emerald-400 bg-emerald-50' : 'border-emerald-200 hover:bg-emerald-50/50',
             ].join(' ')}
           >
             {o.label}
@@ -1537,11 +1446,11 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
         ))}
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={onCancel}>
+        <button className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs bg-white hover:bg-emerald-50 text-emerald-900" onClick={onCancel}>
           Cancel
         </button>
         <button
-          className="rounded-lg bg-zinc-900 text-white px-3 py-1.5 text-xs"
+          className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 text-xs"
           onClick={() => onConfirm(active)}
         >
           Continue
@@ -1637,48 +1546,48 @@ async function exportPng(url) {
 ------------------------------------------------------- */
 function EnhanceCustomizer({ initial, onChange, onComplete }) {
   return (
-    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border space-y-3">
-      <div className="text-sm font-semibold">Enhance Settings</div>
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border border-emerald-200 space-y-3">
+      <div className="text-sm font-semibold text-emerald-900">Enhance Settings</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <label className="space-y-1">
-          <span className="text-zinc-600">Style</span>
+          <span className="text-emerald-700">Style</span>
           <input
             defaultValue={initial?.photographyStyle || ''}
             onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="studio product photography, 50mm"
           />
         </label>
         <label className="space-y-1">
-          <span className="text-zinc-600">Background</span>
+          <span className="text-emerald-700">Background</span>
           <input
             defaultValue={initial?.background || ''}
             onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="white seamless"
           />
         </label>
         <label className="space-y-1">
-          <span className="text-zinc-600">Lighting</span>
+          <span className="text-emerald-700">Lighting</span>
           <input
             defaultValue={initial?.lighting || ''}
             onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="softbox, gentle reflections"
           />
         </label>
         <label className="space-y-1">
-          <span className="text-zinc-600">Colors</span>
+          <span className="text-emerald-700">Colors</span>
           <input
             defaultValue={initial?.colorStyle || ''}
             onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="neutral whites, subtle grays"
           />
         </label>
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onComplete(initial || {})}>
+        <button className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs bg-white hover:bg-emerald-50 text-emerald-900" onClick={() => onComplete(initial || {})}>
           Run
         </button>
       </div>
