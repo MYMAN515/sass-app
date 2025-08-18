@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+// ❌ تمت إزالة useRouter
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
@@ -183,7 +183,7 @@ const PEOPLE_TOOLS = [
 export default function Dashboard() {
   const supabase = useSupabaseClient();
   const user = useUser();
-  const router = useRouter();
+  // ❌ تمت إزالة const router = useRouter();
   const toasts = useToasts();
 
   /* ---------- app state ---------- */
@@ -239,7 +239,10 @@ export default function Dashboard() {
     let mounted = true;
     (async () => {
       if (user === undefined) return;
-      if (!user) { router.replace('/login'); return; }
+      if (!user) {
+        if (typeof window !== 'undefined') window.location.replace('/login');
+        return;
+      }
 
       try {
         const { data } = await supabase
@@ -254,7 +257,7 @@ export default function Dashboard() {
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [user, router, supabase]);
+  }, [user, supabase]);
 
   /* ---------- drag & drop / paste (single file area) ---------- */
   useEffect(() => {
@@ -785,7 +788,7 @@ export default function Dashboard() {
                     <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
                       {compare && localUrl && resultUrl ? (
                         <div className="relative max-w-full max-h-[70vh]">
-                          <img src={resultUrl} alt="after" className="max-w/full max-h-[70vh] object-contain rounded-xl" />
+                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
                           <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
                                className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
                         </div>
