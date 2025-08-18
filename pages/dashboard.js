@@ -708,7 +708,7 @@ export default function Dashboard() {
               <SparkleIcon className="w-4 h-4" />
             </div>
             <div className="leading-tight">
-              <div className="font-semibold">MintLemon Studio</div>
+              <div className="font-semibold">Studio</div>
               <div className="text-[11px] text-zinc-600">Fresh • Clean • Fast</div>
             </div>
           </div>
