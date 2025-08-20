@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
 /* -------------------------------------------------------
-   Theme helpers
+   Helpers
 ------------------------------------------------------- */
 const STORAGE_BUCKET = 'img';
 
@@ -41,7 +41,7 @@ const pickFirstUrl = (obj) => {
 };
 
 /* -------------------------------------------------------
-   Presets (Enhance remains unchanged – for completeness)
+   Product Enhance (unchanged API usage)
 ------------------------------------------------------- */
 const ENHANCE_PRESETS = [
   {
@@ -161,7 +161,7 @@ function ToastHost({ items, onClose }) {
 ------------------------------------------------------- */
 const GROUPS = [
   { id: 'product', label: 'Product', icon: BoxIcon },
-  { id: 'people', label: 'AI Try-On', icon: HangerIcon },
+  { id: 'people', label: 'AI Try-On', icon: PersonIcon },
 ];
 
 const PRODUCT_TOOLS = [
@@ -169,9 +169,36 @@ const PRODUCT_TOOLS = [
   { id: 'enhance', label: 'Enhance', icon: RocketIcon },
 ];
 
-// People group now has only Try-On (without person photo)
 const PEOPLE_TOOLS = [
-  { id: 'tryon', label: 'Try-On (No Model)', icon: HangerIcon },
+  { id: 'tryon', label: 'Try-On (Realistic Model)', icon: PersonIcon },
+];
+
+/* -------------------------------------------------------
+   Try-On Persona / Backdrops / Styles
+------------------------------------------------------- */
+const PERSONAS = [
+  { id: 'female', label: 'Female', hint: 'photorealistic woman, natural makeup' },
+  { id: 'male', label: 'Male', hint: 'photorealistic man, light grooming' },
+  { id: 'unisex', label: 'Unisex', hint: 'androgynous model, neutral styling' },
+  { id: 'kids', label: 'Kids', hint: 'child model, gentle styling' },
+];
+
+const SKIN_TONES = ['fair', 'light', 'medium', 'tan', 'deep'];
+const AGE_VIBES = ['teen', 'young adult', 'adult', 'mature'];
+const POSES = ['front', '3/4', 'side', 'casual stance', 'arms crossed', 'hands in pockets'];
+
+const STYLE_PACKS = [
+  { id: 'editorial', title: 'Editorial', desc: 'Magazine vibe, crisp light', recipe: 'editorial fashion photo, crisp studio light, subtle grain' },
+  { id: 'ecom', title: 'E-commerce', desc: 'Clean, centered, true color', recipe: 'ecommerce catalog photo, true-to-color, centered, no props' },
+  { id: 'street', title: 'Street', desc: 'Lifestyle urban', recipe: 'streetwear lifestyle, soft daylight, candid vibe' },
+  { id: 'runway', title: 'Runway', desc: 'High-fashion runway', recipe: 'runway fashion, high key light, spotlight feel' },
+];
+
+const BG_PACKS = [
+  { id: 'studio_white', title: 'Studio White', desc: 'Seamless white sweep', recipe: 'white seamless background, softbox light, gentle shadow' },
+  { id: 'studio_beige', title: 'Warm Beige', desc: 'Matte beige editorial', recipe: 'matte beige backdrop, directional soft key' },
+  { id: 'slate', title: 'Slate Gray', desc: 'High-contrast slate', recipe: 'charcoal slate, controlled specular, rim light' },
+  { id: 'loft', title: 'Lifestyle Loft', desc: 'Soft daylight interior', recipe: 'sunlit loft interior, soft daylight, shallow depth' },
 ];
 
 /* -------------------------------------------------------
@@ -194,15 +221,32 @@ export default function Dashboard() {
   const [imageData, setImageData] = useState('');
   const [resultUrl, setResultUrl] = useState('');
 
-  // Try-On specific controls (client options that map to /api/tryon.js)
+  // Try-On options
   const [pieceType, setPieceType] = useState('upper'); // upper | lower | dress
-  const [numImages, setNumImages] = useState(1); // 1..3 (API clamps)
+  const [persona, setPersona] = useState('female');
+  const [skin, setSkin] = useState('medium');
+  const [ageVibe, setAgeVibe] = useState('young adult');
+  const [pose, setPose] = useState('front');
+
+  const [stylePack, setStylePack] = useState('editorial');
+  const [bgPack, setBgPack] = useState('studio_white');
+
+  const [numImages, setNumImages] = useState(1); // 1..3
   const [aspect, setAspect] = useState('match_input_image');
   const [seed, setSeed] = useState('');
-  const [guidance, setGuidance] = useState(3.5);
+  const [guidance, setGuidance] = useState(3.7);
   const [safety, setSafety] = useState(2);
 
-  // Enhance modal
+  // Custom modal for Try-On aesthetics
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [custom, setCustom] = useState({
+    camera: '50mm eye-level',
+    lighting: 'softbox + fill, gentle reflections',
+    colorMood: 'neutral, accurate color',
+    extras: '',
+  });
+
+  // Enhance modal (unchanged)
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [showEnhance, setShowEnhance] = useState(false);
 
@@ -210,6 +254,7 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [history, setHistory] = useState([]);
+  const [variants, setVariants] = useState([]);
 
   const dropRef = useRef(null);
   const inputRef = useRef(null);
@@ -253,21 +298,11 @@ export default function Dashboard() {
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
     setResultUrl('');
+    setVariants([]);
     setErr('');
     setPhase('idle');
     setImageData(await fileToDataURL(f));
   };
-
-  /* ---------- computed ---------- */
-  const frameStyle = useMemo(() => {
-    return {
-      background: `linear-gradient(35deg, ${hexToRGBA('#DFFBE6', 1)}, ${hexToRGBA('#FFFADB', 1)})`,
-      borderRadius: 20,
-      padding: 16,
-      boxShadow: '0 18px 50px rgba(0,0,0,.08), 0 6px 18px rgba(0,0,0,.05)',
-      transition: 'all .25s ease',
-    };
-  }, []);
 
   /* ---------- storage ---------- */
   const uploadToStorage = useCallback(async (f) => {
@@ -284,20 +319,44 @@ export default function Dashboard() {
   }, [supabase, user]);
 
   /* ---------- prompt builders ---------- */
-  // برومبت Try-On بدون صورة شخص: إخراج “on-body style mannequin/editorial” من نفس القطعة
-  const buildTryOnPrompt = (type) => {
-    const scope =
-      type === 'upper' ? 'Render the UPER garment realistically on an editorial ghost-mannequin torso.'
-      : type === 'lower' ? 'Render the LOWER garment on an editorial ghost-mannequin waist/legs.'
-      : 'Render a FULL dress on an editorial ghost-mannequin body.';
+  const STYLE_RECIPES = useMemo(() => Object.fromEntries(STYLE_PACKS.map(p => [p.id, p.recipe])), []);
+  const BG_RECIPES = useMemo(() => Object.fromEntries(BG_PACKS.map(p => [p.id, p.recipe])), []);
+
+  const buildPersonaLine = (p, tone, age, pPose) => {
+    const base = PERSONAS.find(x => x.id === p)?.hint || 'photorealistic model';
+    return `${base}, ${age} vibe, ${tone} skin tone, ${pPose} pose`;
+  };
+
+  const buildPieceScope = (type) => {
+    if (type === 'upper') return 'Replace the model’s TOP with the uploaded garment.';
+    if (type === 'lower') return 'Replace the model’s BOTTOM with the uploaded garment.';
+    return 'Replace the model’s FULL OUTFIT with the uploaded garment as a one-piece dress.';
+  };
+
+  // photorealistic person (no person image provided) – rely on prompt only
+  const buildTryOnPrompt = () => {
+    const personaLine = buildPersonaLine(persona, skin, ageVibe, pose);
+    const styleLine = STYLE_RECIPES[stylePack] || 'editorial fashion photo';
+    const bgLine = BG_RECIPES[bgPack] || 'white seamless background';
+
+    const customBits = [
+      custom?.camera ? `camera: ${custom.camera}` : null,
+      custom?.lighting ? `lighting: ${custom.lighting}` : null,
+      custom?.colorMood ? `colors: ${custom.colorMood}` : null,
+      custom?.extras ? custom.extras : null,
+    ].filter(Boolean).join(', ');
+
     return [
-      'Virtual try-on result WITHOUT providing a person image.',
-      scope,
+      'Photorealistic AI try-on. Render a REAL human model (no user photo provided).',
+      personaLine + '.',
+      buildPieceScope(pieceType),
       'Use the uploaded garment EXACTLY: preserve fabric, color, pattern, buttons, collar, pockets, and logos.',
-      'Correct scaling & alignment, accurate neckline/sleeves/hem geometry, natural cloth drape with realistic shadows and wrinkles.',
-      'Simple neutral studio background, soft light, no extra accessories, no text or watermark.',
-      'High-detail, sharp, 4k realistic output.',
-    ].join(' ');
+      'Natural fit & drape: correct scale and alignment, accurate neckline/sleeves/hem geometry, realistic wrinkles and self-shadowing.',
+      `Background: ${bgLine}.`,
+      `Style: ${styleLine}.`,
+      customBits ? `Aesthetic: ${customBits}.` : '',
+      'No extra accessories, no text or watermark. High detail, sharp, 4k realistic output.',
+    ].filter(Boolean).join(' ');
   };
 
   const buildEnhancePrompt = (f) =>
@@ -328,6 +387,7 @@ export default function Dashboard() {
       if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from remove-bg');
       setResultUrl(out);
+      setVariants([]);
       setHistory((h) => [{ tool: 'Remove BG', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
       setPhase('ready'); t.update({ progress: 100, msg: 'Background removed ✓' });
       setTimeout(() => t.close(), 700);
@@ -353,6 +413,7 @@ export default function Dashboard() {
       if (!r.ok) throw new Error(j?.error || 'enhance failed');
       const out = pickFirstUrl(j); if (!out) throw new Error('No output from enhance');
       setResultUrl(out);
+      setVariants([]);
       setHistory((h) => [{ tool: 'Enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
       setPhase('ready'); t.update({ progress: 100, msg: 'Enhanced ✓' }); setTimeout(() => t.close(), 700);
     } catch (e) {
@@ -369,19 +430,14 @@ export default function Dashboard() {
     let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
 
     try {
-      // 1) ارفع صورة الملابس لـ Storage لتحصل على URL عام
       const clothUrl = await uploadToStorage(file);
+      const prompt = buildTryOnPrompt();
 
-      // 2) ابنِ البرومبت
-      const prompt = buildTryOnPrompt(pieceType);
-
-      // 3) استدعاء API الخاص بك كما طلبت (لا نعدل api/tryon.js)
       const payload = {
         imageUrl: clothUrl,
         prompt,
         plan,
         user_email: user.email,
-        // خيارات عميل جاهزة:
         num_images: numImages,
         seed: seed === '' ? undefined : Number(seed),
         aspect_ratio: aspect,
@@ -397,15 +453,16 @@ export default function Dashboard() {
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || 'try-on failed');
 
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from try-on');
-      setResultUrl(out);
-      setHistory((h) => [{ tool: 'Try-On', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
+      const out = pickFirstUrl(j);
+      setResultUrl(out || '');
+      setVariants(Array.isArray(j?.variants) ? j.variants : out ? [out] : []);
+      setHistory((h) => [{ tool: 'Try-On', inputThumb: localUrl, outputUrl: out || '', ts: Date.now() }, ...h].slice(0, 24));
       setPhase('ready'); t.update({ progress: 100, msg: 'Try-On ✓' }); setTimeout(() => t.close(), 700);
     } catch (e) {
       console.error(e); setPhase('error'); setErr('Failed to process.');
       toasts.push('Try-On failed', { type: 'error' });
     } finally { clearInterval(iv); setBusy(false); }
-  }, [file, pieceType, plan, user, uploadToStorage, numImages, seed, aspect, guidance, safety, toasts, localUrl]);
+  }, [file, plan, user, uploadToStorage, numImages, seed, aspect, guidance, safety, toasts, localUrl, pieceType, persona, skin, ageVibe, pose, stylePack, bgPack, custom]);
 
   const handleRun = () => {
     if (group === 'people' && tool === 'tryon') return runTryOn();
@@ -415,12 +472,12 @@ export default function Dashboard() {
 
   const switchTool = (nextId) => {
     setTool(nextId);
-    setResultUrl(''); setErr(''); setPhase('idle'); setCompare(false);
+    setResultUrl(''); setVariants([]); setErr(''); setPhase('idle'); setCompare(false);
     setFile(null); setLocalUrl('');
   };
 
   const resetAll = () => {
-    setFile(null); setLocalUrl(''); setResultUrl('');
+    setFile(null); setLocalUrl(''); setResultUrl(''); setVariants([]);
     setErr(''); setPhase('idle'); setCompare(false);
   };
 
@@ -516,14 +573,23 @@ export default function Dashboard() {
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-                  {group === 'people' ? 'Try-On Flow (No Model)' : 'Quick Presets'}
+                  {group === 'people' ? 'Try-On (Realistic Model)' : 'Quick Presets'}
                 </h1>
                 <p className="text-slate-600 text-xs sm:text-sm">
                   {group === 'people'
-                    ? <>Step 1: upload clothing → Step 2: choose garment type → Step 3: set options → Run.</>
+                    ? <>Step 1: upload clothing → Step 2: persona & style → Step 3: options → Run.</>
                     : <>Pick a preset or open <span className="font-semibold">Customize</span>.</>}
                 </p>
               </div>
+
+              {group === 'people' && (
+                <button
+                  onClick={() => setShowCustomize(true)}
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-emerald-50"
+                >
+                  🎛️ Customize Try-On
+                </button>
+              )}
 
               {group === 'product' && (
                 <button
@@ -535,6 +601,7 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* Packs / Options */}
             {group === 'product' ? (
               <div className="mt-4">
                 <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance</div>
@@ -552,25 +619,33 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <TryOnOptions
-                pieceType={pieceType}
-                setPieceType={setPieceType}
-                numImages={numImages}
-                setNumImages={setNumImages}
-                aspect={aspect}
-                setAspect={setAspect}
-                seed={seed}
-                setSeed={setSeed}
-                guidance={guidance}
-                setGuidance={setGuidance}
-                safety={safety}
-                setSafety={setSafety}
-              />
+              <div className="mt-4 grid gap-4">
+                <PersonaRow
+                  persona={persona} setPersona={setPersona}
+                  skin={skin} setSkin={setSkin}
+                  ageVibe={ageVibe} setAgeVibe={setAgeVibe}
+                  pose={pose} setPose={setPose}
+                />
+
+                <PacksRow
+                  stylePack={stylePack} setStylePack={setStylePack}
+                  bgPack={bgPack} setBgPack={setBgPack}
+                />
+
+                <TryOnCoreOptions
+                  pieceType={pieceType} setPieceType={setPieceType}
+                  numImages={numImages} setNumImages={setNumImages}
+                  aspect={aspect} setAspect={setAspect}
+                  seed={seed} setSeed={setSeed}
+                  guidance={guidance} setGuidance={setGuidance}
+                  safety={safety} setSafety={setSafety}
+                />
+              </div>
             )}
           </div>
 
           {/* Workbench */}
-          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_360px]">
             {/* Canvas Panel */}
             <section className="rounded-2xl md:rounded-3xl border border-emerald-200 bg-white shadow-sm relative">
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
@@ -599,7 +674,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Drop area (single) */}
+              {/* Drop area */}
               <div
                 ref={dropRef}
                 className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-emerald-300/70 bg-emerald-50 hover:bg-emerald-100 transition cursor-pointer"
@@ -614,9 +689,7 @@ export default function Dashboard() {
                 {!localUrl && !resultUrl ? (
                   <div className="text-center text-emerald-800 text-sm">
                     <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-emerald-200">⬆</div>
-                    {tool === 'tryon'
-                      ? 'Upload a clothing image (PNG/JPG). Transparent PNG preferred.'
-                      : 'Drag & drop an image here, click to choose, or paste (Ctrl+V)'}
+                    Upload a clothing image (PNG/JPG). Transparent PNG preferred.
                   </div>
                 ) : (
                   <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
@@ -639,17 +712,33 @@ export default function Dashboard() {
                 )}
               </div>
 
+              {/* Variants */}
+              {variants?.length > 1 && (
+                <div className="px-3 sm:px-4 md:px-5 pb-1">
+                  <div className="text-xs text-slate-600 mb-1">Variants</div>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {variants.map((v, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setResultUrl(v)}
+                        className={[
+                          'shrink-0 w-24 h-24 rounded-lg overflow-hidden border',
+                          resultUrl === v ? 'border-emerald-500 ring-2 ring-emerald-300' : 'border-emerald-200 hover:border-emerald-300'
+                        ].join(' ')}
+                        title={`Variant ${i+1}`}
+                      >
+                        <img src={v} alt={`v${i+1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
                 <button
                   onClick={handleRun}
-                  disabled={
-                    busy || (
-                      tool === 'tryon' ? (!file) :
-                      tool === 'modelSwap' ? true :
-                      !file
-                    )
-                  }
+                  disabled={busy || !file}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                 >
                   {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'tryon' ? 'Try-On' : (tool === 'removeBg' ? 'Remove BG' : 'Enhance')}</>)}
@@ -729,11 +818,19 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="rounded-lg border p-3">
-                    <div className="text-slate-600 mb-1">Type</div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-slate-800 capitalize">{pieceType}</div>
-                    </div>
+                  <div className="rounded-lg border p-3 grid grid-cols-2 gap-2">
+                    <Info label="Type" value={pieceType} />
+                    <Info label="Persona" value={persona} />
+                    <Info label="Skin" value={skin} />
+                    <Info label="Age vibe" value={ageVibe} />
+                    <Info label="Pose" value={pose} />
+                    <Info label="Style" value={stylePack} />
+                    <Info label="Background" value={bgPack} />
+                    <Info label="Aspect" value={aspect} />
+                    <Info label="Guidance" value={String(guidance)} />
+                    <Info label="Safety" value={String(safety)} />
+                    <Info label="Seed" value={seed || '—'} />
+                    <Info label="# Images" value={String(numImages)} />
                   </div>
 
                   {resultUrl && (
@@ -827,6 +924,22 @@ export default function Dashboard() {
             </div>
           </motion.div>
         )}
+
+        {showCustomize && (
+          <motion.div
+            className="fixed inset-0 z-[110] grid place-items-center"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/55" onClick={() => setShowCustomize(false)} />
+            <div className="relative w-full max-w-2xl mx-3">
+              <TryOnCustomizeModal
+                initial={custom}
+                onCancel={() => setShowCustomize(false)}
+                onConfirm={(val) => { setCustom(val); setShowCustomize(false); }}
+              />
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Toasts */}
@@ -836,9 +949,84 @@ export default function Dashboard() {
 }
 
 /* -------------------------------------------------------
-   Try-On Options Panel (No person image)
+   Persona / Packs / Options components
 ------------------------------------------------------- */
-function TryOnOptions({
+function PersonaRow({ persona, setPersona, skin, setSkin, ageVibe, setAgeVibe, pose, setPose }) {
+  return (
+    <div className="grid gap-3">
+      <div className="text-[12px] font-semibold text-slate-700">Persona</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {PERSONAS.map(p => (
+          <button
+            key={p.id}
+            onClick={() => setPersona(p.id)}
+            className={[
+              'rounded-xl border px-3 py-2 text-sm text-left transition',
+              persona === p.id ? 'border-emerald-400 bg-emerald-50' : 'border-emerald-200 hover:bg-emerald-50'
+            ].join(' ')}
+          >
+            <div className="font-semibold capitalize">{p.label}</div>
+            <div className="text-[11px] text-slate-500">{p.hint}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <Field label="Skin tone">
+          <Select value={skin} onChange={setSkin} options={SKIN_TONES} />
+        </Field>
+        <Field label="Age vibe">
+          <Select value={ageVibe} onChange={setAgeVibe} options={AGE_VIBES} />
+        </Field>
+        <Field label="Pose">
+          <Select value={pose} onChange={setPose} options={POSES} />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+function PacksRow({ stylePack, setStylePack, bgPack, setBgPack }) {
+  return (
+    <div className="grid gap-3">
+      <div className="text-[12px] font-semibold text-slate-700">Style Packs</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {STYLE_PACKS.map(p => (
+          <button
+            key={p.id}
+            onClick={() => setStylePack(p.id)}
+            className={[
+              'rounded-xl border px-3 py-2 text-left transition',
+              stylePack === p.id ? 'border-emerald-400 bg-emerald-50' : 'border-emerald-200 hover:bg-emerald-50'
+            ].join(' ')}
+          >
+            <div className="font-semibold">{p.title}</div>
+            <div className="text-[11px] text-slate-500">{p.desc}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="text-[12px] font-semibold text-slate-700 mt-2">Background Packs</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {BG_PACKS.map(p => (
+          <button
+            key={p.id}
+            onClick={() => setBgPack(p.id)}
+            className={[
+              'rounded-xl border px-3 py-2 text-left transition',
+              bgPack === p.id ? 'border-emerald-400 bg-emerald-50' : 'border-emerald-200 hover:bg-emerald-50'
+            ].join(' ')}
+          >
+            <div className="font-semibold">{p.title}</div>
+            <div className="text-[11px] text-slate-500">{p.desc}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TryOnCoreOptions({
   pieceType, setPieceType,
   numImages, setNumImages,
   aspect, setAspect,
@@ -847,10 +1035,10 @@ function TryOnOptions({
   safety, setSafety,
 }) {
   return (
-    <div className="mt-4 grid gap-3">
-      <div className="text-[12px] font-semibold text-slate-700">Try-On Options</div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Field label="Garment Type">
+    <div className="grid gap-3">
+      <div className="text-[12px] font-semibold text-slate-700">Core Options</div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <Field label="Garment type">
           <div className="inline-flex rounded-xl border border-emerald-200 bg-emerald-50 p-1">
             {['upper','lower','dress'].map((id) => (
               <button
@@ -867,7 +1055,7 @@ function TryOnOptions({
           </div>
         </Field>
 
-        <Field label="Aspect Ratio">
+        <Field label="Aspect ratio">
           <select
             value={aspect}
             onChange={(e)=>setAspect(e.target.value)}
@@ -882,7 +1070,7 @@ function TryOnOptions({
           </select>
         </Field>
 
-        <Field label="Num Images">
+        <Field label="# Images">
           <input
             type="number"
             min={1}
@@ -917,6 +1105,20 @@ function TryOnOptions({
 /* -------------------------------------------------------
    Reusable UI widgets
 ------------------------------------------------------- */
+function Select({ value, onChange, options }) {
+  return (
+    <select
+      value={value}
+      onChange={(e)=>onChange(e.target.value)}
+      className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs"
+    >
+      {options.map(opt => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
+  );
+}
+
 function PresetCard({ title, subtitle, onClick, preview, tag }) {
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -979,6 +1181,15 @@ function Range({ value, onChange, min, max, step = 1 }) {
   );
 }
 
+function Info({ label, value }) {
+  return (
+    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1">
+      <div className="text-[10px] text-emerald-700">{label}</div>
+      <div className="text-[11px] text-slate-800 capitalize">{value}</div>
+    </div>
+  );
+}
+
 function StepBadge({ phase }) {
   const map = {
     idle: { label: 'Ready', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
@@ -1017,10 +1228,13 @@ function BoxIcon(props) {
     </svg>
   );
 }
-function HangerIcon(props) {
+function PersonIcon(props) {
   return (
     <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M12 6a2 2 0 112-2 2 2 0 01-2 2zm1 2.5l7.5 5.5a1 1 0 01-1.2 1.6L12 11l-7.3 4.6a1 1 0 11-1.2-1.6L11 8.5V8a1 1 0 112 0v.5z" fill="currentColor"/>
+      <path
+        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
@@ -1071,8 +1285,68 @@ async function exportPng(url) {
 }
 
 /* -------------------------------------------------------
-   Simple Enhance Customizer (unchanged)
+   Modals
 ------------------------------------------------------- */
+function TryOnCustomizeModal({ initial, onCancel, onConfirm }) {
+  const [state, setState] = useState(initial || {
+    camera: '50mm eye-level',
+    lighting: 'softbox + fill, gentle reflections',
+    colorMood: 'neutral, accurate color',
+    extras: '',
+  });
+
+  return (
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border space-y-3">
+      <div className="text-sm font-semibold">Customize Try-On Aesthetics</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <label className="space-y-1">
+          <span className="text-slate-600">Camera</span>
+          <input
+            value={state.camera}
+            onChange={(e)=>setState(s=>({...s, camera: e.target.value}))}
+            className="w-full rounded-lg border px-2 py-1"
+            placeholder="35mm low angle / 50mm eye-level / 85mm portrait"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-slate-600">Lighting</span>
+          <input
+            value={state.lighting}
+            onChange={(e)=>setState(s=>({...s, lighting: e.target.value}))}
+            className="w-full rounded-lg border px-2 py-1"
+            placeholder="softbox + fill / clamp specular / daylight"
+          />
+        </label>
+        <label className="space-y-1 sm:col-span-2">
+          <span className="text-slate-600">Color mood</span>
+          <input
+            value={state.colorMood}
+            onChange={(e)=>setState(s=>({...s, colorMood: e.target.value}))}
+            className="w-full rounded-lg border px-2 py-1"
+            placeholder="neutral, accurate color / warm editorial / cool slate"
+          />
+        </label>
+        <label className="space-y-1 sm:col-span-2">
+          <span className="text-slate-600">Extras</span>
+          <input
+            value={state.extras}
+            onChange={(e)=>setState(s=>({...s, extras: e.target.value}))}
+            className="w-full rounded-lg border px-2 py-1"
+            placeholder="e.g., subtle grain, shallow depth, soft rim light"
+          />
+        </label>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={onCancel}>Cancel</button>
+        <button className="rounded-lg bg-emerald-700 text-white px-3 py-1.5 text-xs" onClick={()=>onConfirm(state)}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* Simple Enhance Customizer (unchanged) */
 function EnhanceCustomizer({ initial, onChange, onComplete }) {
   return (
     <div className="rounded-2xl bg-white p-4 sm:p-5 shadow border space-y-3">
