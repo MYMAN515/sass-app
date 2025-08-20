@@ -1,36 +1,29 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
 /**
- * MintLemon Studio — Dashboard (New, From Scratch)
- * -------------------------------------------------
- * Pure UX/UI rebuild matching the Mint–Lemon palette from the landing page.
- * - Airy gradients (#F3FFF8 → #FFFCE8 → #FFFFFF)
- * - Glass surfaces, soft borders, subtle shadows
- * - Responsive, mobile-first
- * - Generous touch targets
- * - Stepper flows with clear guidance
- * - Motion: layout spring, subtle entrance, no jank
- * - Same endpoints/shape expected by your backend (/api/remove-bg, /api/enhance, /api/tryon, /api/model)
- * - All functional handlers are included so you can drop-in replace the old dashboard
+ * MintLemon Studio — Dashboard (Single-Image Try-On + Presets)
+ * ------------------------------------------------------------
+ * - Try-On redesigned to generate a virtual model from prompt (no model image)
+ * - Persona / Pose & Camera / Scene & Lighting presets + Quick Presets
+ * - Live prompt preview, chips for Fit/Aspect/Shadow
+ * - Mobile-first, mint–lemon aesthetic, soft glass UI
  *
- * NOTE: If you need to adjust to App Router (next/navigation), replace useRouter import.
+ * NOTE:
+ * - /api/tryon now receives a SINGLE garment image + prompt.
+ *   Payload includes `image` (and `image2` for backward-compat).
+ * - If you're on App Router, swap next/router → next/navigation useRouter.
  */
 
 /* -------------------------------------------------------
-   Theme helpers (aligns with HeroSection colors)
+   Theme helpers
 ------------------------------------------------------- */
 const MINT = '#D8FFEA';
 const LEMON = '#FFF7B3';
-const BG_FROM = '#F3FFF8';
-const BG_VIA = '#FFFCE8';
-const BG_TO = '#FFFFFF';
-
 const ease = [0.22, 1, 0.36, 1];
 
 /* -------------------------------------------------------
@@ -42,9 +35,7 @@ const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
   const n = parseInt(v, 16);
-  const r = (n >> 16) & 255,
-    g = (n >> 8) & 255,
-    b = n & 255;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = (n) & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
 
@@ -61,11 +52,11 @@ const pickFirstUrl = (obj) => {
   if (typeof obj === 'string') return obj;
   const keys = ['image', 'image_url', 'output', 'result', 'url'];
   for (const k of keys) if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
-  return '';
+  return Array.isArray(obj) ? obj[0] : '';
 };
 
 /* -------------------------------------------------------
-   Presets — simplified & refreshed artwork slots (you can replace previews)
+   ENHANCE PRESETS (unchanged)
 ------------------------------------------------------- */
 const ENHANCE_PRESETS = [
   {
@@ -131,19 +122,44 @@ const ENHANCE_PRESETS = [
 ];
 
 /* -------------------------------------------------------
-   Models (placeholder demo library)
+   TRY-ON (single image) — Presets Data
 ------------------------------------------------------- */
-const MODELS = [
-  { id: 'm01', name: 'Ava — Studio Front', pose: 'front', url: '/models/m01.webp' },
-  { id: 'm02', name: 'Maya — Side Pose', pose: 'side', url: '/models/m02.webp' },
-  { id: 'm03', name: 'Lina — Half Body', pose: 'half', url: '/models/m03.webp' },
-  { id: 'm04', name: 'Zoe — Studio 3/4', pose: '34', url: '/models/m04.webp' },
-  { id: 'm05', name: 'Noah — Casual Front', pose: 'front', url: '/models/m05.webp' },
-  { id: 'm06', name: 'Omar — Studio Side', pose: 'side', url: '/models/m06.webp' },
-  { id: 'm07', name: 'Yara — Full Body', pose: 'full', url: '/models/m07.webp' },
-  { id: 'm08', name: 'Sara — 3/4 Smile', pose: '34', url: '/models/m08.webp' },
-  { id: 'm09', name: 'Jude — Front Studio', pose: 'front', url: '/models/m09.webp' },
-  { id: 'm10', name: 'Ali — Casual Half', pose: 'half', url: '/models/m10.webp' },
+// Persona (no real people; abstract virtual model descriptors)
+const PERSONA_PRESETS = [
+  { id: 'female_clean', label: 'Female — Clean', gender: 'female', body_shape: 'regular', skin_tone: 'III', hair_or_hijab: 'long hair', age_range: '25-30', height: 'average' },
+  { id: 'female_modest', label: 'Female — Hijab', gender: 'female', body_shape: 'regular', skin_tone: 'III', hair_or_hijab: 'hijab', age_range: '25-30', height: 'average' },
+  { id: 'male_beard', label: 'Male — Beard', gender: 'male', body_shape: 'regular', skin_tone: 'IV', hair_or_hijab: 'short hair + beard', age_range: '28-35', height: 'average' },
+  { id: 'female_plus', label: 'Female — Plus Size', gender: 'female', body_shape: 'plus-size', skin_tone: 'V', hair_or_hijab: 'covered hair', age_range: '28-35', height: 'average' },
+  { id: 'teen_unisex', label: 'Teen — Unisex', gender: 'unisex', body_shape: 'slim', skin_tone: 'IV', hair_or_hijab: 'short hair', age_range: '16-18', height: 'average' },
+  { id: 'male_business', label: 'Male — Business', gender: 'male', body_shape: 'regular', skin_tone: 'II', hair_or_hijab: 'short hair', age_range: '30-40', height: 'tall' },
+];
+
+// Pose & Camera
+const POSE_PRESETS = [
+  { id: 'front_mid', label: 'Front / Mid', pose: 'front', camera_distance: 'mid' },
+  { id: 'threeq_mid', label: '3/4 / Mid', pose: 'three-quarter', camera_distance: 'mid' },
+  { id: 'side_mid', label: 'Side / Mid', pose: 'side', camera_distance: 'mid' },
+  { id: 'front_full', label: 'Front / Full', pose: 'front', camera_distance: 'full' },
+  { id: 'front_close', label: 'Front / Close-up', pose: 'front', camera_distance: 'close-up' },
+];
+
+// Scene & Lighting
+const SCENE_PRESETS = [
+  { id: 'studio_white', label: 'Studio White + Softbox', backdrop: 'white seamless background', lighting: 'large softbox' },
+  { id: 'mint_rim', label: 'Mint Gradient + Soft Rim', backdrop: 'mint haze gradient', lighting: 'soft rim + fill' },
+  { id: 'lemon_editorial', label: 'Lemon Beige + Editorial Glow', backdrop: 'lemon beige gradient', lighting: 'editorial glow' },
+  { id: 'slate_contrast', label: 'Slate Vignette + High Contrast', backdrop: 'cool slate vignette', lighting: 'high contrast studio' },
+  { id: 'street_day', label: 'Street Daylight', backdrop: 'neutral city daylight', lighting: 'soft daylight with gentle shadow' },
+];
+
+// 1-click Quick Presets (combine Persona + Pose + Scene)
+const QUICK_PRESETS = [
+  { id: 'qp_f_clean', title: 'E-Comm Clean (Female)', persona: 'female_clean', pose: 'front_mid', scene: 'studio_white' },
+  { id: 'qp_m_clean', title: 'E-Comm Clean (Male)', persona: 'male_beard', pose: 'threeq_mid', scene: 'studio_white' },
+  { id: 'qp_modest', title: 'Modest Hijab', persona: 'female_modest', pose: 'front_mid', scene: 'mint_rim' },
+  { id: 'qp_plus', title: 'Plus-Size Confidence', persona: 'female_plus', pose: 'side_mid', scene: 'studio_white' },
+  { id: 'qp_street', title: 'Street Casual', persona: 'teen_unisex', pose: 'threeq_mid', scene: 'street_day' },
+  { id: 'qp_business', title: 'Business Male', persona: 'male_business', pose: 'front_full', scene: 'slate_contrast' },
 ];
 
 /* -------------------------------------------------------
@@ -180,9 +196,7 @@ function ToastHost({ items, onClose }) {
           >
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-zinc-900">{t.msg}</div>
-              <button className="text-xs text-zinc-600 hover:text-zinc-900" onClick={() => onClose(t.id)}>
-                ✕
-              </button>
+              <button className="text-xs text-zinc-600 hover:text-zinc-900" onClick={() => onClose(t.id)}>✕</button>
             </div>
             {typeof t.progress === 'number' && (
               <div className="mt-2 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
@@ -221,8 +235,8 @@ export default function Dashboard() {
   const toasts = useToasts();
 
   const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState('product');
-  const [tool, setTool] = useState('enhance');
+  const [group, setGroup] = useState('people'); // default users land on Try-On
+  const [tool, setTool] = useState('tryon');
   const [plan, setPlan] = useState('Free');
 
   // Work items
@@ -235,24 +249,30 @@ export default function Dashboard() {
   const [compare, setCompare] = useState(false);
   const [compareOpacity, setCompareOpacity] = useState(50);
 
-  // Model Swap
+  // Model Swap (kept for completeness)
   const [file1, setFile1] = useState(null);
   const [file2, setFile2] = useState(null);
   const [local1, setLocal1] = useState('');
   const [local2, setLocal2] = useState('');
   const [swapPrompt, setSwapPrompt] = useState('');
 
-  // Try-On
-  const [selectedModel, setSelectedModel] = useState(null);
-  const [pieceType, setPieceType] = useState(null);
-  const [tryonStep, setTryonStep] = useState('cloth'); // cloth → piece → model
+  // Try-On (single image) selections
+  const [pieceType, setPieceType] = useState(null); // upper / lower / dress / outfit
+  const [tryonStep, setTryonStep] = useState('cloth'); // cloth → piece → options
+  const [personaId, setPersonaId] = useState(PERSONA_PRESETS[0].id);
+  const [poseId, setPoseId] = useState(POSE_PRESETS[0].id);
+  const [sceneId, setSceneId] = useState(SCENE_PRESETS[0].id);
+  const [fit, setFit] = useState('regular');
+  const [aspect, setAspect] = useState('1:1'); // 1:1 / 4:5 / 3:2
+  const [shadowOn, setShadowOn] = useState(true);
+  const [faceMode, setFaceMode] = useState('subtle'); // subtle / none / natural
 
   const [phase, setPhase] = useState('idle');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [history, setHistory] = useState([]);
 
-  // Remove BG frame design
+  // Remove BG design
   const [bgMode, setBgMode] = useState('gradient'); // color | gradient | pattern
   const [color, setColor] = useState('#ffffff');
   const [color2, setColor2] = useState('#E8FFF4');
@@ -283,23 +303,17 @@ export default function Dashboard() {
       } catch {}
       setLoading(false);
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [user, router, supabase]);
 
   /* ---------- drop & paste --------- */
   useEffect(() => {
     const el = dropRef.current;
     if (!el) return;
-    const over = (e) => {
-      e.preventDefault();
-      el.classList.add('ring-2', 'ring-zinc-300');
-    };
+    const over = (e) => { e.preventDefault(); el.classList.add('ring-2', 'ring-zinc-300'); };
     const leave = () => el.classList.remove('ring-2', 'ring-zinc-300');
     const drop = async (e) => {
-      e.preventDefault();
-      leave();
+      e.preventDefault(); leave();
       const f = e.dataTransfer.files?.[0];
       if (f) await onPick(f);
     };
@@ -356,12 +370,12 @@ export default function Dashboard() {
     }
     return {
       ...bgStyle,
-      borderRadius: `${radius}px`,
-      padding: `${padding}px`,
+      borderRadius: 16,
+      padding: 16,
       boxShadow: shadow ? '0 22px 60px rgba(0,0,0,.08), 0 8px 20px rgba(0,0,0,.05)' : 'none',
       transition: 'all .25s ease',
     };
-  }, [bgMode, color, color2, angle, radius, padding, shadow, patternOpacity]);
+  }, [bgMode, color, color2, angle, shadow, patternOpacity]);
 
   /* ---------- storage ---------- */
   const uploadToStorage = useCallback(
@@ -370,9 +384,7 @@ export default function Dashboard() {
       const ext = (f.name?.split('.').pop() || 'png').toLowerCase();
       const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, f, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: f.type || 'image/*',
+        cacheControl: '3600', upsert: false, contentType: f.type || 'image/*',
       });
       if (upErr) throw upErr;
       const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
@@ -383,6 +395,34 @@ export default function Dashboard() {
   );
 
   /* ---------- prompts ---------- */
+  const getPersona = (id) => PERSONA_PRESETS.find(p => p.id === id);
+  const getPose = (id) => POSE_PRESETS.find(p => p.id === id);
+  const getScene = (id) => SCENE_PRESETS.find(s => s.id === id);
+
+  const buildTryOnPromptFromCards = () => {
+    const persona = getPersona(personaId);
+    const pose = getPose(poseId);
+    const scene = getScene(sceneId);
+
+    // Aspect to wording
+    const aspectWords = aspect === '1:1' ? 'square 1:1' : aspect === '4:5' ? 'portrait 4:5' : 'landscape 3:2';
+    const faceText =
+      faceMode === 'none' ? 'no visible face; no identity; ' :
+      faceMode === 'subtle' ? 'subtle, non-identifiable face features; ' : 'natural face; ';
+
+    return [
+      'Generate a photorealistic fashion model (virtual, not a real person) wearing the garment from the input image only.',
+      `Persona: ${persona.gender}, ${persona.body_shape} body, skin tone ${persona.skin_tone}, ${persona.hair_or_hijab}, approx ${persona.height} height, age ${persona.age_range}.`,
+      `Pose & Camera: ${pose.pose} orientation, ${pose.camera_distance} framing, centered body, realistic proportions.`,
+      `Scene & Lighting: ${scene.backdrop}, ${scene.lighting}, ${shadowOn ? 'coherent ground shadow,' : 'no ground shadow,'} ${aspectWords} composition.`,
+      faceText + 'no brands, no extra text.',
+      'Preserve garment anatomy exactly: sleeves, collar, hem, waistband, seams, logos; align scale to torso; natural fabric drape; avoid cropping garment edges.',
+      `Clothing placement: ${pieceType ? (pieceType === 'upper' ? 'TOP' : pieceType === 'lower' ? 'BOTTOM' : pieceType === 'dress' ? 'FULL DRESS' : 'FULL OUTFIT') : 'TOP'}.`,
+      `Fit style: ${fit}. Output 4k, crisp edges, clean studio result.`,
+      'If any region is occluded in source, inpaint realistically to complete without altering design.',
+    ].join(' ');
+  };
+
   const buildEnhancePrompt = (f) =>
     [
       f?.photographyStyle,
@@ -391,43 +431,17 @@ export default function Dashboard() {
       `colors: ${f?.colorStyle}`,
       f?.realism,
       `output: ${f?.outputQuality}`,
-    ]
-      .filter(Boolean)
-      .join(', ');
-
-  const buildTryOnPrompt = (pieceType) => {
-    const region =
-      pieceType === 'upper'
-        ? 'the TOP'
-        : pieceType === 'lower'
-        ? 'the BOTTOM'
-        : pieceType === 'dress'
-        ? 'the FULL DRESS'
-        : 'the FULL OUTFIT';
-
-    return [
-      'Make the model wear the garment from the clothing photo on the person image; align scale and pose; preserve original garment structure (sleeves, collar, length, waistband, hem);',
-      'respect body occlusions and inpaint hidden areas naturally; keep hands and hair realistic; coherent lighting & shadows; photorealistic fabric drape & seams; 4k output;',
-      `place the garment on ${region}; avoid crop; center the person; maintain realistic body proportions.`,
-    ].join(' ');
-  };
+    ].filter(Boolean).join(', ');
 
   /* ---------- runners ---------- */
   const runRemoveBg = useCallback(async () => {
     if (!file) return setErr('Pick an image first.');
-    setBusy(true);
-    setErr('');
-    setPhase('processing');
+    setBusy(true); setErr(''); setPhase('processing');
     const t = toasts.push('Removing background…', { progress: 8 });
-    let adv = 8;
-    const iv = setInterval(() => {
-      adv = Math.min(adv + 6, 88);
-      t.update({ progress: adv });
-    }, 500);
+    let adv = 8; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
     try {
       const r = await fetch('/api/remove-bg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageData }),
       });
       const j = await r.json();
@@ -440,35 +454,23 @@ export default function Dashboard() {
       t.update({ progress: 100, msg: 'Background removed ✓' });
       setTimeout(() => t.close(), 700);
     } catch (e) {
-      console.error(e);
-      setPhase('error');
-      setErr('Failed to process.');
+      console.error(e); setPhase('error'); setErr('Failed to process.');
       t.update({ msg: 'Remove BG failed', type: 'error' });
       setTimeout(() => t.close(), 1500);
-    } finally {
-      clearInterval(iv);
-      setBusy(false);
-    }
+    } finally { clearInterval(iv); setBusy(false); }
   }, [file, imageData, localUrl, toasts]);
 
   const runEnhance = useCallback(
     async (selections) => {
       if (!file) return setErr('Pick an image first.');
-      setBusy(true);
-      setErr('');
-      setPhase('processing');
+      setBusy(true); setErr(''); setPhase('processing');
       const imageUrl = await uploadToStorage(file);
       const prompt = buildEnhancePrompt(selections);
       const t = toasts.push('Enhancing…', { progress: 12 });
-      let adv = 12;
-      const iv = setInterval(() => {
-        adv = Math.min(adv + 6, 88);
-        t.update({ progress: adv });
-      }, 500);
+      let adv = 12; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
       try {
         const r = await fetch('/api/enhance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email }),
         });
         const j = await r.json();
@@ -481,86 +483,46 @@ export default function Dashboard() {
         t.update({ progress: 100, msg: 'Enhanced ✓' });
         setTimeout(() => t.close(), 700);
       } catch (e) {
-        console.error(e);
-        setPhase('error');
-        setErr('Failed to process.');
+        console.error(e); setPhase('error'); setErr('Failed to process.');
         t.update({ msg: 'Enhance failed', type: 'error' });
         setTimeout(() => t.close(), 1500);
-      } finally {
-        clearInterval(iv);
-        setBusy(false);
-      }
+      } finally { clearInterval(iv); setBusy(false); }
     },
     [file, uploadToStorage, plan, user, localUrl, toasts]
   );
 
   const runTryOn = useCallback(async () => {
-    if (!file) {
-      setErr('Please upload a clothing image first.');
-      return;
-    }
-    if (!selectedModel?.url) {
-      setErr('Please select a model first.');
-      return;
-    }
-    if (!pieceType) {
-      setErr('Please choose the clothing type.');
-      return;
-    }
+    if (!file) { setErr('Please upload a clothing image first.'); return; }
+    if (!pieceType) { setErr('Please choose the clothing type.'); return; }
 
-    const origin =
-      (typeof window !== 'undefined' && window.location?.origin) ||
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      'https://aistoreassistant.app';
+    setBusy(true); setErr(''); setPhase('processing');
 
-    const modelUrlAbs = selectedModel.url.startsWith('http')
-      ? selectedModel.url
-      : new URL(selectedModel.url, origin).toString();
-
-    setBusy(true);
-    setErr('');
-    setPhase('processing');
-
-    const prompt = buildTryOnPrompt(pieceType);
-
+    const prompt = buildTryOnPromptFromCards();
     const toast = toasts.push('Generating try-on…', { progress: 10 });
-    let progress = 10;
-    const iv = setInterval(() => {
-      progress = Math.min(progress + 6, 88);
-      toast.update({ progress });
-    }, 500);
+    let progress = 10; const iv = setInterval(() => { progress = Math.min(progress + 6, 88); toast.update({ progress }); }, 500);
 
     try {
       const clothUrl = await uploadToStorage(file);
 
+      // Send only ONE image. Include image2 for backward-compat if backend still expects it.
+      const payload = {
+        image: clothUrl,
+        image2: clothUrl,
+        pieceType,
+        plan,
+        user_email: user.email,
+        prompt,
+        aspect, // optional hint to backend
+      };
+
       const r = await fetch('/api/tryon', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image1: modelUrlAbs,
-          image2: clothUrl,
-          pieceType,
-          plan,
-          user_email: user.email,
-          prompt,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        const msg =
-          j?.error ||
-          (r.status === 400
-            ? 'Missing required fields.'
-            : r.status === 401
-            ? 'Unauthorized.'
-            : r.status === 403
-            ? 'No credits left.'
-            : r.status === 404
-            ? 'User not found.'
-            : r.status === 500
-            ? 'Generation failed on the server.'
-            : `Unexpected error (${r.status}).`);
+        const msg = j?.error || (r.status === 500 ? 'Generation failed on the server.' : `Unexpected error (${r.status}).`);
         throw new Error(msg);
       }
 
@@ -568,40 +530,30 @@ export default function Dashboard() {
       if (!out) throw new Error('No output image returned from the API.');
 
       setResultUrl(out);
-      setHistory((h) => [{ tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
-
+      setHistory((h) => [{ tool: 'Try-On', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
       setPhase('ready');
       toast.update({ progress: 100, msg: 'Try-On ✓' });
       setTimeout(() => toast.close(), 700);
     } catch (e) {
       console.error(e);
-      setPhase('error');
-      setErr(e?.message || 'Processing failed.');
+      setPhase('error'); setErr(e?.message || 'Processing failed.');
       toast.update({ msg: `Try-On failed: ${e?.message || 'Error'}`, type: 'error' });
       setTimeout(() => toast.close(), 1500);
     } finally {
-      clearInterval(iv);
-      setBusy(false);
+      clearInterval(iv); setBusy(false);
     }
-  }, [file, selectedModel, pieceType, uploadToStorage, plan, user, toasts]);
+  }, [file, pieceType, uploadToStorage, plan, user, toasts, aspect, buildTryOnPromptFromCards, localUrl]);
 
   const runModelSwap = useCallback(
     async () => {
       if (!file1 || !file2) return setErr('Pick both images.');
-      setBusy(true);
-      setErr('');
-      setPhase('processing');
+      setBusy(true); setErr(''); setPhase('processing');
       const [image1, image2] = await Promise.all([uploadToStorage(file1), uploadToStorage(file2)]);
       const t = toasts.push('Running Model Swap…', { progress: 10 });
-      let adv = 10;
-      const iv = setInterval(() => {
-        adv = Math.min(adv + 6, 88);
-        t.update({ progress: adv });
-      }, 500);
+      let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
       try {
         const r = await fetch('/api/model', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image1, image2, prompt: swapPrompt, plan, user_email: user.email }),
         });
         const j = await r.json();
@@ -614,51 +566,28 @@ export default function Dashboard() {
         t.update({ progress: 100, msg: 'Model Swap done ✓' });
         setTimeout(() => t.close(), 700);
       } catch (e) {
-        console.error(e);
-        setPhase('error');
-        setErr('Failed to process.');
+        console.error(e); setPhase('error'); setErr('Failed to process.');
         t.update({ msg: 'Model Swap failed', type: 'error' });
         setTimeout(() => t.close(), 1500);
-      } finally {
-        clearInterval(iv);
-        setBusy(false);
-      }
+      } finally { clearInterval(iv); setBusy(false); }
     },
     [file1, file2, swapPrompt, uploadToStorage, plan, user, local1, toasts]
   );
 
   /* ---------- handlers ---------- */
   const resetAll = () => {
-    setFile(null);
-    setLocalUrl('');
-    setResultUrl('');
-    setFile1(null);
-    setFile2(null);
-    setLocal1('');
-    setLocal2('');
-    setErr('');
-    setPhase('idle');
-    setCompare(false);
-    setSelectedModel(null);
-    setPieceType(null);
-    setTryonStep(tool === 'tryon' ? 'cloth' : 'cloth');
+    setFile(null); setLocalUrl(''); setResultUrl('');
+    setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
+    setErr(''); setPhase('idle'); setCompare(false);
+    setPieceType(null); setTryonStep(tool === 'tryon' ? 'cloth' : 'cloth');
   };
 
   const switchTool = (nextId) => {
     setTool(nextId);
-    setResultUrl('');
-    setErr('');
-    setPhase('idle');
-    setCompare(false);
-    setFile(null);
-    setLocalUrl('');
-    setFile1(null);
-    setFile2(null);
-    setLocal1('');
-    setLocal2('');
-    setSelectedModel(null);
-    setPieceType(null);
-    setTryonStep(nextId === 'tryon' ? 'cloth' : 'cloth');
+    setResultUrl(''); setErr(''); setPhase('idle'); setCompare(false);
+    setFile(null); setLocalUrl('');
+    setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
+    setPieceType(null); setTryonStep(nextId === 'tryon' ? 'cloth' : 'cloth');
   };
 
   const handleRun = () => {
@@ -690,6 +619,8 @@ export default function Dashboard() {
     const p = n.split(' ').filter(Boolean);
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
+
+  const livePrompt = buildTryOnPromptFromCards();
 
   return (
     <main className="relative min-h-screen w-full overflow-clip bg-gradient-to-b from-[#F3FFF8] via-[#FFFCE8] to-white text-zinc-900">
@@ -805,31 +736,24 @@ export default function Dashboard() {
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
           {/* Header Card */}
-          <motion.div
-            layout
-            className="rounded-3xl border border-zinc-200 bg-white/70 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm"
-          >
+          <motion.div layout className="rounded-3xl border border-zinc-200 bg-white/70 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-zinc-900">
-                  {group === 'product' ? 'Presets & Actions' : tool === 'tryon' ? 'Try-On Flow' : 'Model Swap'}
+                  {group === 'product' ? 'Presets & Actions' : tool === 'tryon' ? 'Try-On (Single Image)' : 'Model Swap'}
                 </h1>
                 <p className="text-zinc-700/80 text-xs sm:text-sm">
                   {group === 'product'
                     ? 'Choose a preset or open Customize.'
                     : tool === 'tryon'
-                    ? 'Step 1: upload clothing → Step 2: choose type → Step 3: pick a model → Run.'
+                    ? 'Step 1: upload clothing → Step 2: choose type → Step 3: select presets → Run.'
                     : 'Upload two images and write a short instruction, then run Model Swap.'}
                 </p>
               </div>
 
               {group === 'product' ? (
                 <button
-                  onClick={() => {
-                    setTool('enhance');
-                    setPendingEnhancePreset(null);
-                    setShowEnhance(true);
-                  }}
+                  onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
                   className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-zinc-50 text-zinc-900"
                 >
                   ✨ Customize Enhance
@@ -857,30 +781,66 @@ export default function Dashboard() {
                       subtitle={p.subtitle}
                       preview={p.preview}
                       tag={p.tag}
-                      onClick={() => {
-                        setTool('enhance');
-                        setPendingEnhancePreset(p.config);
-                        setShowEnhance(true);
-                      }}
+                      onClick={() => { setTool('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
                     />
                   ))}
                 </div>
               </div>
             ) : tool === 'tryon' ? (
-              <div className="mt-4">
-                <TryOnStepper step={tryonStep} pieceType={pieceType} modelPicked={!!selectedModel} />
-                {tryonStep === 'model' ? (
-                  <div className="mt-3">
-                    <div className="mb-2 text-[12px] font-semibold text-zinc-700">Models</div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      {MODELS.map((m) => (
-                        <ModelCard key={m.id} model={m} active={selectedModel?.id === m.id} onSelect={() => setSelectedModel(m)} />)
-                      )}
+              <div className="mt-4 space-y-3">
+                {/* Stepper */}
+                <TryOnStepper step={tryonStep} pieceType={pieceType} />
+
+                {/* Quick Presets */}
+                {tryonStep === 'options' ? (
+                  <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
+                    <div className="mb-2 text-[12px] font-semibold text-zinc-700">Quick Presets</div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {QUICK_PRESETS.map(q => (
+                        <QuickPresetCard
+                          key={q.id}
+                          title={q.title}
+                          active={personaId === q.persona && poseId === q.pose && sceneId === q.scene}
+                          onClick={() => { setPersonaId(q.persona); setPoseId(q.pose); setSceneId(q.scene); }}
+                        />
+                      ))}
                     </div>
+                  </div>
+                ) : null}
+
+                {/* Persona / Pose / Scene */}
+                {tryonStep === 'options' ? (
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    <PresetGroup
+                      title="Persona"
+                      items={PERSONA_PRESETS}
+                      activeId={personaId}
+                      onSelect={setPersonaId}
+                      getSubtitle={(p) => `${p.gender}, ${p.body_shape}, tone ${p.skin_tone}`}
+                    />
+                    <PresetGroup
+                      title="Pose & Camera"
+                      items={POSE_PRESETS}
+                      activeId={poseId}
+                      onSelect={setPoseId}
+                      getSubtitle={(p) => `${p.pose}, ${p.camera_distance}`}
+                    />
+                    <PresetGroup
+                      title="Scene & Lighting"
+                      items={SCENE_PRESETS}
+                      activeId={sceneId}
+                      onSelect={setSceneId}
+                      getSubtitle={(s) => s.lighting}
+                    />
+                  </div>
+                ) : tryonStep === 'piece' ? (
+                  <div className="mt-3">
+                    <div className="text-[12px] font-semibold text-zinc-700 mb-2">Choose clothing type</div>
+                    <PieceChips value={pieceType} onChange={(v) => { setPieceType(v); setTryonStep('options'); }} />
                   </div>
                 ) : (
                   <div className="mt-3 rounded-2xl border border-dashed border-zinc-300/70 p-4 text-xs text-zinc-700 bg-white/60">
-                    Upload clothing first, then choose type. Models will appear next.
+                    Upload clothing first, then choose type. Presets will appear next.
                   </div>
                 )}
               </div>
@@ -932,7 +892,13 @@ export default function Dashboard() {
                   onClick={() => inputRef.current?.click()}
                   title="Drag & drop / Click / Paste (Ctrl+V)"
                 >
-                  <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }} />
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
+                  />
                   {!localUrl && !resultUrl ? (
                     <div className="text-center text-zinc-700 text-sm">
                       <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-zinc-200">⬆</div>
@@ -978,15 +944,16 @@ export default function Dashboard() {
                 <button
                   onClick={handleRun}
                   disabled={
-                    busy || (tool === 'modelSwap' ? !file1 || !file2 : tool === 'tryon' ? !file || !selectedModel || !pieceType : !file)
+                    busy ||
+                    (tool === 'modelSwap'
+                      ? !file1 || !file2
+                      : tool === 'tryon'
+                      ? !file || !pieceType
+                      : !file)
                   }
                   className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                 >
-                  {busy ? 'Processing…' : (
-                    <>
-                      <PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On'}
-                    </>
-                  )}
+                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On'}</>)}
                 </button>
 
                 {resultUrl && (
@@ -1060,19 +1027,34 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  <div className="rounded-xl border border-zinc-200 p-3 bg-white space-y-2">
+                    <div className="text-zinc-700">Fine Controls</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Chip active={fit === 'regular'} onClick={() => setFit('regular')}>Fit: Regular</Chip>
+                      <Chip active={fit === 'slim'} onClick={() => setFit('slim')}>Fit: Slim</Chip>
+                      <Chip active={fit === 'oversized'} onClick={() => setFit('oversized')}>Fit: Oversized</Chip>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Chip active={aspect === '1:1'} onClick={() => setAspect('1:1')}>1:1</Chip>
+                      <Chip active={aspect === '4:5'} onClick={() => setAspect('4:5')}>4:5</Chip>
+                      <Chip active={aspect === '3:2'} onClick={() => setAspect('3:2')}>3:2</Chip>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Chip active={shadowOn} onClick={() => setShadowOn(true)}>Shadow: On</Chip>
+                      <Chip active={!shadowOn} onClick={() => setShadowOn(false)}>Shadow: Off</Chip>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Chip active={faceMode === 'subtle'} onClick={() => setFaceMode('subtle')}>Face: Subtle</Chip>
+                      <Chip active={faceMode === 'none'} onClick={() => setFaceMode('none')}>Face: None</Chip>
+                      <Chip active={faceMode === 'natural'} onClick={() => setFaceMode('natural')}>Face: Natural</Chip>
+                    </div>
+                  </div>
+
                   <div className="rounded-xl border border-zinc-200 p-3 bg-white">
-                    <div className="text-zinc-700 mb-1">Selected Model</div>
-                    {selectedModel ? (
-                      <div className="flex items-center gap-2">
-                        <img src={selectedModel.url} alt={selectedModel.name} className="w-10 h-10 rounded-md object-cover border border-zinc-100" />
-                        <div>
-                          <div className="font-semibold text-zinc-900">{selectedModel.name}</div>
-                          <div className="text-[11px] text-zinc-600">Pose: {selectedModel.pose}</div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-zinc-400">— Pick a model above —</div>
-                    )}
+                    <div className="text-zinc-700 mb-1">Live Prompt Preview</div>
+                    <div className="text-[11px] leading-relaxed text-zinc-700 max-h-40 overflow-auto">
+                      {livePrompt}
+                    </div>
                   </div>
 
                   {resultUrl && (
@@ -1091,7 +1073,6 @@ export default function Dashboard() {
                   <Field label="Primary">
                     <Color value={color} onChange={setColor} />
                   </Field>
-
                   {bgMode === 'gradient' && (
                     <>
                       <Field label="Secondary">
@@ -1102,18 +1083,16 @@ export default function Dashboard() {
                       </Field>
                     </>
                   )}
-
                   {bgMode === 'pattern' && (
                     <Field label="Pattern opacity">
                       <Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} />
                     </Field>
                   )}
-
                   <Field label="Radius">
-                    <Range value={radius} onChange={setRadius} min={0} max={48} />
+                    <Range value={16} onChange={() => {}} min={0} max={48} />
                   </Field>
                   <Field label="Padding">
-                    <Range value={padding} onChange={setPadding} min={0} max={64} />
+                    <Range value={16} onChange={() => {}} min={0} max={64} />
                   </Field>
 
                   <label className="mt-1 inline-flex items-center gap-2 text-xs text-zinc-800">
@@ -1139,9 +1118,7 @@ export default function Dashboard() {
               {/* Enhance inspector */}
               {tool === 'enhance' && (
                 <div className="space-y-2 text-xs text-zinc-700 mt-3">
-                  <div>
-                    Choose a preset above or press <span className="font-semibold text-zinc-900">Customize</span>.
-                  </div>
+                  <div>Choose a preset above or press <span className="font-semibold text-zinc-900">Customize</span>.</div>
                   {resultUrl && (
                     <div className="mt-2 rounded-2xl overflow-hidden border border-zinc-200 bg-white/60">
                       <div className="relative w-full min-h-[140px] grid place-items-center">
@@ -1227,17 +1204,13 @@ export default function Dashboard() {
             <div className="relative w-full max-w-3xl mx-3">
               <EnhanceCustomizer
                 initial={pendingEnhancePreset || undefined}
-                onComplete={(form) => {
-                  setShowEnhance(false);
-                  setPendingEnhancePreset(null);
-                  runEnhance(form);
-                }}
+                onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form); }}
               />
             </div>
           </motion.div>
         )}
 
-        {/* Try-On piece chooser as inline panel */}
+        {/* Try-On piece chooser (if needed) */}
         {tryonStep === 'piece' && tool === 'tryon' && (
           <motion.div className="fixed inset-0 z-[110] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/30" onClick={() => setTryonStep('cloth')} />
@@ -1245,10 +1218,7 @@ export default function Dashboard() {
               <PieceTypeModal
                 initial={pieceType || 'upper'}
                 onCancel={() => setTryonStep('cloth')}
-                onConfirm={(type) => {
-                  setPieceType(type);
-                  setTryonStep('model');
-                }}
+                onConfirm={(type) => { setPieceType(type); setTryonStep('options'); }}
               />
             </div>
           </motion.div>
@@ -1311,41 +1281,80 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
   );
 }
 
-function ModelCard({ model, active, onSelect }) {
+function QuickPresetCard({ title, onClick, active }) {
   return (
-    <motion.button onClick={onSelect} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className={[ 'group relative rounded-2xl overflow-hidden border bg-white/80 backdrop-blur shadow-sm transition', active ? 'border-zinc-400 ring-2 ring-zinc-300' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-md', ].join(' ')} title={model.name}>
-      <div className="relative w-full aspect-[4/5] bg-zinc-50/60">
-        <img src={model.url} alt={model.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-        <div className="absolute top-2 left-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">{active ? 'Selected' : 'Use model'}</div>
-      </div>
-      <div className="p-3">
-        <div className="font-semibold truncate text-zinc-900">{model.name}</div>
-        <div className="text-[11px] text-zinc-600">Pose: {model.pose}</div>
-      </div>
+    <motion.button onClick={onClick} whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}
+      className={[
+        'rounded-xl border px-3 py-2 text-sm text-left transition',
+        active ? 'border-zinc-400 bg-white shadow-sm' : 'border-zinc-200 bg-white/80 hover:bg-white'
+      ].join(' ')}
+    >
+      {title}
     </motion.button>
   );
 }
 
-function TryOnStepper({ step, pieceType, modelPicked }) {
-  const map = { cloth: 0, piece: 1, model: 2 };
+function PresetGroup({ title, items, activeId, onSelect, getSubtitle }) {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
+      <div className="mb-2 text-[12px] font-semibold text-zinc-700">{title}</div>
+      <div className="grid gap-2">
+        {items.map((it) => (
+          <button
+            key={it.id}
+            onClick={() => onSelect(it.id)}
+            className={[
+              'w-full text-left rounded-xl border px-3 py-2 text-sm transition',
+              activeId === it.id ? 'border-zinc-400 bg-white' : 'border-zinc-200 hover:bg-white/70'
+            ].join(' ')}
+          >
+            <div className="font-semibold text-zinc-900">{it.label}</div>
+            <div className="text-[11px] text-zinc-600">{getSubtitle ? getSubtitle(it) : ''}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PieceChips({ value, onChange }) {
+  const opts = [
+    { id: 'upper', label: 'Upper (T-shirt/Shirt/Jacket)' },
+    { id: 'lower', label: 'Lower (Pants/Jeans/Skirt)' },
+    { id: 'dress', label: 'Full Dress' },
+    { id: 'outfit', label: 'Full Outfit' },
+  ];
+  return (
+    <div className="flex flex-wrap gap-2">
+      {opts.map(o => (
+        <Chip key={o.id} active={value === o.id} onClick={() => onChange(o.id)}>
+          {o.label}
+        </Chip>
+      ))}
+    </div>
+  );
+}
+
+function TryOnStepper({ step, pieceType }) {
+  const map = { cloth: 0, piece: 1, options: 2 };
   const idx = map[step] ?? 0;
   const steps = [
     { id: 'cloth', label: 'Upload clothing' },
     { id: 'piece', label: pieceType ? `Type: ${pieceType}` : 'Choose type' },
-    { id: 'model', label: modelPicked ? 'Model selected' : 'Pick a model' },
+    { id: 'options', label: 'Select presets' },
   ];
   return (
     <div className="w-full">
       <div className="flex items-center justify-between gap-2">
         {steps.map((s, i) => {
-          const done = i < idx;
-          const active = i === idx;
+          const done = i < idx; const active = i === idx;
           return (
             <div key={s.id} className="flex-1">
               <div className="flex items-center gap-2">
-                <motion.div layout className={[ 'size-6 rounded-full grid place-items-center border text-[11px] font-semibold', done ? 'bg-zinc-900 text-white border-zinc-900' : active ? 'bg-white text-zinc-900 border-zinc-300' : 'bg-white text-zinc-700 border-zinc-200', ].join(' ')}>
-                  {done ? '✓' : i + 1}
-                </motion.div>
+                <motion.div layout className={[
+                  'size-6 rounded-full grid place-items-center border text-[11px] font-semibold',
+                  done ? 'bg-zinc-900 text-white border-zinc-900' : active ? 'bg-white text-zinc-900 border-zinc-300' : 'bg-white text-zinc-700 border-zinc-200',
+                ].join(' ')}>{done ? '✓' : i + 1}</motion.div>
                 <div className={['text-xs sm:text-[13px]', done ? 'text-zinc-700' : active ? 'text-zinc-900' : 'text-zinc-700/80'].join(' ')}>{s.label}</div>
               </div>
               {i < steps.length - 1 && (
@@ -1374,6 +1383,20 @@ function StepBadge({ phase }) {
       <span className={`inline-block size-2 rounded-full ${phase === 'processing' ? 'bg-zinc-700 animate-pulse' : 'bg-zinc-700'}`} />
       {it.label}
     </span>
+  );
+}
+
+function Chip({ children, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        'px-3 py-1.5 rounded-full border text-xs transition',
+        active ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white border-zinc-200 hover:bg-zinc-100'
+      ].join(' ')}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -1427,13 +1450,14 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
     { id: 'upper', label: 'Upper (T-shirt/Shirt/Jacket)' },
     { id: 'lower', label: 'Lower (Pants/Jeans/Skirt)' },
     { id: 'dress', label: 'Full Dress (One-piece)' },
+    { id: 'outfit', label: 'Full Outfit' },
   ];
   return (
     <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border border-zinc-200 space-y-3">
       <div className="text-sm font-semibold text-zinc-900">Choose clothing type</div>
       <div className="grid grid-cols-1 gap-2">
         {options.map((o) => (
-          <button key={o.id} onClick={() => setActive(o.id)} className={[ 'w-full text-left rounded-xl border px-3 py-2 text-sm transition', active === o.id ? 'border-zinc-400 bg-white' : 'border-zinc-200 hover:bg-white/70', ].join(' ')}>
+          <button key={o.id} onClick={() => setActive(o.id)} className={['w-full text-left rounded-xl border px-3 py-2 text-sm transition', active === o.id ? 'border-zinc-400 bg-white' : 'border-zinc-200 hover:bg-white/70'].join(' ')}>
             {o.label}
           </button>
         ))}
@@ -1451,56 +1475,13 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
 }
 
 /* ----- Icons (SVG) ----- */
-function SparkleIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" />
-    </svg>
-  );
-}
-function BoxIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor" />
-    </svg>
-  );
-}
-function PersonIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor" />
-    </svg>
-  );
-}
-function ScissorsIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" />
-    </svg>
-  );
-}
-function RocketIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" />
-      <circle cx="15" cy="9" r="1.5" fill="#fff" />
-    </svg>
-  );
-}
-function SwapIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor" />
-    </svg>
-  );
-}
-function PlayIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M8 5v14l11-7z" fill="currentColor" />
-    </svg>
-  );
-}
+function SparkleIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" /></svg>); }
+function BoxIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true"><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor" /></svg>); }
+function PersonIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor" /></svg>); }
+function ScissorsIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true"><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" /></svg>); }
+function RocketIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true"><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" /><circle cx="15" cy="9" r="1.5" fill="#fff" /></svg>); }
+function SwapIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true"><path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor" /></svg>); }
+function PlayIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>); }
 
 /* -------------------------------------------------------
    Export helpers — safe (handles CORS fallback)
@@ -1511,26 +1492,17 @@ async function exportPngSafe(url) {
     const blob = await res.blob();
     const img = await createImageBitmap(blob);
     const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
+    canvas.width = img.width; canvas.height = img.height;
     const ctx = canvas.getContext('2d', { alpha: true });
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0);
     const a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
-    a.download = 'studio-output.png';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.href = canvas.toDataURL('image/png'); a.download = 'studio-output.png';
+    document.body.appendChild(a); a.click(); a.remove();
   } catch {
-    // Fallback: direct download (may fail to set filename)
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'studio-output.png';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.href = url; a.download = 'studio-output.png';
+    document.body.appendChild(a); a.click(); a.remove();
   }
 }
 
@@ -1546,9 +1518,7 @@ function EnhanceCustomizer({ initial, onComplete }) {
     realism: initial?.realism || 'photorealistic',
     outputQuality: initial?.outputQuality || '4k',
   });
-
   const update = (k, v) => setForm((s) => ({ ...s, [k]: v }));
-
   return (
     <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border border-zinc-200 space-y-3">
       <div className="text-sm font-semibold text-zinc-900">Enhance Settings</div>
