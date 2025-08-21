@@ -1,4 +1,3 @@
-// pages/dashboard.js
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -9,7 +8,6 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 /* -------------------------------------------------------
    Theme (Tabby-like soft fintech palette)
 ------------------------------------------------------- */
-// خلفية عامة فاتحة + لمسات Mint/Lemon/Blue/Purple ناعمة
 const BG_GRADIENT =
   'bg-[radial-gradient(1200px_600px_at_-10%_-10%,#FFFBEA_0%,transparent_50%),radial-gradient(900px_600px_at_110%_-10%,#E6FFF5_0%,transparent_45%),radial-gradient(1000px_600px_at_30%_120%,#EAF3FF_0%,transparent_50%)]';
 
@@ -44,7 +42,7 @@ const pickFirstUrl = (obj) => {
 };
 
 /* -------------------------------------------------------
-   Product Enhance (unchanged API usage)
+   Product Enhance (presets)
 ------------------------------------------------------- */
 const ENHANCE_PRESETS = [
   {
@@ -175,7 +173,7 @@ const PRODUCT_TOOLS = [
 const PEOPLE_TOOLS = [{ id: 'tryon', label: 'Try-On (Realistic Model)', icon: PersonIcon }];
 
 /* -------------------------------------------------------
-   Try-On Preset Bundles (Female/Male + pose + bg)
+   Try-On Presets
 ------------------------------------------------------- */
 const TRYON_PRESETS = [
   {
@@ -220,7 +218,7 @@ const TRYON_PRESETS = [
   },
 ];
 
-/* Style & BG recipes (reused from earlier approach) */
+/* Style & BG recipes */
 const STYLE_PACKS = [
   { id: 'editorial', title: 'Editorial', recipe: 'editorial fashion photo, crisp studio light, subtle grain' },
   { id: 'ecom', title: 'E-commerce', recipe: 'ecommerce catalog photo, true-to-color, centered, no props' },
@@ -256,7 +254,7 @@ export default function Dashboard() {
   const [resultUrl, setResultUrl] = useState('');
   const [variants, setVariants] = useState([]);
 
-  // Try-On minimal flow (female/male only)
+  // Try-On minimal flow
   const [persona, setPersona] = useState('female');
   const [pieceType, setPieceType] = useState('upper'); // upper | lower | dress
   const [skin, setSkin] = useState('medium');
@@ -271,7 +269,21 @@ export default function Dashboard() {
   const [guidance, setGuidance] = useState(3.7);
   const [safety, setSafety] = useState(2);
 
-  // Customize modal
+  // Enhance Prompt Builder (chips)
+  const [builder, setBuilder] = useState({
+    base: new Set(['retouch']), // 'retouch'|'upscale'|'relight'|'recolor'|'shadow'
+    look: new Set(['soft studio', '50mm']),
+    constraints: new Set(['preserve brand colors']),
+    negative: new Set(['no text', 'no watermark', 'no artifacts']),
+    strength: 35,
+  });
+
+  // Modal flow
+  const [showFlow, setShowFlow] = useState(true);
+  const [flowStep, setFlowStep] = useState(0); // 0: QuickStart, 1: Upload, 2: Presets, 3: Customize
+  const [rememberChoice, setRememberChoice] = useState(false);
+
+  // Customize modal (legacy quick access)
   const [showCustomize, setShowCustomize] = useState(false);
   const [custom, setCustom] = useState({
     camera: '50mm eye-level',
@@ -280,7 +292,7 @@ export default function Dashboard() {
     extras: '',
   });
 
-  // Enhance modal
+  // Enhance modal (legacy)
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [showEnhance, setShowEnhance] = useState(false);
 
@@ -313,6 +325,22 @@ export default function Dashboard() {
     })();
     return () => { mounted = false; };
   }, [user, router, supabase]);
+
+  /* ---------- remember choice ---------- */
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('aiStudioDefaultChoice') : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed?.group && parsed?.tool) {
+          setGroup(parsed.group);
+          setTool(parsed.tool);
+          setShowFlow(false);
+          setFlowStep(1);
+        }
+      } catch {}
+    }
+  }, []);
 
   /* ---------- DnD / paste ---------- */
   useEffect(() => {
@@ -398,7 +426,7 @@ export default function Dashboard() {
     ].filter(Boolean).join(' ');
   };
 
-  const buildEnhancePrompt = (f) =>
+  const buildEnhancePromptFromPreset = (f) =>
     [
       f?.photographyStyle,
       `background: ${f?.background}`,
@@ -407,6 +435,20 @@ export default function Dashboard() {
       f?.realism,
       `output: ${f?.outputQuality}`,
     ].filter(Boolean).join(', ');
+
+  const buildEnhancePromptFromBuilder = () => {
+    const base = [...builder.base].join(', ');
+    const look = [...builder.look].join(', ');
+    const constraints = [...builder.constraints].join(', ');
+    const negative = [...builder.negative].join(', ');
+    return [
+      base && `Base: ${base}`,
+      look && `Look: ${look}`,
+      constraints && `Constraints: ${constraints}`,
+      `Strength: ${builder.strength}/100`,
+      negative && `Negative: ${negative}`,
+    ].filter(Boolean).join(' — ');
+  };
 
   /* ---------- runners ---------- */
   const runRemoveBg = useCallback(async () => {
@@ -433,17 +475,17 @@ export default function Dashboard() {
     } finally { clearInterval(iv); setBusy(false); }
   }, [file, imageData, localUrl, toasts]);
 
-  const runEnhance = useCallback(async (selections) => {
+  const runEnhance = useCallback(async (selectionsOrNull) => {
     if (!file) return setErr('Pick an image first.');
     setBusy(true); setErr(''); setPhase('processing');
     const imageUrl = await uploadToStorage(file);
-    const prompt = buildEnhancePrompt(selections);
+    const prompt = selectionsOrNull ? buildEnhancePromptFromPreset(selectionsOrNull) : buildEnhancePromptFromBuilder();
     const t = toasts.push('Enhancing…', { progress: 12 });
     let adv = 12; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 450);
     try {
       const r = await fetch('/api/enhance', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email }),
+        body: JSON.stringify({ imageUrl, selections: selectionsOrNull || {}, prompt, plan, user_email: user.email }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || 'enhance failed');
@@ -456,7 +498,7 @@ export default function Dashboard() {
       console.error(e); setPhase('error'); setErr('Failed to process.');
       t.update({ msg: 'Enhance failed', type: 'error' }); setTimeout(() => t.close(), 1200);
     } finally { clearInterval(iv); setBusy(false); }
-  }, [file, uploadToStorage, plan, user, localUrl, toasts]);
+  }, [file, uploadToStorage, plan, user, localUrl, toasts, builder]);
 
   const runTryOn = useCallback(async () => {
     if (!file) return setErr('Upload a clothing image first.');
@@ -502,15 +544,13 @@ export default function Dashboard() {
 
   const handleRun = () => {
     if (group === 'people' && tool === 'tryon') return runTryOn();
-    if (group === 'product' && tool === 'removeBg') return runRemoveBg(); // زر مستقل حسب طلبك
-    if (group === 'product' && tool === 'enhance') return setShowEnhance(true);
+    if (group === 'product' && tool === 'removeBg') return runRemoveBg();
+    if (group === 'product' && tool === 'enhance') return runEnhance(null);
   };
 
   const switchTool = (nextId) => {
     setTool(nextId);
     setResultUrl(''); setVariants([]); setErr(''); setPhase('idle'); setCompare(false);
-    // لا نمسح الملف حتى يسهل تجربة المستخدم، لكن للنظافة بنعيده:
-    // (يمكن تعليق السطرين التاليين إذا حبيت يبقى الملف)
     setFile(null); setLocalUrl('');
   };
 
@@ -541,7 +581,6 @@ export default function Dashboard() {
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
 
-  // Progress bar: 3 مراحل بسيطة
   const currentStep = !file ? 1 : (resultUrl ? 3 : 2);
 
   return (
@@ -714,6 +753,15 @@ export default function Dashboard() {
               <div className="mt-4">
                 <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance Presets</div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {/* None (Default) card */}
+                  <PresetCard
+                    key="none-default"
+                    title="None (Default)"
+                    subtitle="Use Prompt Builder"
+                    preview="/placeholder-default.webp"
+                    tag="Default"
+                    onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
+                  />
                   {ENHANCE_PRESETS.map((p) => (
                     <PresetCard
                       key={p.id}
@@ -859,7 +907,7 @@ export default function Dashboard() {
                   )}
                 </button>
 
-                {/* زر Remove BG مستقل دومًا حسب طلبك */}
+                {/* Independent Remove BG */}
                 <button
                   onClick={runRemoveBg}
                   disabled={busy || !file}
@@ -972,8 +1020,36 @@ export default function Dashboard() {
               )}
 
               {tool === 'enhance' && (
-                <div className="space-y-2 text-xs text-slate-600 mt-3">
-                  <div>Choose a preset above or press <span className="font-semibold">Customize</span>.</div>
+                <div className="space-y-3 mt-3 text-xs text-slate-700">
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="font-semibold text-slate-900">Prompt Builder</div>
+                    <ChipGroup
+                      label="Base"
+                      options={['retouch','upscale','relight','recolor','shadow']}
+                      value={builder.base}
+                      onToggle={(id)=>toggleSet('base', id)}
+                    />
+                    <ChipGroup
+                      label="Look & Camera"
+                      options={['soft studio','high-key','50mm','neutral color','white sweep']}
+                      value={builder.look}
+                      onToggle={(id)=>toggleSet('look', id)}
+                    />
+                    <ChipGroup
+                      label="Constraints"
+                      options={['preserve brand colors','no extra fabric','no background props']}
+                      value={builder.constraints}
+                      onToggle={(id)=>toggleSet('constraints', id)}
+                    />
+                    <ChipGroup
+                      label="Negative"
+                      options={['no text','no watermark','no artifacts','no deformed shapes']}
+                      value={builder.negative}
+                      onToggle={(id)=>toggleSet('negative', id)}
+                    />
+                    <StrengthSlider value={builder.strength} onChange={(v)=>setBuilder(s=>({...s, strength:v}))} />
+                  </div>
+
                   {resultUrl && (
                     <div className="mt-2 rounded-xl overflow-hidden border">
                       <div className="relative w-full min-h-[140px] grid place-items-center">
@@ -1029,8 +1105,163 @@ export default function Dashboard() {
         </section>
       </div>
 
-      {/* Modals */}
+      {/* Sticky mobile actions */}
+      <div className="lg:hidden fixed bottom-2 left-1/2 -translate-x-1/2 z-[60]">
+        <div className="inline-flex gap-2 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-2 py-2 shadow">
+          <button
+            onClick={() => setShowFlow(true)}
+            className={`${ACCENT_RING} text-xs px-3 py-2 rounded-xl border hover:bg-slate-50`}
+          >
+            ◷ Steps
+          </button>
+          <button
+            onClick={handleRun}
+            disabled={busy || !file}
+            className={`${ACCENT_BTN} ${ACCENT_RING} text-xs px-3 py-2 rounded-xl font-semibold disabled:opacity-50`}
+          >
+            {tool === 'tryon' ? 'Run Try-On' : tool === 'enhance' ? 'Run Enhance' : 'Remove BG'}
+          </button>
+          <button
+            onClick={runRemoveBg}
+            disabled={busy || !file}
+            className={`${ACCENT_RING} text-xs px-3 py-2 rounded-xl border hover:bg-slate-50 disabled:opacity-50`}
+          >
+            ✂ BG
+          </button>
+        </div>
+      </div>
+
+      {/* Modals: Flow Stepper + Legacy modals */}
       <AnimatePresence>
+        {showFlow && (
+          <motion.div className="fixed inset-0 z-[100] grid place-items-end sm:place-items-center"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="absolute inset-0 bg-black/55" onClick={() => setShowFlow(false)} />
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              className="relative w-full sm:max-w-2xl bg-white rounded-t-3xl sm:rounded-2xl shadow-xl border overflow-hidden"
+            >
+              <div className="p-3 sm:p-4 border-b flex items-center justify-between">
+                <div className="text-sm font-semibold">QuickStart</div>
+                <button onClick={() => setShowFlow(false)} className="text-xs text-slate-500 hover:text-slate-800">✕</button>
+              </div>
+
+              {/* Stepper header */}
+              <div className="px-3 sm:px-4 py-2">
+                <StepperHeader step={flowStep} />
+              </div>
+
+              {/* Steps */}
+              <div className="p-3 sm:p-4">
+                {flowStep === 0 && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <ActionCard
+                        title="Try-On"
+                        subtitle="Render on a realistic model"
+                        onClick={() => { setGroup('people'); setTool('tryon'); setFlowStep(1); }}
+                        icon={<PersonIcon className="size-5" />}
+                      />
+                      <ActionCard
+                        title="Enhance"
+                        subtitle="Retouch, relight, upscale"
+                        onClick={() => { setGroup('product'); setTool('enhance'); setFlowStep(1); }}
+                        icon={<RocketIcon className="size-5" />}
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-slate-600">
+                      <input type="checkbox" checked={rememberChoice} onChange={(e)=>setRememberChoice(e.target.checked)} />
+                      Remember my choice
+                    </label>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => {
+                          if (rememberChoice) {
+                            localStorage.setItem('aiStudioDefaultChoice', JSON.stringify({ group, tool }));
+                          }
+                          setFlowStep(1);
+                        }}
+                        className={`${ACCENT_RING} text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50`}
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {flowStep === 1 && (
+                  <div className="space-y-3">
+                    <DropZoneInline onPick={onPick} />
+                    <div className="flex items-center justify-between">
+                      <button onClick={() => setFlowStep(2)} className={`${ACCENT_RING} text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50`}>
+                        Continue
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setShowFlow(false)} className="text-xs text-slate-600">Skip</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {flowStep === 2 && (
+                  <div className="space-y-3">
+                    {group === 'people' ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {TRYON_PRESETS.map((p) => (
+                          <SmallPreset key={p.id} title={p.title} onClick={() => {
+                            setPersona(p.persona); setPose(p.pose); setBgPack(p.bg); setStylePack(p.style);
+                          }} />
+                        ))}
+                        <SmallPreset title="None (Default)" onClick={() => { /* use defaults */ }} />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <SmallPreset title="None (Default)" onClick={() => setPendingEnhancePreset(null)} />
+                        {ENHANCE_PRESETS.map((p)=> (
+                          <SmallPreset key={p.id} title={p.title} onClick={() => setPendingEnhancePreset(p.config)} />
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <button onClick={() => setFlowStep(3)} className={`${ACCENT_RING} text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50`}>
+                        Continue
+                      </button>
+                      <button onClick={() => setShowFlow(false)} className="text-xs text-slate-600">Skip</button>
+                    </div>
+                  </div>
+                )}
+
+                {flowStep === 3 && (
+                  <div className="space-y-3">
+                    {group === 'people' ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <ChipGroup label="Gender" options={['female','male']} value={new Set([persona])} single onToggle={(id)=>setPersona(id)} />
+                        <ChipGroup label="Garment" options={['upper','lower','dress']} value={new Set([pieceType])} single onToggle={(id)=>setPieceType(id)} />
+                        <ChipGroup label="Pose" options={POSES} value={new Set([pose])} single onToggle={(id)=>setPose(id)} />
+                        <ChipGroup label="Skin" options={SKIN_TONES} value={new Set([skin])} single onToggle={(id)=>setSkin(id)} />
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border p-3 space-y-2">
+                        <div className="text-xs text-slate-600">Use Prompt Builder or selected preset.</div>
+                        <ChipGroup label="Base" options={['retouch','upscale','relight','recolor','shadow']} value={builder.base} onToggle={(id)=>toggleSet('base', id)} />
+                        <StrengthSlider value={builder.strength} onChange={(v)=>setBuilder(s=>({...s, strength:v}))} />
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <button onClick={() => { setShowFlow(false); }} className={`${ACCENT_RING} text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50`}>
+                        Done
+                      </button>
+                      <button onClick={() => setShowFlow(false)} className="text-xs text-slate-600">Skip</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {showEnhance && (
           <motion.div
             className="fixed inset-0 z-[100] grid place-items-center"
@@ -1044,7 +1275,7 @@ export default function Dashboard() {
                 onComplete={(form) => {
                   setShowEnhance(false);
                   setPendingEnhancePreset(null);
-                  runEnhance(form);
+                  runEnhance(form && Object.keys(form).length ? form : null);
                 }}
               />
             </div>
@@ -1072,6 +1303,18 @@ export default function Dashboard() {
       <ToastHost items={toasts.items} onClose={toasts.remove} />
     </main>
   );
+
+  /* ------ local helpers ------ */
+  function toggleSet(key, id) {
+    setBuilder((s) => {
+      const next = new Set(s[key]);
+      if (s[key] instanceof Set) {
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return { ...s, [key]: next };
+      }
+      return s;
+    });
+  }
 }
 
 /* -------------------------------------------------------
@@ -1214,14 +1457,16 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
     >
       <div className="relative w-full aspect-[4/3] bg-slate-50">
         {!loaded && <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-white via-slate-50 to-white" />}
-        <img
-          src={preview}
-          alt={title}
-          className="absolute inset-0 w-full h-full object-cover"
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          onError={() => setBroken(true)}
-        />
+        {preview && (
+          <img
+            src={preview}
+            alt={title}
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+            onError={() => setBroken(true)}
+          />
+        )}
         {tag && (
           <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-[#2BC48A]/90 text-white shadow">
             {tag}
@@ -1478,5 +1723,94 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/* -------------------------------------------------------
+   Flow components
+------------------------------------------------------- */
+function StepperHeader({ step }) {
+  const labels = ['Choose Tool', 'Upload', 'Presets', 'Customize'];
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      {labels.map((lb, i) => (
+        <div key={lb} className="flex items-center gap-2">
+          <div className={`size-6 grid place-items-center rounded-full border ${i===step? 'bg-[#BFF7E0] border-[#BFF7E0] text-slate-900' : i<step? 'bg-[#2BC48A] border-[#2BC48A] text-white' : 'bg-white border-slate-300 text-slate-600'}`}>{i<step?'✓':i}</div>
+          <span className={`${i===step?'text-slate-900':'text-slate-500'}`}>{lb}</span>
+          {i<labels.length-1 && <div className="w-8 h-1 rounded-full bg-slate-200" />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActionCard({ title, subtitle, onClick, icon }) {
+  return (
+    <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} onClick={onClick}
+      className="p-4 rounded-2xl border bg-white hover:shadow-md text-left">
+      <div className="flex items-center gap-3">
+        <div className="size-9 grid place-items-center rounded-xl bg-[#E8FFF5] text-[#0F766E]">{icon}</div>
+        <div>
+          <div className="font-semibold">{title}</div>
+          <div className="text-[11px] text-slate-600">{subtitle}</div>
+        </div>
+      </div>
+    </motion.button>
+  );
+}
+
+function DropZoneInline({ onPick }) {
+  const iref = useRef(null);
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-slate-300 p-4 grid place-items-center bg-white">
+      <div className="text-center text-xs text-slate-700">
+        <div className="mb-2">Upload clothing/product image (PNG/JPG)</div>
+        <div className="flex items-center justify-center gap-2">
+          <button onClick={()=>iref.current?.click()} className={`${ACCENT_RING} text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50`}>Choose file</button>
+          <span className="text-slate-400">or drag & drop / paste</span>
+        </div>
+      </div>
+      <input ref={iref} type="file" accept="image/*" className="hidden" onChange={async (e)=>{ const f=e.target.files?.[0]; if (f) await onPick(f); }} />
+    </div>
+  );
+}
+
+function SmallPreset({ title, onClick }) {
+  return (
+    <button onClick={onClick} className="rounded-xl border bg-white px-3 py-2 text-xs text-left hover:bg-slate-50">
+      {title}
+    </button>
+  );
+}
+
+function ChipGroup({ label, options, value, onToggle, single=false }) {
+  const isActive = (id) => value instanceof Set ? value.has(id) : value === id;
+  return (
+    <div>
+      <div className="text-[12px] font-semibold text-slate-700 mb-1">{label}</div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => (
+          <button key={opt}
+            onClick={() => {
+              if (single) onToggle(opt);
+              else onToggle(opt);
+            }}
+            className={`px-3 py-1.5 text-xs rounded-lg border ${isActive(opt)? 'bg-[#2BC48A] text-white border-[#2BC48A]':'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'}`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StrengthSlider({ value, onChange }) {
+  return (
+    <label className="flex items-center gap-2 text-xs">
+      <span className="min-w-24 text-slate-700">Strength</span>
+      <input type="range" min={0} max={100} value={value} onChange={(e)=>onChange(Number(e.target.value))} className="flex-1" />
+      <span className="w-10 text-right">{value}</span>
+    </label>
   );
 }
