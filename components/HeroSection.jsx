@@ -1,456 +1,640 @@
 // components/HeroSection.jsx
 'use client';
 
-import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 
 /**
- * HeroSection — Enhance + Try-On (single section)
- * - English only
- * - WebP assets (no Next/Image)
- * - Heavy animations (Framer Motion) but respects reduced motion
- * - Mobile-first responsive
- * - No stock models (Try-On preview is synthetic/abstract)
- *
- * Expected local assets (all .webp):
- * /ba/perfume-before.webp  /ba/perfume-after.webp
- * (You can swap with your own WebP pairs.)
+ * Landing Body (no Nav/No Footer) — Startup-serious with playful wit
+ * Clear value prop • Early email capture • Rich animations • SVG aurora • Marquee • KPIs
  */
-
-const ease = [0.22, 1, 0.36, 1];
 
 export default function HeroSection() {
   return (
-    <section
-      id="hero"
-      className="relative isolate w-full overflow-hidden bg-gradient-to-b from-[#F3FFF8] via-[#FFFCE8] to-white text-zinc-900"
-    >
-      <AuroraFX />
-      <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-10 sm:px-6 sm:pt-14 md:px-10 md:pb-16 md:pt-20 xl:px-16">
-        <TopBadge />
-        <ContentTwoCol />
-        <FeatureChips />
-      </div>
+    <section className="relative w-full overflow-hidden font-sans text-black dark:text-white">
+      <BackgroundFX />
+      <TopHero />
+      <LogoMarquee />
+      <ProofMetrics />
+      <ValueProps />
+      <HowItWorks />
+      <HumorBreak />
+      <TestimonialsTicker />
+      <BottomCTA />
+      <StickyMobileCTA />
     </section>
   );
 }
 
-/* --------------------------- Subcomponents --------------------------- */
+/* ------------------------------ Top Section -------------------------------- */
 
-function TopBadge() {
+function TopHero() {
   return (
-    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-      <span className="inline-grid size-4 place-items-center rounded-full bg-emerald-600 text-white">★</span>
-      New: Enhance + AI Try-On
-    </div>
-  );
-}
-
-function ContentTwoCol() {
-  const rm = useReducedMotion();
-  return (
-    <div className="grid items-center gap-10 md:grid-cols-2">
-      {/* LEFT: copy + CTAs */}
+    <div className="relative z-10 px-6 md:px-12 lg:px-20 pt-24 pb-16 lg:pt-28 lg:pb-24">
       <motion.div
-        initial={rm ? { opacity: 1 } : { opacity: 0, y: 16 }}
-        animate={rm ? { opacity: 1 } : { opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="mx-auto max-w-6xl"
       >
-        <h1 className="text-balance text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
-          <span className="bg-gradient-to-r from-emerald-600 via-lime-500 to-amber-500 bg-clip-text text-transparent">
-            Make products irresistible
+        {/* Badge + micro subtext */}
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur-md">
+            STARTUP SERIOUS • TASTEFULLY FUN
           </span>
-        </h1>
-        <p className="mt-4 max-w-[72ch] text-lg text-zinc-700">
-          Two services — <strong>Enhance</strong> for studio-perfect product shots,
-          and <strong>AI Try-On</strong> that generates a photo-real model per request.
-          No stock libraries. Privacy-first. Enterprise-ready.
-        </p>
-        <p className="mt-1 text-[15px] text-zinc-600">
-          Upload, describe, export. Background clean, color balance, 4× upscaling, and fully controllable model specs.
-        </p>
+          <span className="text-[11px] text-zinc-600 dark:text-zinc-300">Clarity • Speed • Conversion-first</span>
+        </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <a
-            href="#enhance"
-            className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-lime-400 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.99]"
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          {/* Left copy */}
+          <div>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.05] tracking-tight">
+              Turn <span className="bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-rose-500 bg-clip-text text-transparent">product photos</span> into sales—<span className="whitespace-nowrap">no studio needed.</span>
+            </h1>
+
+            <p className="mt-4 max-w-xl text-lg md:text-xl text-zinc-700 dark:text-zinc-300">
+              Upload a photo → get on-brand, studio-grade shots and AI try-ons in seconds. It’s like hiring a photo team—minus the coffee drama.
+            </p>
+
+            {/* Micro commitments */}
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+              <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">No credit card</span>
+              <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">Free starter credits</span>
+              <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">Cancel anytime</span>
+            </div>
+
+            {/* CTAs + Email capture */}
+            <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <MagneticCTA href="/dashboard" ariaLabel="Get started for free">
+                Get started free
+              </MagneticCTA>
+              <a
+                href="#demo"
+                className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/60 px-5 py-3 text-base font-semibold text-zinc-900 backdrop-blur-md transition hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white"
+              >
+                Watch 30s demo
+              </a>
+            </div>
+
+            <EarlyEmailCapture />
+            <TrustBar />
+          </div>
+
+          {/* Right: Interactive Compare */}
+          <motion.div
+            id="demo"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="relative isolate mx-auto w-full max-w-xl overflow-hidden rounded-2xl border border-black/10 bg-white/70 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+            aria-label="Before and after preview"
           >
-            Get started
-            <svg
-              className="size-4 transition-transform group-hover:translate-x-0.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 12h14" />
-              <path d="M12 5l7 7-7 7" />
-            </svg>
-          </a>
-          <a
-            href="#tryon"
-            className="inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white/70 px-4 py-2.5 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-white"
-          >
-            Live demo
-            <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-          </a>
+            <CompareSlider
+              before={{ src: '/demo-before.jpg', alt: 'Original product photo before enhancement' }}
+              after={{ src: '/demo-after.jpg', alt: 'Enhanced product photo after AI processing' }}
+              defaultPercent={62}
+              showLabels
+            />
+            <CornerBadge />
+          </motion.div>
+        </div>
+
+        {/* Scroll hint */}
+        <div className="pointer-events-none mt-10 flex items-center justify-center text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="animate-bounce">Scroll to see the magic ↓</span>
         </div>
       </motion.div>
-
-      {/* RIGHT: dual demos (Enhance + Try-On) */}
-      <MotionCard delay={0.05}>
-        <div className="mb-3 flex items-end justify-between">
-          <div>
-            <div className="text-base font-semibold">Dual services</div>
-            <div className="text-xs text-zinc-500">Enhance + AI Try-On (synthetic preview)</div>
-          </div>
-          <span className="inline-flex h-8 w-20 items-center justify-center rounded-xl bg-gradient-to-br from-[#CFFAE2] to-[#FFF0A6] text-xs font-medium text-zinc-900" />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Enhance: Before/After slider */}
-          <DemoCard title="Enhance" subtitle="Before / After slider">
-            <BeforeAfter
-              beforeUrl="/ba/perfume-before.webp"
-              afterUrl="/ba/perfume-after.webp"
-            />
-          </DemoCard>
-
-          {/* Try-On: abstract synthetic mannequin (no stock models) */}
-          <DemoCard title="Try-On" subtitle="AI-generated model (no stock)">
-            <TryOnMini />
-          </DemoCard>
-        </div>
-      </MotionCard>
     </div>
   );
 }
 
-function FeatureChips() {
-  const rm = useReducedMotion();
+/* -------------------------------- Background -------------------------------- */
+
+function BackgroundFX() {
   return (
-    <motion.div
-      className="mt-6 flex flex-wrap items-center gap-3 text-sm text-zinc-700"
-      initial={rm ? {} : { opacity: 0 }}
-      whileInView={rm ? {} : { opacity: 1 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6, ease }}
-    >
-      <Chip icon={<ShieldIcon />}>SSO & policy controls</Chip>
-      <Chip icon={<LockIcon />}>Encrypted at rest</Chip>
-      <Chip icon={<ZapIcon />}>4× Upscale</Chip>
-    </motion.div>
-  );
-}
-
-/* ------------------------------ Cards ------------------------------ */
-
-function MotionCard({ children, delay = 0 }) {
-  const rm = useReducedMotion();
-  return (
-    <motion.div
-      className="relative rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm md:p-5"
-      initial={rm ? { opacity: 1 } : { opacity: 0, scale: 0.98 }}
-      animate={rm ? { opacity: 1 } : { opacity: 1, scale: 1 }}
-      transition={{ duration: 0.7, ease, delay }}
-    >
-      {!rm && (
-        <motion.div
-          className="pointer-events-none absolute -right-3 -top-3 rounded-2xl border border-zinc-200 bg-white/80 px-3 py-2 text-xs shadow-sm"
-          initial={{ y: 0 }}
-          animate={{ y: [0, -6, 0] }}
-          transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
-        >
-          Live
-        </motion.div>
-      )}
-      {children}
-    </motion.div>
-  );
-}
-
-function DemoCard({ title, subtitle, children }) {
-  return (
-    <div className="rounded-2xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-      <div className="mb-2">
-        <div className="text-sm font-semibold">{title}</div>
-        <div className="text-xs text-zinc-500">{subtitle}</div>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-/* ----------------------- Enhance: Before/After ---------------------- */
-
-function BeforeAfter({ beforeUrl, afterUrl }) {
-  const [pos, setPos] = useState(55);
-  return (
-    <div className="relative h-56 w-full overflow-hidden rounded-2xl md:h-64">
-      <img src={beforeUrl} alt="before" className="absolute inset-0 h-full w-full object-cover" />
-      <img
-        src={afterUrl}
-        alt="after"
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
-      />
-      {/* divider */}
+    <div className="absolute inset-0 -z-20">
+      {/* Light */}
+      <div className="h-full w-full bg-[radial-gradient(75%_100%_at_50%_0%,#eef2ff_0%,#ffffff_35%,#fff5f7_100%)] dark:hidden" />
+      {/* Dark */}
+      <div className="hidden h-full w-full dark:block bg-[radial-gradient(120%_80%_at_60%_-10%,#3b1e82_0%,#0f0320_55%,#080312_100%)]" />
+      {/* Grid */}
+      <div className="pointer-events-none absolute inset-0 hidden dark:block opacity-25 [background-image:linear-gradient(to_right,rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,.06)_1px,transparent_1px)] [background-size:24px_24px]" />
+      {/* Noise */}
       <div
-        className="pointer-events-none absolute inset-y-0 my-2 w-[2px] rounded bg-white/80 shadow"
-        style={{ left: `${pos}%` }}
+        className="pointer-events-none absolute inset-0 opacity-[0.04] mix-blend-soft-light"
+        style={{
+          backgroundImage:
+            'url("data:image/svg+xml;utf8,\
+<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'1200\' height=\'600\'><filter id=\'n\'>\
+<feTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\'/></filter>\
+<rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' opacity=\'0.4\'/></svg>")',
+        }}
       />
-      {/* slider */}
-      <input
-        aria-label="Reveal enhanced image"
-        type="range"
-        min={0}
-        max={100}
-        value={pos}
-        onChange={(e) => setPos(parseInt(e.target.value))}
-        className="absolute bottom-3 left-1/2 w-[92%] -translate-x-1/2 cursor-pointer appearance-none rounded-full bg-white/80 p-1 shadow [accent-color:#86EFAC]"
-      />
+      <AuroraBlobs />
+      <FloatingShapes />
     </div>
   );
 }
 
-/* ------------------------ Try-On: Synthetic Mini ----------------------- */
+function AuroraBlobs() {
+  const prefersReducedMotion = useReducedMotion();
+  return (
+    <div className="absolute inset-0 -z-10 overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 0.6, scale: 1 }}
+        transition={{ duration: 1.2 }}
+        className="absolute -top-24 left-[-10%] h-[40rem] w-[40rem] rounded-full blur-3xl"
+        style={{
+          background: 'conic-gradient(from 90deg, rgba(99,102,241,.35), rgba(236,72,153,.35), rgba(244,63,94,.35))',
+          filter: 'blur(80px)',
+        }}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 0.55, scale: 1 }}
+        transition={{ duration: 1.2, delay: 0.1 }}
+        className="absolute -bottom-24 right-[-10%] h-[36rem] w-[36rem] rounded-full blur-3xl"
+        style={{
+          background: 'conic-gradient(from 200deg, rgba(34,197,94,.35), rgba(59,130,246,.35), rgba(236,72,153,.35))',
+          filter: 'blur(90px)',
+        }}
+      />
+      {!prefersReducedMotion && (
+        <motion.div
+          aria-hidden
+          initial={{ rotate: 0 }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 55, repeat: Infinity, ease: 'linear' }}
+          className="absolute left-1/2 top-1/2 h-[28rem] w-[28rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 dark:border-white/5"
+        />
+      )}
+    </div>
+  );
+}
 
-function TryOnMini() {
-  const rm = useReducedMotion();
-  const [tone, setTone] = useState('Medium');
-  const [bg, setBg] = useState('Clean studio');
+function FloatingShapes() {
+  const items = [
+    { cx: 40, cy: 30, r: 14, opacity: 0.5 },
+    { cx: 85, cy: 65, r: 10, opacity: 0.35 },
+    { cx: 15, cy: 75, r: 8, opacity: 0.4 },
+  ];
+  return (
+    <svg className="pointer-events-none absolute inset-0 -z-10 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+      {items.map((b, i) => (
+        <motion.circle
+          key={i}
+          cx={b.cx}
+          cy={b.cy}
+          r={b.r}
+          fill="url(#grad)"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: b.opacity, scale: 1 }}
+          transition={{ duration: 1, delay: i * 0.2 }}
+        />
+      ))}
+      <defs>
+        <radialGradient id="grad">
+          <stop offset="0%" stopColor="#f0abfc" />
+          <stop offset="100%" stopColor="transparent" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
 
-  const toneFill = {
-    Porcelain: '#F2E7DB',
-    Light: '#EDD8C7',
-    Medium: '#D9B69A',
-    Olive: '#C99E7F',
-    Tan: '#B88163',
-    Deep: '#8D563A',
-  }[tone];
+/* ---------------------------------- CTAs ------------------------------------ */
 
-  const bgGrad = {
-    'Clean studio': ['#F3FFF8', '#FFFFFF'],
-    'Editorial beige': ['#F6EEE2', '#FFF7EA'],
-    'Streetwear concrete': ['#F3F3F3', '#E8E8E8'],
-    'Lifestyle home': ['#F3FFF8', '#FFFCE8'],
-    'Desert tones': ['#FCE9CC', '#FFF3D1'],
-  }[bg];
+function MagneticCTA({ href, children, ariaLabel }) {
+  const [xy, setXy] = useState({ x: 0, y: 0 });
+  const onMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setXy({ x: (e.clientX - rect.left - rect.width / 2) / 6, y: (e.clientY - rect.top - rect.height / 2) / 6 });
+  };
+  const onLeave = () => setXy({ x: 0, y: 0 });
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white/70 p-3">
-      <div className="relative overflow-hidden rounded-2xl border border-zinc-100">
-        <div
-          className="absolute inset-0"
-          style={{ background: `linear-gradient(180deg, ${bgGrad[0]}, ${bgGrad[1]})` }}
+    <Link
+      href={href}
+      aria-label={ariaLabel}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      className="group inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:from-fuchsia-600 hover:to-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400"
+      style={{ transform: `translate3d(${xy.x}px, ${xy.y}px, 0)` }}
+    >
+      {children}
+      <svg className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+        <path d="M13 5l7 7-7 7M5 12h14" />
+      </svg>
+    </Link>
+  );
+}
+
+function EarlyEmailCapture() {
+  const [email, setEmail] = useState('');
+  const [state, setState] = useState('idle'); // idle | loading | success | error
+  const [msg, setMsg] = useState('');
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (!/.+@.+\..+/.test(email)) {
+      setState('error');
+      setMsg('Please enter a valid email.');
+      return;
+    }
+    setState('loading');
+    setMsg('');
+    setTimeout(() => {
+      setState('success');
+      setMsg('Invite reserved! Redirecting…');
+      window.location.href = `/dashboard?email=${encodeURIComponent(email)}&source=hero-email`;
+    }, 600);
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="mt-5 flex w-full max-w-xl gap-2" aria-live="polite">
+      <div className="relative grow">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter your work email"
+          className="w-full rounded-xl border border-black/10 bg-white/70 px-4 py-3 text-sm outline-none backdrop-blur placeholder:text-zinc-500 focus:ring-2 focus:ring-fuchsia-400 dark:border-white/15 dark:bg-white/10"
+          aria-label="Work email"
         />
-        {/* animated aurora ring */}
-        {!rm && (
-          <motion.div
-            className="pointer-events-none absolute -left-20 -top-20 size-56 rounded-full opacity-60 blur-2xl"
-            style={{
-              background:
-                'conic-gradient(from 90deg, #9AE6B4, #FDE68A, #60A5FA, #9AE6B4)',
-            }}
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 18, ease: 'linear' }}
-          />
-        )}
+        {/* FIX: renamed SVGMail -> MailIcon to avoid duplicate identifier */}
+        <MailIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-70" />
+      </div>
+      <button
+        type="submit"
+        disabled={state === 'loading'}
+        className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-zinc-100"
+      >
+        {state === 'loading' ? 'Reserving…' : 'Get beta invite'}
+      </button>
+      {msg && <div className={`ml-2 self-center text-xs ${state === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>{msg}</div>}
+    </form>
+  );
+}
 
-        {/* abstract mannequin */}
-        <div className="relative z-10 grid h-56 place-items-center md:h-60">
-          <svg viewBox="0 0 220 360" className="h-[78%] w-auto drop-shadow-sm">
-            <defs>
-              <filter id="sblur">
-                <feGaussianBlur stdDeviation="0.4" />
-              </filter>
-              <linearGradient id="garment" x1="0" x2="1">
-                <stop offset="0%" stopColor="#86EFAC" />
-                <stop offset="100%" stopColor="#FDE68A" />
-              </linearGradient>
-            </defs>
-            <g fill={toneFill} filter="url(#sblur)">
-              <circle cx="110" cy="48" r="26" />
-              <rect x="92" y="74" width="36" height="70" rx="18" />
-              <rect x="62" y="140" width="96" height="96" rx="24" />
-              <rect x="70" y="236" width="24" height="74" rx="12" />
-              <rect x="126" y="236" width="24" height="74" rx="12" />
-            </g>
-            {/* garment placeholder */}
-            <path
-              d="M75 145 h70 v55 q0 12 -12 12 h-46 q-12 0 -12 -12 z"
-              fill="url(#garment)"
-              opacity=".9"
-            />
-          </svg>
-        </div>
+/* ------------- FIXED: unique name to avoid redeclare collisions ------------- */
+function MailIcon(props) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" {...props} aria-hidden>
+      <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-2">
-          <span className="rounded-lg bg-white/85 px-2 py-1 text-[10px] font-semibold text-zinc-900">
-            No stock models
-          </span>
-          <span className="rounded-lg bg-white/85 px-2 py-1 text-[10px] font-semibold text-zinc-900">
-            {bg}
-          </span>
-        </div>
+function CornerBadge() {
+  return (
+    <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+      <SparkleIcon /> AI Enhanced
+    </div>
+  );
+}
+function SparkleIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 2l1.6 4.4L18 8l-4.4 1.6L12 14l-1.6-4.4L6 8l4.4-1.6L12 2z" stroke="currentColor" strokeWidth="1.2" fill="currentColor" opacity="0.9" />
+    </svg>
+  );
+}
+
+/* --------------------------------- Trust Bar -------------------------------- */
+
+function TrustBar() {
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+      <span className="font-medium">Trusted by 1,200+ stores</span>
+      <span className="inline-block h-1 w-1 rounded-full bg-zinc-400" />
+      <span>GDPR-friendly</span>
+      <span className="inline-block h-1 w-1 rounded-full bg-zinc-400" />
+      <span>Secure uploads</span>
+    </div>
+  );
+}
+
+/* ----------------------------- Compare Slider ------------------------------- */
+
+function CompareSlider({ before, after, defaultPercent = 60, showLabels = true }) {
+  const trackRef = useRef(null);
+  const [pos, setPos] = useState(defaultPercent);
+  const clamp = (v) => Math.max(0, Math.min(100, v));
+
+  const moveToClientX = (clientX) => {
+    if (!trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const x = clamp(((clientX - rect.left) / rect.width) * 100);
+    setPos(x);
+  };
+
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    moveToClientX(e.clientX);
+  };
+
+  const onPointerMove = (e) => {
+    if (!(e.buttons & 1)) return;
+    moveToClientX(e.clientX);
+  };
+
+  return (
+    <div ref={trackRef} className="relative w-full overflow-hidden">
+      {/* After (base) */}
+      <Image src={after.src} alt={after.alt} width={900} height={1200} priority className="h-auto w-full select-none object-cover" />
+      {/* Before overlay clipped */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ width: `${pos}%` }}>
+        <Image src={before.src} alt={before.alt} width={900} height={1200} className="h-full w-full object-cover" priority={false} />
       </div>
 
-      {/* tiny controls */}
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <MiniSelect
-          label="Tone"
-          value={tone}
-          onChange={setTone}
-          options={['Porcelain', 'Light', 'Medium', 'Olive', 'Tan', 'Deep']}
-        />
-        <MiniSelect
-          label="Background"
-          value={bg}
-          onChange={setBg}
-          options={[
-            'Clean studio',
-            'Editorial beige',
-            'Streetwear concrete',
-            'Lifestyle home',
-            'Desert tones',
-          ]}
+      {/* Labels */}
+      {showLabels && (
+        <>
+          <div className="pointer-events-none absolute left-3 top-3 select-none rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-zinc-800 shadow-sm dark:bg-black/60 dark:text-white">
+            Before
+          </div>
+          <div className="pointer-events-none absolute right-3 top-3 select-none rounded-full bg-rose-500/90 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+            After
+          </div>
+        </>
+      )}
+
+      {/* Handle/rail */}
+      <div
+        role="slider"
+        aria-label="Compare before and after"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pos)}
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') setPos((p) => clamp(p - 5));
+          if (e.key === 'ArrowRight') setPos((p) => clamp(p + 5));
+        }}
+        className="absolute top-0 cursor-ew-resize"
+        style={{ left: `calc(${pos}% - 1px)`, height: '100%' }}
+      >
+        <div className="h-full w-0.5 bg-white/90 mix-blend-difference shadow-[0_0_0_1px_rgba(0,0,0,.2)]" />
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-2 py-1 text-xs text-white">Drag</div>
+      </div>
+
+      {/* Range fallback */}
+      <div className="absolute inset-x-0 bottom-0 z-10 m-0 flex items-center gap-2 bg-gradient-to-t from-black/15 to-transparent px-4 pb-4 pt-10">
+        <input
+          aria-label="Compare before and after"
+          className="h-1 w-full cursor-ew-resize appearance-none rounded-full bg-zinc-300 outline-none accent-fuchsia-600 dark:bg-zinc-700"
+          type="range"
+          min={0}
+          max={100}
+          value={pos}
+          onChange={(e) => setPos(Number(e.target.value))}
         />
       </div>
     </div>
   );
 }
 
-function MiniSelect({ label, value, options, onChange }) {
+/* ----------------------------- Logos Marquee -------------------------------- */
+
+function LogoMarquee() {
+  const logos = ['brand-1.svg', 'brand-2.svg', 'brand-3.svg', 'brand-4.svg', 'brand-5.svg'];
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white/70 px-2 py-1.5 text-xs">
-      <span className="min-w-16 text-zinc-600">{label}</span>
-      <div className="flex flex-wrap gap-1">
-        {options.map((o) => (
-          <button
-            key={o}
-            onClick={() => onChange(o)}
-            className={`rounded-lg px-2 py-1 ${
-              o === value
-                ? 'bg-white text-zinc-900 shadow-sm'
-                : 'bg-white/50 text-zinc-600 hover:bg-white'
-            }`}
-          >
-            {o}
-          </button>
+    <div className="relative z-10 mx-auto mt-6 w-full max-w-7xl overflow-hidden px-6 py-6 md:px-12">
+      <div className="mb-3 text-center text-[11px] uppercase tracking-widest text-zinc-500">POWERING TEAMS AT</div>
+      <div className="[mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+        <div className="animate-marquee flex min-w-full items-center gap-10 opacity-70 hover:[animation-play-state:paused]">
+          {logos.concat(logos).map((src, i) => (
+            <div key={i} className="relative h-8 w-28 opacity-80">
+              <Image src={`/${src}`} alt="brand logo" fill className="object-contain" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <style jsx>{`
+        .animate-marquee { animation: marquee 26s linear infinite; }
+        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      `}</style>
+    </div>
+  );
+}
+
+/* ------------------------------- Proof Metrics ------------------------------ */
+
+function ProofMetrics() {
+  const metrics = [
+    { label: 'Higher conversion', to: 32, suffix: '%' },
+    { label: 'Time saved per shoot', to: 90, suffix: '%' },
+    { label: 'Avg render', to: 15, suffix: 's', reverse: true },
+    { label: 'Uptime', to: 99.9, suffix: '%' },
+  ];
+  return (
+    <div id="proof" className="relative z-10 mx-auto mt-4 max-w-7xl px-6 md:px-12">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {metrics.map((m, i) => (
+          <KPI key={i} label={m.label} to={m.to} suffix={m.suffix} reverse={m.reverse} />
         ))}
       </div>
     </div>
   );
 }
 
-/* ------------------------------ FX + UI ------------------------------ */
+function KPI({ label, to, suffix = '', reverse = false }) {
+  const ref = useRef(null);
+  const [val, setVal] = useState(reverse ? to : 0);
+  useEffect(() => {
+    let frame;
+    const el = ref.current;
+    if (!el) return;
+    let start = null;
+    const duration = 1000;
+    const startVal = reverse ? to : 0;
+    const endVal = reverse ? (to <= 15 ? to : 0) : to; // gag for honesty on "15s"
+    const step = (t) => {
+      if (!start) start = t;
+      const p = Math.min((t - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(Number((startVal + (endVal - startVal) * eased).toFixed(1)));
+      if (p < 1) frame = requestAnimationFrame(step);
+    };
+    const io = new IntersectionObserver(
+      (ents) => ents.forEach((e) => e.isIntersecting && requestAnimationFrame(step)),
+      { threshold: 0.5 }
+    );
+    io.observe(el);
+    return () => { cancelAnimationFrame(frame); io.disconnect(); };
+  }, [to, reverse]);
 
-function Chip({ icon, children }) {
-  const rm = useReducedMotion();
   return (
-    <motion.div
-      className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 shadow-sm"
-      initial={rm ? { opacity: 1 } : { opacity: 0, y: 8 }}
-      whileInView={rm ? { opacity: 1 } : { opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, ease }}
-    >
-      {icon}
-      <span className="whitespace-nowrap text-sm text-zinc-800">{children}</span>
-    </motion.div>
-  );
-}
-
-function AuroraFX() {
-  const rm = useReducedMotion();
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      {/* soft base auras */}
-      <div className="absolute -top-32 -left-20 h-80 w-80 rounded-full bg-[#D8FFEA] blur-3xl" />
-      <div className="absolute top-24 -right-24 h-80 w-80 rounded-full bg-[#FFF7B3] blur-3xl" />
-      <div className="absolute bottom-10 left-1/3 h-64 w-64 rounded-full bg-[#E8FFF4] blur-3xl" />
-      {/* animated ribbons */}
-      {!rm && (
-        <>
-          <motion.div
-            className="absolute left-1/2 top-[-120px] h-[520px] w-[520px] -translate-x-1/2 rounded-full opacity-40 blur-3xl"
-            style={{
-              background: 'radial-gradient(closest-side, #9AE6B4 0%, transparent 70%)',
-            }}
-            animate={{ y: [0, 12, 0] }}
-            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            className="absolute right-[-160px] top-[20%] h-[460px] w-[460px] rounded-full opacity-35 blur-3xl"
-            style={{
-              background: 'radial-gradient(closest-side, #FDE68A 0%, transparent 70%)',
-            }}
-            animate={{ y: [0, -14, 0] }}
-            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            className="absolute left-[-120px] bottom-[8%] h-[460px] w-[460px] rounded-full opacity-30 blur-3xl"
-            style={{
-              background: 'radial-gradient(closest-side, #BFDBFE 0%, transparent 70%)',
-            }}
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        </>
-      )}
+    <div ref={ref} className="rounded-xl border border-black/10 bg-white p-4 text-center dark:border-white/10 dark:bg-zinc-800">
+      <div className="text-2xl font-extrabold">{val}{suffix}</div>
+      <div className="text-xs text-zinc-600 dark:text-zinc-300">{label}</div>
     </div>
   );
 }
 
-/* ------------------------------ Icons ------------------------------ */
+/* --------------------------------- Features -------------------------------- */
 
-function ShieldIcon() {
+function ValueProps() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
+    <div id="features" className="relative z-10 bg-white px-6 py-16 text-zinc-900 dark:bg-zinc-900 dark:text-white md:px-12 lg:px-20">
+      <motion.h2
+        initial={{ opacity: 0, y: 8 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.4 }}
+        transition={{ duration: 0.5 }}
+        className="mx-auto mb-10 text-center text-3xl font-bold md:text-4xl"
+      >
+        Designed to convert — and delight
+      </motion.h2>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {[
+          { title: 'Image Enhancement', icon: '📷', desc: 'Studio quality at your fingertips.' },
+          { title: 'AI Try-On', icon: '🧍‍♂️', desc: 'Preview products on real models.' },
+          { title: 'Smart Descriptions', icon: '💡', desc: 'Auto-generate marketing copy.' },
+        ].map(({ title, icon, desc }) => (
+          <motion.div
+            key={title}
+            whileHover={{ y: -4 }}
+            className="rounded-2xl border border-black/10 bg-gradient-to-br from-white to-zinc-50 p-6 shadow-md transition dark:border-white/10 dark:from-zinc-800 dark:to-zinc-800"
+          >
+            <div className="mb-3 text-3xl" aria-hidden>{icon}</div>
+            <h3 className="text-lg font-semibold">{title}</h3>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{desc}</p>
+          </motion.div>
+        ))}
+      </div>
+    </div>
   );
 }
-function ZapIcon() {
+
+/* ------------------------------- How It Works ------------------------------- */
+
+function HowItWorks() {
+  const steps = [
+    { title: 'Upload', desc: 'Add your product photo', icon: '📤' },
+    { title: 'Enhance', desc: 'AI-powered quality', icon: '⚙️' },
+    { title: 'Publish', desc: 'Export to your store', icon: '🚀' },
+  ];
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M13 2L3 14h7l-1 8 11-12h-7l1-8z" />
-    </svg>
+    <div id="how" className="relative z-10 bg-gradient-to-b from-[#0f0320] to-black px-6 py-20 text-white md:px-12 lg:px-20">
+      <h2 className="mb-12 text-center text-3xl font-bold md:text-4xl">How it works</h2>
+      <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
+        {steps.map((step, idx) => (
+          <div key={idx} className="relative rounded-xl border border-white/10 bg-white/5 px-6 py-8 text-center shadow-xl">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-fuchsia-600 text-2xl">{step.icon}</div>
+            <h3 className="text-xl font-semibold">{step.title}</h3>
+            <p className="mt-1 text-sm text-zinc-300">{step.desc}</p>
+            {idx < steps.length - 1 && (
+              <svg className="pointer-events-none absolute right-[-18px] top-1/2 hidden -translate-y-1/2 md:block" width="36" height="2" viewBox="0 0 36 2" fill="none" aria-hidden>
+                <path d="M0 1h36" stroke="white" strokeOpacity="0.25" strokeDasharray="4 3" />
+              </svg>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-10 text-center">
+        <Link href="/dashboard" className="inline-flex items-center justify-center rounded-xl bg-white/90 px-5 py-3 font-semibold text-zinc-900 hover:bg-white">
+          Start creating →
+        </Link>
+      </div>
+    </div>
   );
 }
-function LockIcon() {
+
+/* -------------------------------- Fun Section ------------------------------- */
+
+function HumorBreak() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="11" width="18" height="11" rx="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
+    <div className="relative z-10 mx-auto max-w-5xl px-6 py-14 text-center md:px-12">
+      <p className="text-lg text-zinc-700 dark:text-zinc-300">
+        Pixel philosophy: <span className="font-semibold">beauty persuades</span>, speed convinces, and clarity closes. Also—yes—your coffee mug is now a fashion model.
+      </p>
+    </div>
+  );
+}
+
+/* ------------------------------ Testimonials Ticker ------------------------- */
+
+function TestimonialsTicker() {
+  const data = [
+    '“CTR up 27% in 14 days.” — UrbanWear',
+    '“Returns dropped 18% after try-on.” — SneakLab',
+    '“Catalog refresh in a weekend.” — BloomBox',
+    '“Consistent brand images = team peace.” — M.J.',
+  ];
+  return (
+    <div className="relative z-10 mx-auto mb-2 mt-2 max-w-7xl overflow-hidden px-6 py-6 md:px-12">
+      <div className="rounded-2xl border border-black/10 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-white/5">
+        <div className="relative [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
+          <div className="animate-marquee2 flex min-w-full items-center gap-10">
+            {data.concat(data).map((t, i) => (
+              <div key={i} className="whitespace-nowrap text-sm text-zinc-700 dark:text-zinc-300">
+                {t}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style jsx>{`
+        .animate-marquee2 { animation: marquee2 30s linear infinite; }
+        @keyframes marquee2 { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      `}</style>
+    </div>
+  );
+}
+
+/* --------------------------------- Bottom CTA ------------------------------- */
+
+function BottomCTA() {
+  return (
+    <div className="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-10 text-center md:px-12">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.5 }}
+        className="rounded-3xl border border-black/10 bg-gradient-to-br from-white to-zinc-50 p-8 shadow-xl dark:border-white/10 dark:from-zinc-900 dark:to-zinc-900"
+      >
+        <h3 className="text-2xl font-extrabold">Your competitors are already here.</h3>
+        <p className="mt-2 text-zinc-600 dark:text-zinc-300">
+          Join the beta, spend less time retouching, and more time selling. Limited invites this month.
+        </p>
+        <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <MagneticCTA href="/dashboard">Claim your invite</MagneticCTA>
+          <Link
+            href="#features"
+            className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/60 px-5 py-3 text-sm font-semibold text-zinc-900 backdrop-blur transition hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white"
+          >
+            Explore features
+          </Link>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ------------------------------ Sticky Mobile CTA --------------------------- */
+
+function StickyMobileCTA() {
+  return (
+    <div className="md:hidden">
+      <Link
+        href="/dashboard"
+        className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-indigo-700/20 transition hover:bg-fuchsia-600"
+        aria-label="Try it now"
+      >
+        Try now <span aria-hidden>→</span>
+      </Link>
+    </div>
   );
 }
