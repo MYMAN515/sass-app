@@ -5,15 +5,28 @@ import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
 /**
- * MintLemon AI — Full-width, responsive landing
+ * MintLemon / Studio — Full-width landing
+ * - uses ONLY local assets from /public and /public/models
  * - <img> only (no Next/Image)
- * - No "Book a demo / Talk to sales" buttons
  * - No sticky mobile CTA
- * - FULL WIDTH containers
  * - Mobile-visible header links (scrollable row)
  */
 
 const ease = [0.22, 1, 0.36, 1];
+
+const MODEL_HERO = [
+  '/models/m01.webp',
+  '/models/m03.webp',
+  '/models/m05.webp',
+  '/models/m07.webp',
+  '/models/m09.webp',
+];
+const MODEL_GRID = [
+  '/models/m02.webp',
+  '/models/m04.webp',
+  '/models/m06.webp',
+  '/models/m08.webp',
+];
 
 export default function HeroSection() {
   return (
@@ -21,9 +34,11 @@ export default function HeroSection() {
       <BackgroundAuras />
       <Header />
       <Hero />
+      <ModelsSpotlight />
       <LogosStrip />
       <HowItWorks />
       <ProductDemo />
+      <CuratedModelGrid />
       <FAQ />
     </main>
   );
@@ -34,11 +49,15 @@ function Header() {
   return (
     <header className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-4">
       <div className="flex items-center justify-between">
-        <div className="text-xl font-bold tracking-tight">MintLemon</div>
+        <div className="flex items-center gap-2">
+          <img src="/ai-studio.png" alt="Studio logo" className="h-6 w-6 rounded" />
+          <div className="text-xl font-bold tracking-tight">AI Studio</div>
+        </div>
         <nav className="flex gap-2 overflow-x-auto text-sm">
           <a href="#features" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Features</a>
           <a href="#how" className="rounded-lg px-3 py-1.5 hover:bg-white/70">How it works</a>
           <a href="#demo" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Demo</a>
+          <a href="#models" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Models</a>
           <a href="#faq" className="rounded-lg px-3 py-1.5 hover:bg-white/70">FAQ</a>
         </nav>
       </div>
@@ -67,7 +86,7 @@ function Hero() {
           </motion.h1>
 
           <p className="mt-4 max-w-[70ch] text-lg text-zinc-700">
-            Premium product images in seconds. Clean backgrounds, upscale, and place garments on studio-ready models — with audit logs and SSO.
+            Premium product shots in seconds. Clean backgrounds, upscale, and place garments on studio-ready models — with audit logs and SSO.
           </p>
           <p className="mt-1 text-zinc-600">
             منصّة للفرق: تعزيز الصور وتجربة الملابس افتراضياً مع خصوصية عالية وتكامل مؤسسي.
@@ -123,15 +142,64 @@ function HeroDemos() {
   return (
     <div className="grid gap-5 md:grid-cols-2">
       <DemoCard title="Enhance" subtitle="Before / After">
-        <BeforeAfter
-          beforeUrl="https://images.unsplash.com/photo-1516762689617-e1cffcef479d?q=80&w=1200&auto=format&fit=crop"
-          afterUrl="https://images.unsplash.com/photo-1585386959984-a41552231608?q=80&w=1200&auto=format&fit=crop"
-        />
+        <BeforeAfter beforeUrl="/demo-before.jpg" afterUrl="/demo-after.jpg" />
       </DemoCard>
 
       <DemoCard title="Try-On" subtitle="Garment → Model">
         <TryOnMock />
       </DemoCard>
+    </div>
+  );
+}
+
+/* ----------------------- MODELS — MARQUEE ------------------------ */
+function ModelsSpotlight() {
+  const rm = useReducedMotion();
+  return (
+    <section id="models" className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-10 md:py-14">
+      <div className="mb-4 flex items-end justify-between">
+        <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Models Spotlight</h2>
+        <span className="text-xs text-zinc-500">Curated — not all models, just the hits</span>
+      </div>
+
+      <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-3 shadow-sm">
+        {/* repeating row for seamless loop */}
+        <div className="relative w-full">
+          <motion.div
+            className="flex gap-3"
+            initial={false}
+            animate={rm ? {} : { x: ['0%', '-50%'] }}
+            transition={rm ? {} : { duration: 28, repeat: Infinity, ease: 'linear' }}
+          >
+            <MarqueeRow images={MODEL_HERO} />
+            <MarqueeRow images={MODEL_HERO} />{/* duplicate for loop */}
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MarqueeRow({ images }) {
+  return (
+    <div className="flex shrink-0 items-stretch gap-3 pr-3">
+      {images.map((src, i) => (
+        <div
+          key={`${src}-${i}`}
+          className="group relative h-40 w-64 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 md:h-48 md:w-80"
+        >
+          <img
+            loading="lazy"
+            src={src}
+            alt={`Model ${i + 1}`}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+          <div className="absolute left-3 top-3 rounded-lg bg-white/85 px-2 py-1 text-[10px] font-semibold tracking-wide text-zinc-900">
+            MODEL {String(i + 1).padStart(2, '0')}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -214,6 +282,33 @@ function ProductDemo() {
         <DemoCard title="Try-On" subtitle="Place garment on model">
           <TryOnMock />
         </DemoCard>
+      </div>
+    </section>
+  );
+}
+
+/* --------------------- MODELS — CURATED GRID --------------------- */
+function CuratedModelGrid() {
+  return (
+    <section className="w-full px-4 sm:px-6 md:px-10 xl:px-16 pb-14">
+      <div className="mb-4 flex items-end justify-between">
+        <h3 className="text-xl font-semibold tracking-tight">Editorial styles (curated)</h3>
+        <span className="text-xs text-zinc-500">Hand-picked from /public/models</span>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+        {MODEL_GRID.map((src, i) => (
+          <div key={src} className="group relative h-48 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
+            <img
+              loading="lazy"
+              src={src}
+              alt={`Editorial model ${i + 1}`}
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            />
+            <div className="absolute bottom-3 left-3 rounded-lg bg-white/85 px-2 py-1 text-[10px] font-semibold text-zinc-900">
+              CURATED {String(i + 1).padStart(2, '0')}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -313,13 +408,13 @@ function TryOnMock() {
     <div>
       <div className="relative h-56 w-full overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50 md:h-64">
         <img
-          src="https://images.unsplash.com/photo-1520975916090-3105956dac38?q=80&w=1200&auto=format&fit=crop"
+          src="/ecom-mannequin.webp"
           alt="model"
           className="absolute inset-0 h-full w-full object-cover transition-opacity"
           style={{ opacity: tab === 'before' ? 1 : 0 }}
         />
         <img
-          src="https://images.unsplash.com/photo-1548883354-51e87a8514d4?q=80&w=1200&auto=format&fit=crop"
+          src="/streetwear.webp"
           alt="model with garment"
           className="absolute inset-0 h-full w-full object-cover transition-opacity"
           style={{ opacity: tab === 'after' ? 1 : 0 }}
