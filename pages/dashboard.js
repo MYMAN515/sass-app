@@ -4,15 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 
 /* -------------------------------------------------------
-   Theme (Tabby-like soft fintech palette)
+   Font (clean, friendly)
+------------------------------------------------------- */
+const jak = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400','500','600','700'], display: 'swap' });
+
+/* -------------------------------------------------------
+   Theme — softer whites + mint/iris accents
 ------------------------------------------------------- */
 const BG_GRADIENT =
-  'bg-[radial-gradient(1200px_600px_at_-10%_-10%,#FFFBEA_0%,transparent_50%),radial-gradient(900px_600px_at_110%_-10%,#E6FFF5_0%,transparent_45%),radial-gradient(1000px_600px_at_30%_120%,#EAF3FF_0%,transparent_50%)]';
+  'bg-[radial-gradient(1200px_600px_at_-10%_-10%,#F6F2FF_0%,transparent_55%),radial-gradient(1000px_600px_at_110%_-10%,#E9FFF6_0%,transparent_50%),radial-gradient(900px_700px_at_20%_110%,#F6FAFF_0%,transparent_55%)]';
 
-const SOFT_CARD = 'bg-white/90 backdrop-blur border border-slate-200 shadow-sm';
-const ACCENT_BTN = 'bg-[#2BC48A] hover:bg-[#1FB57C] text-white'; // Mint
+const SOFT_CARD = 'bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 border border-slate-200 shadow-sm';
+const ACCENT_BTN = 'bg-[#2BC48A] hover:bg-[#1FB57C] text-white';
 const ACCENT_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2BC48A]/60 rounded-xl';
 
 /* -------------------------------------------------------
@@ -173,52 +179,15 @@ const PRODUCT_TOOLS = [
 const PEOPLE_TOOLS = [{ id: 'tryon', label: 'Try-On (Realistic Model)', icon: PersonIcon }];
 
 /* -------------------------------------------------------
-   Try-On Presets
+   Try-On Presets & recipes
 ------------------------------------------------------- */
 const TRYON_PRESETS = [
-  {
-    id: 'ecom-female-front-white',
-    title: 'E-commerce • Female',
-    subtitle: 'Front • Studio White',
-    persona: 'female',
-    pose: 'front',
-    bg: 'studio_white',
-    style: 'ecom',
-    thumb: '/presets/ecom-female-front-white.webp',
-  },
-  {
-    id: 'editorial-female-34-beige',
-    title: 'Editorial • Female',
-    subtitle: '3/4 • Warm Beige',
-    persona: 'female',
-    pose: '3/4',
-    bg: 'studio_beige',
-    style: 'editorial',
-    thumb: '/presets/editorial-female-34-beige.webp',
-  },
-  {
-    id: 'ecom-male-front-white',
-    title: 'E-commerce • Male',
-    subtitle: 'Front • Studio White',
-    persona: 'male',
-    pose: 'front',
-    bg: 'studio_white',
-    style: 'ecom',
-    thumb: '/presets/ecom-male-front-white.webp',
-  },
-  {
-    id: 'street-male-casual-slate',
-    title: 'Street • Male',
-    subtitle: 'Casual • Slate',
-    persona: 'male',
-    pose: 'casual stance',
-    bg: 'slate',
-    style: 'street',
-    thumb: '/presets/street-male-casual-slate.webp',
-  },
+  { id: 'ecom-female-front-white', title: 'E-commerce • Female', subtitle: 'Front • Studio White', persona: 'female', pose: 'front', bg: 'studio_white', style: 'ecom', thumb: '/presets/ecom-female-front-white.webp' },
+  { id: 'editorial-female-34-beige', title: 'Editorial • Female', subtitle: '3/4 • Warm Beige', persona: 'female', pose: '3/4', bg: 'studio_beige', style: 'editorial', thumb: '/presets/editorial-female-34-beige.webp' },
+  { id: 'ecom-male-front-white', title: 'E-commerce • Male', subtitle: 'Front • Studio White', persona: 'male', pose: 'front', bg: 'studio_white', style: 'ecom', thumb: '/presets/ecom-male-front-white.webp' },
+  { id: 'street-male-casual-slate', title: 'Street • Male', subtitle: 'Casual • Slate', persona: 'male', pose: 'casual stance', bg: 'slate', style: 'street', thumb: '/presets/street-male-casual-slate.webp' },
 ];
 
-/* Style & BG recipes */
 const STYLE_PACKS = [
   { id: 'editorial', title: 'Editorial', recipe: 'editorial fashion photo, crisp studio light, subtle grain' },
   { id: 'ecom', title: 'E-commerce', recipe: 'ecommerce catalog photo, true-to-color, centered, no props' },
@@ -262,16 +231,13 @@ export default function Dashboard() {
   const [stylePack, setStylePack] = useState('ecom');
   const [bgPack, setBgPack] = useState('studio_white');
 
-  // Options
-  const [numImages, setNumImages] = useState(1);
-  const [aspect, setAspect] = useState('match_input_image');
-  const [seed, setSeed] = useState('');
-  const [guidance, setGuidance] = useState(3.7);
-  const [safety, setSafety] = useState(2);
+  // Simplified output options
+  const [numImages, setNumImages] = useState(1); // keep tiny & fast
+  const [aspect, setAspect] = useState('4:5'); // default retail-friendly
 
   // Enhance Prompt Builder (chips)
   const [builder, setBuilder] = useState({
-    base: new Set(['retouch']), // 'retouch'|'upscale'|'relight'|'recolor'|'shadow'
+    base: new Set(['retouch']),
     look: new Set(['soft studio', '50mm']),
     constraints: new Set(['preserve brand colors']),
     negative: new Set(['no text', 'no watermark', 'no artifacts']),
@@ -280,10 +246,10 @@ export default function Dashboard() {
 
   // Modal flow
   const [showFlow, setShowFlow] = useState(true);
-  const [flowStep, setFlowStep] = useState(0); // 0: QuickStart, 1: Upload, 2: Presets, 3: Customize
+  const [flowStep, setFlowStep] = useState(0);
   const [rememberChoice, setRememberChoice] = useState(false);
 
-  // Customize modal (legacy quick access)
+  // Customize modal
   const [showCustomize, setShowCustomize] = useState(false);
   const [custom, setCustom] = useState({
     camera: '50mm eye-level',
@@ -292,7 +258,7 @@ export default function Dashboard() {
     extras: '',
   });
 
-  // Enhance modal (legacy)
+  // Enhance modal
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [showEnhance, setShowEnhance] = useState(false);
 
@@ -390,8 +356,7 @@ export default function Dashboard() {
   const BG_RECIPES = useMemo(() => Object.fromEntries(BG_PACKS.map(p => [p.id, p.recipe])), []);
 
   const buildPersonaLine = (p, tone, pPose) => {
-    const base = p === 'female' ? 'photorealistic woman, natural makeup'
-               : 'photorealistic man, light grooming';
+    const base = p === 'female' ? 'photorealistic woman, natural makeup' : 'photorealistic man, light grooming';
     return `${base}, ${tone} skin tone, ${pPose} pose`;
   };
 
@@ -517,17 +482,10 @@ export default function Dashboard() {
         plan,
         user_email: user.email,
         num_images: numImages,
-        seed: seed === '' ? undefined : Number(seed),
         aspect_ratio: aspect,
-        guidance_scale: guidance,
-        safety_tolerance: safety,
       };
 
-      const r = await fetch('/api/tryon', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const r = await fetch('/api/tryon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || 'try-on failed');
 
@@ -540,7 +498,7 @@ export default function Dashboard() {
       console.error(e); setPhase('error'); setErr('Failed to process.');
       toasts.push('Try-On failed', { type: 'error' });
     } finally { clearInterval(iv); setBusy(false); }
-  }, [file, plan, user, uploadToStorage, numImages, seed, aspect, guidance, safety, toasts, localUrl, pieceType, persona, skin, pose, stylePack, bgPack, custom]);
+  }, [file, plan, user, uploadToStorage, numImages, aspect, toasts, localUrl, pieceType, persona, skin, pose, stylePack, bgPack, custom]);
 
   const handleRun = () => {
     if (group === 'people' && tool === 'tryon') return runTryOn();
@@ -562,12 +520,8 @@ export default function Dashboard() {
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
     return (
-      <main className={`min-h-screen grid place-items-center ${BG_GRADIENT} text-slate-600`}>
-        <motion.div
-          initial={{ scale: 0.98, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className={`${SOFT_CARD} rounded-2xl px-4 py-3 text-sm`}
-        >
+      <main className={`min-h-screen grid place-items-center ${BG_GRADIENT} text-slate-600 ${jak.className} antialiased`}>
+        <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`${SOFT_CARD} rounded-2xl px-4 py-3 text-sm`}>
           Loading…
         </motion.div>
       </main>
@@ -584,15 +538,11 @@ export default function Dashboard() {
   const currentStep = !file ? 1 : (resultUrl ? 3 : 2);
 
   return (
-    <main className={`min-h-screen ${BG_GRADIENT} text-slate-900`}>
+    <main className={`min-h-screen ${BG_GRADIENT} text-slate-900 ${jak.className} antialiased`}>
       <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
 
         {/* Sidebar */}
-        <motion.aside
-          initial={{ x: -12, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 120, damping: 16 }}
-          className={`${SOFT_CARD} rounded-2xl sticky top-3 md:top-4 self-start h-fit`}
-        >
+        <motion.aside initial={{ x: -12, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 120, damping: 16 }} className={`${SOFT_CARD} rounded-2xl sticky top-3 md:top-4 self-start h-fit`}>
           <div className="px-4 py-4 flex items-center gap-3 border-b border-slate-200">
             <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-[#2BC48A] to-[#83E0BE] text-white shadow">
               <SparkleIcon className="w-4 h-4" />
@@ -607,15 +557,8 @@ export default function Dashboard() {
                 const Active = group === g.id;
                 const Icon = g.icon;
                 return (
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    key={g.id}
-                    onClick={() => { setGroup(g.id); switchTool(g.id === 'product' ? 'enhance' : 'tryon'); }}
-                    className={[
-                      'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                      Active ? 'bg-[#2BC48A] text-white shadow' : 'text-slate-800 hover:bg-slate-100'
-                    ].join(' ')}
-                  >
+                  <motion.button whileTap={{ scale: 0.98 }} key={g.id} onClick={() => { setGroup(g.id); switchTool(g.id === 'product' ? 'enhance' : 'tryon'); }}
+                    className={[ 'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition', Active ? 'bg-[#2BC48A] text-white shadow' : 'text-slate-800 hover:bg-slate-100' ].join(' ')}>
                     <Icon className="size-4" /> {g.label}
                   </motion.button>
                 );
@@ -630,16 +573,8 @@ export default function Dashboard() {
                 const Active = tool === t.id;
                 const Icon = t.icon;
                 return (
-                  <motion.button
-                    whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}
-                    key={t.id}
-                    onClick={() => switchTool(t.id)}
-                    className={[
-                      'w-full group flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition',
-                      Active ? 'bg-white text-[#2BC48A] border border-[#2BC48A]/30 shadow-sm'
-                             : 'text-slate-700 hover:bg-slate-50 border border-transparent'
-                    ].join(' ')}
-                  >
+                  <motion.button whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} key={t.id} onClick={() => switchTool(t.id)}
+                    className={[ 'w-full group flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition', Active ? 'bg-white text-[#2BC48A] border border-[#2BC48A]/30 shadow-sm' : 'text-slate-700 hover:bg-slate-50 border border-transparent' ].join(' ')}>
                     <Icon className={['size-4', Active ? 'text-[#2BC48A]' : 'text-slate-500 group-hover:text-slate-700'].join(' ')} />
                     <span className="truncate">{t.label}</span>
                   </motion.button>
@@ -661,10 +596,7 @@ export default function Dashboard() {
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
           {/* Header / Steps */}
-          <motion.div
-            initial={{ y: 8, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-            className={`${SOFT_CARD} rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6`}
-          >
+          <motion.div initial={{ y: 8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className={`${SOFT_CARD} rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6`}>
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
@@ -672,27 +604,21 @@ export default function Dashboard() {
                 </h1>
                 <p className="text-slate-600 text-xs sm:text-sm">
                   {group === 'people'
-                    ? <>Step 1: Upload clothing → Step 2: Preset or Customize → Step 3: Run.</>
+                    ? <>Step 1: Upload clothing → Step 2: Preset → Step 3: Run.</>
                     : <>Pick a preset or open <span className="font-semibold">Customize</span>.</>}
                 </p>
               </div>
 
               {group === 'people' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <button
-                    onClick={() => setShowCustomize(true)}
-                    className={`${ACCENT_BTN} ${ACCENT_RING} inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold`}
-                  >
+                  <button onClick={() => setShowCustomize(true)} className={`${ACCENT_BTN} ${ACCENT_RING} inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold`}>
                     🎛️ Customize
                   </button>
                 </motion.div>
               )}
 
               {group === 'product' && (
-                <button
-                  onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
-                  className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50`}
-                >
+                <button onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }} className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50`}>
                   ✨ Customize Enhance
                 </button>
               )}
@@ -703,48 +629,20 @@ export default function Dashboard() {
               <ProgressSteps current={currentStep} />
             </div>
 
-            {/* Try-On presets or Product enhance presets */}
+            {/* Presets */}
             {group === 'people' ? (
               <div className="mt-4">
                 <div className="mb-2 text-[12px] font-semibold text-slate-700">Quick Presets</div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {TRYON_PRESETS.map((p) => (
-                    <TryonPresetCard
-                      key={p.id}
-                      title={p.title}
-                      subtitle={p.subtitle}
-                      thumb={p.thumb}
-                      onClick={() => {
-                        setPersona(p.persona);
-                        setPose(p.pose);
-                        setBgPack(p.bg);
-                        setStylePack(p.style);
-                      }}
-                    />
+                    <TryonPresetCard key={p.id} title={p.title} subtitle={p.subtitle} thumb={p.thumb} onClick={() => { setPersona(p.persona); setPose(p.pose); setBgPack(p.bg); setStylePack(p.style); }} />
                   ))}
                 </div>
 
                 {/* Minimal quick switches */}
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <ToggleChips
-                    label="Gender"
-                    value={persona}
-                    setValue={setPersona}
-                    options={[
-                      { id: 'female', label: 'Female' },
-                      { id: 'male', label: 'Male' },
-                    ]}
-                  />
-                  <ToggleChips
-                    label="Garment"
-                    value={pieceType}
-                    setValue={setPieceType}
-                    options={[
-                      { id: 'upper', label: 'Upper' },
-                      { id: 'lower', label: 'Lower' },
-                      { id: 'dress', label: 'Dress' },
-                    ]}
-                  />
+                  <ToggleChips label="Gender" value={persona} setValue={setPersona} options={[ { id: 'female', label: 'Female' }, { id: 'male', label: 'Male' } ]} />
+                  <ToggleChips label="Garment" value={pieceType} setValue={setPieceType} options={[ { id: 'upper', label: 'Upper' }, { id: 'lower', label: 'Lower' }, { id: 'dress', label: 'Dress' } ]} />
                   <SelectField label="Pose" value={pose} onChange={setPose} options={POSES} />
                   <SelectField label="Skin" value={skin} onChange={setSkin} options={SKIN_TONES} />
                 </div>
@@ -753,24 +651,9 @@ export default function Dashboard() {
               <div className="mt-4">
                 <div className="mb-2 text-[12px] font-semibold text-slate-700">Enhance Presets</div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {/* None (Default) card */}
-                  <PresetCard
-                    key="none-default"
-                    title="None (Default)"
-                    subtitle="Use Prompt Builder"
-                    preview="/placeholder-default.webp"
-                    tag="Default"
-                    onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
-                  />
+                  <PresetCard key="none-default" title="None (Default)" subtitle="Use Prompt Builder" preview="/placeholder-default.webp" tag="Default" onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }} />
                   {ENHANCE_PRESETS.map((p) => (
-                    <PresetCard
-                      key={p.id}
-                      title={p.title}
-                      subtitle={p.subtitle}
-                      preview={p.preview}
-                      tag={p.tag}
-                      onClick={() => { setTool('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
-                    />
+                    <PresetCard key={p.id} title={p.title} subtitle={p.subtitle} preview={p.preview} tag={p.tag} onClick={() => { setTool('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }} />
                   ))}
                 </div>
               </div>
@@ -780,27 +663,14 @@ export default function Dashboard() {
           {/* Workbench */}
           <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_360px]">
             {/* Canvas Panel */}
-            <motion.section
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className={`${SOFT_CARD} rounded-2xl md:rounded-3xl relative`}
-            >
+            <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`${SOFT_CARD} rounded-2xl md:rounded-3xl relative`}>
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
                 <div className="inline-flex rounded-full border border-slate-200 bg-white p-1">
                   {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((it) => {
-                    const Active = tool === it.id;
-                    const Icon = it.icon;
+                    const Active = tool === it.id; const Icon = it.icon;
                     return (
-                      <motion.button
-                        whileTap={{ scale: 0.98 }}
-                        key={it.id}
-                        onClick={() => switchTool(it.id)}
-                        className={[
-                          'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                          Active ? 'bg-[#2BC48A] text-white shadow' : 'text-slate-800 hover:bg-slate-100'
-                        ].join(' ')}
-                      >
-                        <Icon className="size-4" />
-                        <span>{it.label}</span>
+                      <motion.button whileTap={{ scale: 0.98 }} key={it.id} onClick={() => switchTool(it.id)} className={[ 'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition', Active ? 'bg-[#2BC48A] text-white shadow' : 'text-slate-800 hover:bg-slate-100' ].join(' ')}>
+                        <Icon className="size-4" /> <span>{it.label}</span>
                       </motion.button>
                     );
                   })}
@@ -814,21 +684,10 @@ export default function Dashboard() {
               </div>
 
               {/* Drop area */}
-              <div
-                ref={dropRef}
-                className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/70 bg-white hover:bg-slate-50 transition cursor-pointer"
-                onClick={() => inputRef.current?.click()}
-                title="Drag & drop / Click / Paste (Ctrl+V)"
-              >
-                <input
-                  ref={inputRef}
-                  type="file" accept="image/*" className="hidden"
-                  onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
-                />
+              <div ref={dropRef} className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/70 bg-white hover:bg-slate-50 transition cursor-pointer" onClick={() => inputRef.current?.click()} title="Drag & drop / Click / Paste (Ctrl+V)">
+                <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }} />
                 {!localUrl && !resultUrl ? (
-                  <motion.div initial={{ opacity: 0.6 }} animate={{ opacity: 1 }}
-                    className="text-center text-slate-700 text-sm"
-                  >
+                  <motion.div initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} className="text-center text-slate-700 text-sm">
                     <div className="mx-auto mb-3 grid place-items-center size-12 sm:size-14 rounded-full bg-white border border-slate-200">⬆</div>
                     Upload a clothing image (PNG/JPG). Transparent PNG preferred.
                   </motion.div>
@@ -837,34 +696,21 @@ export default function Dashboard() {
                     {compare && localUrl && resultUrl ? (
                       <div className="relative max-w-full max-h-[70vh]">
                         <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
-                        <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
-                             className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
+                        <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}} className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
                       </div>
                     ) : (
-                      <img
-                        src={resultUrl || localUrl}
-                        alt="preview"
-                        className="max-w-full max-h-[70vh] object-contain rounded-xl"
-                        draggable={false}
-                        loading="lazy"
-                      />
+                      <img src={resultUrl || localUrl} alt="preview" className="max-w-full max-h-[70vh] object-contain rounded-xl" draggable={false} loading="lazy" />
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Try-On Advanced row (compact) */}
+              {/* Try-On quick output options (simplified) */}
               {group === 'people' && (
                 <div className="px-3 sm:px-4 md:px-5 -mt-3 pb-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <SelectField
-                      label="Aspect"
-                      value={aspect}
-                      onChange={setAspect}
-                      options={['match_input_image', '1:1', '3:4', '4:5', '9:16', '16:9']}
-                    />
-                    <NumberField label="# Images" value={numImages} setValue={setNumImages} min={1} max={3} />
-                    <TextField label="Seed (optional)" value={seed} setValue={(v)=>setSeed(v.replace(/[^\d\-]/g,''))} placeholder="e.g. 123" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <SelectField label="Aspect" value={aspect} onChange={setAspect} options={['1:1', '4:5', '3:4', '9:16', '16:9']} />
+                    <NumberField label="# Images" value={numImages} setValue={setNumImages} min={1} max={2} />
                   </div>
                 </div>
               )}
@@ -875,16 +721,7 @@ export default function Dashboard() {
                   <div className="text-xs text-slate-600 mb-1">Variants</div>
                   <div className="flex gap-2 overflow-x-auto pb-2">
                     {variants.map((v, i) => (
-                      <motion.button
-                        whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-                        key={i}
-                        onClick={() => setResultUrl(v)}
-                        className={[
-                          'shrink-0 w-24 h-24 rounded-lg overflow-hidden border',
-                          resultUrl === v ? 'border-[#2BC48A] ring-2 ring-[#2BC48A]/40' : 'border-slate-200 hover:border-slate-300'
-                        ].join(' ')}
-                        title={`Variant ${i+1}`}
-                      >
+                      <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} key={i} onClick={() => setResultUrl(v)} className={[ 'shrink-0 w-24 h-24 rounded-lg overflow-hidden border', resultUrl === v ? 'border-[#2BC48A] ring-2 ring-[#2BC48A]/40' : 'border-slate-200 hover:border-slate-300' ].join(' ')} title={`Variant ${i+1}`}>
                         <img src={v} alt={`v${i+1}`} className="w-full h-full object-cover" />
                       </motion.button>
                     ))}
@@ -894,46 +731,24 @@ export default function Dashboard() {
 
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-5 pb-4 md:pb-5">
-                <button
-                  onClick={handleRun}
-                  disabled={busy || !file}
-                  className={`${ACCENT_BTN} ${ACCENT_RING} inline-flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50`}
-                >
-                  {busy ? 'Processing…' : (
-                    <>
-                      <PlayIcon className="size-4" />
-                      {tool === 'tryon' ? 'Run Try-On' : (tool === 'removeBg' ? 'Remove Background' : 'Run Enhance')}
-                    </>
-                  )}
+                <button onClick={handleRun} disabled={busy || !file} className={`${ACCENT_BTN} ${ACCENT_RING} inline-flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50`}>
+                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" />{tool === 'tryon' ? 'Run Try-On' : (tool === 'removeBg' ? 'Remove Background' : 'Run Enhance')}</>)}
                 </button>
 
                 {/* Independent Remove BG */}
-                <button
-                  onClick={runRemoveBg}
-                  disabled={busy || !file}
-                  className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50`}
-                >
+                <button onClick={runRemoveBg} disabled={busy || !file} className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50`}>
                   ✂ Remove Background
                 </button>
 
                 {resultUrl && (
                   <>
-                    <button
-                      onClick={() => exportPng(resultUrl)}
-                      className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50`}
-                    >
+                    <button onClick={() => exportPng(resultUrl)} className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50`}>
                       ⬇ Download PNG
                     </button>
-                    <a
-                      href={resultUrl} target="_blank" rel="noreferrer"
-                      className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50`}
-                    >
+                    <a href={resultUrl} target="_blank" rel="noreferrer" className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50`}>
                       ↗ Open
                     </a>
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(resultUrl).catch(()=>{}); }}
-                      className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50`}
-                    >
+                    <button onClick={() => { navigator.clipboard.writeText(resultUrl).catch(()=>{}); }} className={`${ACCENT_RING} inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-slate-50`}>
                       🔗 Copy URL
                     </button>
 
@@ -945,8 +760,7 @@ export default function Dashboard() {
                         </label>
                         {compare && (
                           <div className="flex items-center gap-2">
-                            <input type="range" min={0} max={100} value={compareOpacity}
-                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} />
+                            <input type="range" min={0} max={100} value={compareOpacity} onChange={(e)=>setCompareOpacity(Number(e.target.value))} />
                             <span className="text-xs w-8 text-right">{compareOpacity}%</span>
                           </div>
                         )}
@@ -961,10 +775,7 @@ export default function Dashboard() {
               {/* busy overlay */}
               <AnimatePresence>
                 {busy && (
-                  <motion.div
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="pointer-events-none absolute inset-0 rounded-2xl md:rounded-3xl grid place-items-center bg-white/60"
-                  >
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pointer-events-none absolute inset-0 rounded-2xl md:rounded-3xl grid place-items-center bg-white/60">
                     <div className="text-xs px-3 py-2 rounded-lg bg-white border shadow">Working…</div>
                   </motion.div>
                 )}
@@ -972,10 +783,7 @@ export default function Dashboard() {
             </motion.section>
 
             {/* Inspector */}
-            <motion.aside
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className={`${SOFT_CARD} rounded-2xl md:rounded-3xl p-4 md:pb-5`}
-            >
+            <motion.aside initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`${SOFT_CARD} rounded-2xl md:rounded-3xl p-4 md:pb-5`}>
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold text-slate-900">Inspector</div>
                 <span className="text-xs text-slate-600">Tool: {tool}</span>
@@ -1000,20 +808,13 @@ export default function Dashboard() {
                     <Info label="Style" value={stylePack} />
                     <Info label="Background" value={bgPack} />
                     <Info label="Aspect" value={aspect} />
-                    <Info label="Guidance" value={String(guidance)} />
-                    <Info label="Safety" value={String(safety)} />
-                    <Info label="Seed" value={seed || '—'} />
                     <Info label="# Images" value={String(numImages)} />
                   </div>
 
                   {resultUrl && (
                     <div className="rounded-lg border p-3">
                       <div className="text-slate-600 mb-2">Result</div>
-                      <img
-                        src={resultUrl}
-                        alt="final"
-                        className="w-full max-h-64 object-contain rounded-md border bg-white"
-                      />
+                      <img src={resultUrl} alt="final" className="w-full max-h-64 object-contain rounded-md border bg-white" />
                     </div>
                   )}
                 </div>
@@ -1023,30 +824,10 @@ export default function Dashboard() {
                 <div className="space-y-3 mt-3 text-xs text-slate-700">
                   <div className="rounded-lg border p-3 space-y-2">
                     <div className="font-semibold text-slate-900">Prompt Builder</div>
-                    <ChipGroup
-                      label="Base"
-                      options={['retouch','upscale','relight','recolor','shadow']}
-                      value={builder.base}
-                      onToggle={(id)=>toggleSet('base', id)}
-                    />
-                    <ChipGroup
-                      label="Look & Camera"
-                      options={['soft studio','high-key','50mm','neutral color','white sweep']}
-                      value={builder.look}
-                      onToggle={(id)=>toggleSet('look', id)}
-                    />
-                    <ChipGroup
-                      label="Constraints"
-                      options={['preserve brand colors','no extra fabric','no background props']}
-                      value={builder.constraints}
-                      onToggle={(id)=>toggleSet('constraints', id)}
-                    />
-                    <ChipGroup
-                      label="Negative"
-                      options={['no text','no watermark','no artifacts','no deformed shapes']}
-                      value={builder.negative}
-                      onToggle={(id)=>toggleSet('negative', id)}
-                    />
+                    <ChipGroup label="Base" options={['retouch','upscale','relight','recolor','shadow']} value={builder.base} onToggle={(id)=>toggleSet('base', id)} />
+                    <ChipGroup label="Look & Camera" options={['soft studio','high-key','50mm','neutral color','white sweep']} value={builder.look} onToggle={(id)=>toggleSet('look', id)} />
+                    <ChipGroup label="Constraints" options={['preserve brand colors','no extra fabric','no background props']} value={builder.constraints} onToggle={(id)=>toggleSet('constraints', id)} />
+                    <ChipGroup label="Negative" options={['no text','no watermark','no artifacts','no deformed shapes']} value={builder.negative} onToggle={(id)=>toggleSet('negative', id)} />
                     <StrengthSlider value={builder.strength} onChange={(v)=>setBuilder(s=>({...s, strength:v}))} />
                   </div>
 
@@ -1063,36 +844,21 @@ export default function Dashboard() {
           </div>
 
           {/* History */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            className={`${SOFT_CARD} rounded-2xl md:rounded-3xl p-4 md:p-5`}
-          >
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`${SOFT_CARD} rounded-2xl md:rounded-3xl p-4 md:p-5`}>
             <div className="text-sm font-semibold text-slate-900 mb-2">History</div>
             {history.length === 0 ? (
               <div className="text-xs text-slate-500 px-1 py-4">— No renders yet —</div>
             ) : (
               <>
                 <div className="mb-2">
-                  <button
-                    onClick={() => setHistory([])}
-                    className={`${ACCENT_RING} text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50`}
-                  >
+                  <button onClick={() => setHistory([])} className={`${ACCENT_RING} text-xs px-2 py-1 rounded-lg border bg-white hover:bg-slate-50`}>
                     Clear history
                   </button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
                   {history.map((h, i) => (
-                    <motion.button
-                      whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-                      key={i}
-                      onClick={() => setResultUrl(h.outputUrl)}
-                      className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-white"
-                    >
-                      <img
-                        src={h.outputUrl || h.inputThumb}
-                        alt="hist"
-                        className="w-full h-28 object-cover"
-                      />
+                    <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} key={i} onClick={() => setResultUrl(h.outputUrl)} className="group relative rounded-xl overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-white">
+                      <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
                       <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
                         {h.tool} • {new Date(h.ts).toLocaleTimeString()}
                       </div>
@@ -1106,43 +872,26 @@ export default function Dashboard() {
       </div>
 
       {/* Sticky mobile actions */}
-      <div className="lg:hidden fixed bottom-2 left-1/2 -translate-x-1/2 z-[60]">
+      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[60]">
         <div className="inline-flex gap-2 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-2 py-2 shadow">
-          <button
-            onClick={() => setShowFlow(true)}
-            className={`${ACCENT_RING} text-xs px-3 py-2 rounded-xl border hover:bg-slate-50`}
-          >
+          <button onClick={() => setShowFlow(true)} className={`${ACCENT_RING} text-xs px-3 py-2 rounded-xl border hover:bg-slate-50`}>
             ◷ Steps
           </button>
-          <button
-            onClick={handleRun}
-            disabled={busy || !file}
-            className={`${ACCENT_BTN} ${ACCENT_RING} text-xs px-3 py-2 rounded-xl font-semibold disabled:opacity-50`}
-          >
+          <button onClick={handleRun} disabled={busy || !file} className={`${ACCENT_BTN} ${ACCENT_RING} text-xs px-3 py-2 rounded-xl font-semibold disabled:opacity-50`}>
             {tool === 'tryon' ? 'Run Try-On' : tool === 'enhance' ? 'Run Enhance' : 'Remove BG'}
           </button>
-          <button
-            onClick={runRemoveBg}
-            disabled={busy || !file}
-            className={`${ACCENT_RING} text-xs px-3 py-2 rounded-xl border hover:bg-slate-50 disabled:opacity-50`}
-          >
+          <button onClick={runRemoveBg} disabled={busy || !file} className={`${ACCENT_RING} text-xs px-3 py-2 rounded-xl border hover:bg-slate-50 disabled:opacity-50`}>
             ✂ BG
           </button>
         </div>
       </div>
 
-      {/* Modals: Flow Stepper + Legacy modals */}
+      {/* Modals */}
       <AnimatePresence>
         {showFlow && (
-          <motion.div className="fixed inset-0 z-[100] grid place-items-end sm:place-items-center"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div className="fixed inset-0 z-[100] grid place-items-end sm:place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={() => setShowFlow(false)} />
-            <motion.div
-              initial={{ y: 24, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 24, opacity: 0 }}
-              className="relative w-full sm:max-w-2xl bg-white rounded-t-3xl sm:rounded-2xl shadow-xl border overflow-hidden"
-            >
+            <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }} className="relative w-full sm:max-w-2xl bg-white rounded-t-3xl sm:rounded-2xl shadow-xl border overflow-hidden">
               <div className="p-3 sm:p-4 border-b flex items-center justify-between">
                 <div className="text-sm font-semibold">QuickStart</div>
                 <button onClick={() => setShowFlow(false)} className="text-xs text-slate-500 hover:text-slate-800">✕</button>
@@ -1158,33 +907,15 @@ export default function Dashboard() {
                 {flowStep === 0 && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <ActionCard
-                        title="Try-On"
-                        subtitle="Render on a realistic model"
-                        onClick={() => { setGroup('people'); setTool('tryon'); setFlowStep(1); }}
-                        icon={<PersonIcon className="size-5" />}
-                      />
-                      <ActionCard
-                        title="Enhance"
-                        subtitle="Retouch, relight, upscale"
-                        onClick={() => { setGroup('product'); setTool('enhance'); setFlowStep(1); }}
-                        icon={<RocketIcon className="size-5" />}
-                      />
+                      <ActionCard title="Try-On" subtitle="Render on a realistic model" onClick={() => { setGroup('people'); setTool('tryon'); setFlowStep(1); }} icon={<PersonIcon className="size-5" />} />
+                      <ActionCard title="Enhance" subtitle="Retouch, relight, upscale" onClick={() => { setGroup('product'); setTool('enhance'); setFlowStep(1); }} icon={<RocketIcon className="size-5" />} />
                     </div>
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       <input type="checkbox" checked={rememberChoice} onChange={(e)=>setRememberChoice(e.target.checked)} />
                       Remember my choice
                     </label>
                     <div className="flex justify-end">
-                      <button
-                        onClick={() => {
-                          if (rememberChoice) {
-                            localStorage.setItem('aiStudioDefaultChoice', JSON.stringify({ group, tool }));
-                          }
-                          setFlowStep(1);
-                        }}
-                        className={`${ACCENT_RING} text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50`}
-                      >
+                      <button onClick={() => { if (rememberChoice) { localStorage.setItem('aiStudioDefaultChoice', JSON.stringify({ group, tool })); } setFlowStep(1); }} className={`${ACCENT_RING} text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50`}>
                         Continue
                       </button>
                     </div>
@@ -1210,11 +941,9 @@ export default function Dashboard() {
                     {group === 'people' ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {TRYON_PRESETS.map((p) => (
-                          <SmallPreset key={p.id} title={p.title} onClick={() => {
-                            setPersona(p.persona); setPose(p.pose); setBgPack(p.bg); setStylePack(p.style);
-                          }} />
+                          <SmallPreset key={p.id} title={p.title} onClick={() => { setPersona(p.persona); setPose(p.pose); setBgPack(p.bg); setStylePack(p.style); }} />
                         ))}
-                        <SmallPreset title="None (Default)" onClick={() => { /* use defaults */ }} />
+                        <SmallPreset title="None (Default)" onClick={() => {}} />
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1263,37 +992,19 @@ export default function Dashboard() {
         )}
 
         {showEnhance && (
-          <motion.div
-            className="fixed inset-0 z-[100] grid place-items-center"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          >
+          <motion.div className="fixed inset-0 z-[100] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={() => setShowEnhance(false)} />
             <div className="relative w-full max-w-3xl mx-3">
-              <EnhanceCustomizer
-                initial={pendingEnhancePreset || undefined}
-                onChange={() => {}}
-                onComplete={(form) => {
-                  setShowEnhance(false);
-                  setPendingEnhancePreset(null);
-                  runEnhance(form && Object.keys(form).length ? form : null);
-                }}
-              />
+              <EnhanceCustomizer initial={pendingEnhancePreset || undefined} onChange={() => {}} onComplete={(form) => { setShowEnhance(false); setPendingEnhancePreset(null); runEnhance(form && Object.keys(form).length ? form : null); }} />
             </div>
           </motion.div>
         )}
 
         {showCustomize && (
-          <motion.div
-            className="fixed inset-0 z-[110] grid place-items-center"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          >
+          <motion.div className="fixed inset-0 z-[110] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={() => setShowCustomize(false)} />
             <div className="relative w-full max-w-2xl mx-3">
-              <TryOnCustomizeModal
-                initial={custom}
-                onCancel={() => setShowCustomize(false)}
-                onConfirm={(val) => { setCustom(val); setShowCustomize(false); }}
-              />
+              <TryOnCustomizeModal initial={custom} onCancel={() => setShowCustomize(false)} onConfirm={(val) => { setCustom(val); setShowCustomize(false); }} />
             </div>
           </motion.div>
         )}
@@ -1321,42 +1032,20 @@ export default function Dashboard() {
    Progress steps
 ------------------------------------------------------- */
 function ProgressSteps({ current = 1 }) {
-  const steps = [
-    { id: 1, label: 'Upload' },
-    { id: 2, label: 'Select' },
-    { id: 3, label: 'Preview' },
-  ];
+  const steps = [ { id: 1, label: 'Upload' }, { id: 2, label: 'Select' }, { id: 3, label: 'Preview' } ];
   return (
     <div className="flex items-center gap-2">
       {steps.map((s, i) => {
-        const active = s.id === current;
-        const done = s.id < current;
+        const active = s.id === current; const done = s.id < current;
         return (
           <div key={s.id} className="flex items-center gap-2">
-            <motion.div
-              layout
-              className={[
-                'size-7 rounded-full grid place-items-center border text-[11px] font-semibold',
-                done
-                  ? 'bg-[#2BC48A] text-white border-[#2BC48A]'
-                  : active
-                  ? 'bg-[#B7E9F7] text-slate-800 border-[#B7E9F7]'
-                  : 'bg-white text-slate-600 border-slate-300',
-              ].join(' ')}
-            >
+            <motion.div layout className={[ 'size-7 rounded-full grid place-items-center border text-[11px] font-semibold', done ? 'bg-[#2BC48A] text-white border-[#2BC48A]' : active ? 'bg-[#CDEFE1] text-slate-800 border-[#CDEFE1]' : 'bg-white text-slate-600 border-slate-300', ].join(' ')}>
               {done ? '✓' : s.id}
             </motion.div>
-            <div className={['text-xs', done ? 'text-[#2BC48A]' : active ? 'text-slate-800' : 'text-slate-500'].join(' ')}>
-              {s.label}
-            </div>
+            <div className={['text-xs', done ? 'text-[#2BC48A]' : active ? 'text-slate-800' : 'text-slate-500'].join(' ')}>{s.label}</div>
             {i < steps.length - 1 && (
               <motion.div layout className="w-10 h-1 rounded-full bg-slate-200 overflow-hidden">
-                <motion.div
-                  initial={false}
-                  animate={{ width: s.id < current ? '100%' : '0%' }}
-                  transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-                  className="h-full bg-[#2BC48A]"
-                />
+                <motion.div initial={false} animate={{ width: s.id < current ? '100%' : '0%' }} transition={{ type: 'spring', stiffness: 120, damping: 18 }} className="h-full bg-[#2BC48A]" />
               </motion.div>
             )}
           </div>
@@ -1375,14 +1064,7 @@ function ToggleChips({ label, value, setValue, options }) {
       <div className="text-[12px] font-semibold text-slate-700 mb-1">{label}</div>
       <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
         {options.map((o) => (
-          <button
-            key={o.id}
-            onClick={() => setValue(o.id)}
-            className={[
-              'px-3 py-1.5 text-xs rounded-lg transition capitalize',
-              value === o.id ? 'bg-[#2BC48A] text-white shadow' : 'text-slate-800 hover:bg-slate-100',
-            ].join(' ')}
-          >
+          <button key={o.id} onClick={() => setValue(o.id)} className={[ 'px-3 py-1.5 text-xs rounded-lg transition capitalize', value === o.id ? 'bg-[#2BC48A] text-white shadow' : 'text-slate-800 hover:bg-slate-100', ].join(' ')}>
             {o.label}
           </button>
         ))}
@@ -1395,11 +1077,7 @@ function SelectField({ label, value, onChange, options }) {
   return (
     <label className="flex items-center justify-between gap-3 text-xs text-slate-700">
       <span className="min-w-24">{label}</span>
-      <select
-        value={value}
-        onChange={(e)=>onChange(e.target.value)}
-        className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
-      >
+      <select value={value} onChange={(e)=>onChange(e.target.value)} className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs">
         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
       </select>
     </label>
@@ -1410,12 +1088,7 @@ function TextField({ label, value, setValue, placeholder }) {
   return (
     <label className="flex items-center justify-between gap-3 text-xs text-slate-700">
       <span className="min-w-24">{label}</span>
-      <input
-        value={value}
-        onChange={(e)=>setValue(e.target.value)}
-        placeholder={placeholder}
-        className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
-      />
+      <input value={value} onChange={(e)=>setValue(e.target.value)} placeholder={placeholder} className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs" />
     </label>
   );
 }
@@ -1424,13 +1097,7 @@ function NumberField({ label, value, setValue, min=1, max=3 }) {
   return (
     <label className="flex items-center justify-between gap-3 text-xs text-slate-700">
       <span className="min-w-24">{label}</span>
-      <input
-        type="number"
-        min={min} max={max}
-        value={value}
-        onChange={(e)=>setValue(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
-        className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
-      />
+      <input type="number" min={min} max={max} value={value} onChange={(e)=>setValue(Math.max(min, Math.min(max, Number(e.target.value) || min)))} className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs" />
     </label>
   );
 }
@@ -1450,31 +1117,16 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
   if (broken) return null;
 
   return (
-    <motion.button
-      whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm transition text-left hover:shadow-md"
-    >
+    <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} onClick={onClick} className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm transition text-left hover:shadow-md">
       <div className="relative w-full aspect-[4/3] bg-slate-50">
         {!loaded && <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-white via-slate-50 to-white" />}
         {preview && (
-          <img
-            src={preview}
-            alt={title}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
-            onLoad={() => setLoaded(true)}
-            onError={() => setBroken(true)}
-          />
+          <img src={preview} alt={title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" onLoad={() => setLoaded(true)} onError={() => setBroken(true)} />
         )}
         {tag && (
-          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-[#2BC48A]/90 text-white shadow">
-            {tag}
-          </span>
+          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-[#2BC48A]/90 text-white shadow">{tag}</span>
         )}
-        <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
-          Use preset
-        </div>
+        <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">Use preset</div>
       </div>
       <div className="p-3">
         <div className="font-semibold">{title}</div>
@@ -1489,24 +1141,11 @@ function TryonPresetCard({ title, subtitle, thumb, onClick }) {
   const [broken, setBroken] = useState(false);
   if (broken) return null;
   return (
-    <motion.button
-      whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-white hover:shadow-md transition text-left"
-    >
+    <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} onClick={onClick} className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-white hover:shadow-md transition text-left">
       <div className="relative w-full aspect-[4/3]">
         {!loaded && <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#FFF8B7] via-white to-[#EAF3FF]" />}
-        <img
-          src={thumb}
-          alt={title}
-          className="absolute inset-0 w-full h-full object-cover"
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          onError={() => setBroken(true)}
-        />
-        <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
-          Select
-        </div>
+        <img src={thumb} alt={title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" onLoad={() => setLoaded(true)} onError={() => setBroken(true)} />
+        <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">Select</div>
       </div>
       <div className="p-3">
         <div className="font-semibold">{title}</div>
@@ -1526,69 +1165,19 @@ function StepBadge({ phase }) {
   const it = map[phase] || map.idle;
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${it.color}`}>
-      <span
-        className={`inline-block size-2 rounded-full ${
-          phase === 'processing' ? 'bg-slate-700 animate-pulse' : 'bg-slate-600'
-        }`}
-      />
+      <span className={`inline-block size-2 rounded-full ${ phase === 'processing' ? 'bg-slate-700 animate-pulse' : 'bg-slate-600' }`} />
       {it.label}
     </span>
   );
 }
 
 /* ----- Icons (SVG) ----- */
-function SparkleIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" />
-    </svg>
-  );
-}
-function BoxIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function PersonIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function ScissorsIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function RocketIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" />
-      <circle cx="15" cy="9" r="1.5" fill="#fff" />
-    </svg>
-  );
-}
-function PlayIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M8 5v14l11-7z" fill="currentColor" />
-    </svg>
-  );
-}
+function SparkleIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" /></svg>); }
+function BoxIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor" /></svg>); }
+function PersonIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor" /></svg>); }
+function ScissorsIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" /></svg>); }
+function RocketIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" /><circle cx="15" cy="9" r="1.5" fill="#fff" /></svg>); }
+function PlayIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M8 5v14l11-7z" fill="currentColor" /></svg>); }
 
 /* -------------------------------------------------------
    Export helpers
@@ -1596,30 +1185,20 @@ function PlayIcon(props) {
 async function exportPng(url) {
   const img = await fetch(url).then((r) => r.blob()).then(createImageBitmap);
   const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
+  canvas.width = img.width; canvas.height = img.height;
   const ctx = canvas.getContext('2d', { alpha: true });
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0);
   const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = 'studio-output.png';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  a.href = canvas.toDataURL('image/png'); a.download = 'studio-output.png';
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* -------------------------------------------------------
    Modals
 ------------------------------------------------------- */
 function TryOnCustomizeModal({ initial, onCancel, onConfirm }) {
-  const [state, setState] = useState(initial || {
-    camera: '50mm eye-level',
-    lighting: 'softbox + fill, gentle reflections',
-    colorMood: 'neutral, accurate color',
-    extras: '',
-  });
+  const [state, setState] = useState(initial || { camera: '50mm eye-level', lighting: 'softbox + fill, gentle reflections', colorMood: 'neutral, accurate color', extras: '' });
 
   return (
     <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border space-y-3">
@@ -1627,49 +1206,24 @@ function TryOnCustomizeModal({ initial, onCancel, onConfirm }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <label className="space-y-1">
           <span className="text-slate-600">Camera</span>
-          <input
-            value={state.camera}
-            onChange={(e)=>setState(s=>({...s, camera: e.target.value}))}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="35mm low angle / 50mm eye-level / 85mm portrait"
-          />
+          <input value={state.camera} onChange={(e)=>setState(s=>({...s, camera: e.target.value}))} className="w-full rounded-lg border px-2 py-1.5" placeholder="35mm low angle / 50mm eye-level / 85mm portrait" />
         </label>
         <label className="space-y-1">
           <span className="text-slate-600">Lighting</span>
-          <input
-            value={state.lighting}
-            onChange={(e)=>setState(s=>({...s, lighting: e.target.value}))}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="softbox + fill / clamp specular / daylight"
-          />
+          <input value={state.lighting} onChange={(e)=>setState(s=>({...s, lighting: e.target.value}))} className="w-full rounded-lg border px-2 py-1.5" placeholder="softbox + fill / clamp specular / daylight" />
         </label>
         <label className="space-y-1 sm:col-span-2">
           <span className="text-slate-600">Color mood</span>
-          <input
-            value={state.colorMood}
-            onChange={(e)=>setState(s=>({...s, colorMood: e.target.value}))}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="neutral, accurate color / warm editorial / cool slate"
-          />
+          <input value={state.colorMood} onChange={(e)=>setState(s=>({...s, colorMood: e.target.value}))} className="w-full rounded-lg border px-2 py-1.5" placeholder="neutral, accurate color / warm editorial / cool slate" />
         </label>
         <label className="space-y-1 sm:col-span-2">
           <span className="text-slate-600">Extras</span>
-          <input
-            value={state.extras}
-            onChange={(e)=>setState(s=>({...s, extras: e.target.value}))}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="e.g., subtle grain, shallow depth, soft rim light"
-          />
+          <input value={state.extras} onChange={(e)=>setState(s=>({...s, extras: e.target.value}))} className="w-full rounded-lg border px-2 py-1.5" placeholder="e.g., subtle grain, shallow depth, soft rim light" />
         </label>
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
         <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={onCancel}>Cancel</button>
-        <button
-          className="rounded-lg bg-[#2BC48A] text-white px-3 py-1.5 text-xs"
-          onClick={()=>onConfirm(state)}
-        >
-          Save
-        </button>
+        <button className="rounded-lg bg-[#2BC48A] text-white px-3 py-1.5 text-xs" onClick={()=>onConfirm(state)}>Save</button>
       </div>
     </div>
   );
@@ -1682,45 +1236,23 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <label className="space-y-1">
           <span className="text-slate-600">Style</span>
-          <input
-            defaultValue={initial?.photographyStyle || ''}
-            onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="studio product photography, 50mm"
-          />
+          <input defaultValue={initial?.photographyStyle || ''} onChange={() => {}} className="w-full rounded-lg border px-2 py-1.5" placeholder="studio product photography, 50mm" />
         </label>
         <label className="space-y-1">
           <span className="text-slate-600">Background</span>
-          <input
-            defaultValue={initial?.background || ''}
-            onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="white seamless"
-          />
+          <input defaultValue={initial?.background || ''} onChange={() => {}} className="w-full rounded-lg border px-2 py-1.5" placeholder="white seamless" />
         </label>
         <label className="space-y-1">
           <span className="text-slate-600">Lighting</span>
-          <input
-            defaultValue={initial?.lighting || ''}
-            onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="softbox, gentle reflections"
-          />
+          <input defaultValue={initial?.lighting || ''} onChange={() => {}} className="w-full rounded-lg border px-2 py-1.5" placeholder="softbox, gentle reflections" />
         </label>
         <label className="space-y-1">
           <span className="text-slate-600">Colors</span>
-          <input
-            defaultValue={initial?.colorStyle || ''}
-            onChange={() => {}}
-            className="w-full rounded-lg border px-2 py-1"
-            placeholder="neutral whites, subtle grays"
-          />
+          <input defaultValue={initial?.colorStyle || ''} onChange={() => {}} className="w-full rounded-lg border px-2 py-1.5" placeholder="neutral whites, subtle grays" />
         </label>
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onComplete(initial || {})}>
-          Run
-        </button>
+        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onComplete(initial || {})}>Run</button>
       </div>
     </div>
   );
@@ -1735,7 +1267,7 @@ function StepperHeader({ step }) {
     <div className="flex items-center gap-2 text-xs">
       {labels.map((lb, i) => (
         <div key={lb} className="flex items-center gap-2">
-          <div className={`size-6 grid place-items-center rounded-full border ${i===step? 'bg-[#BFF7E0] border-[#BFF7E0] text-slate-900' : i<step? 'bg-[#2BC48A] border-[#2BC48A] text-white' : 'bg-white border-slate-300 text-slate-600'}`}>{i<step?'✓':i}</div>
+          <div className={`size-6 grid place-items-center rounded-full border ${i===step? 'bg-[#CDEFE1] border-[#CDEFE1] text-slate-900' : i<step? 'bg-[#2BC48A] border-[#2BC48A] text-white' : 'bg-white border-slate-300 text-slate-600'}`}>{i<step?'✓':i}</div>
           <span className={`${i===step?'text-slate-900':'text-slate-500'}`}>{lb}</span>
           {i<labels.length-1 && <div className="w-8 h-1 rounded-full bg-slate-200" />}
         </div>
@@ -1746,8 +1278,7 @@ function StepperHeader({ step }) {
 
 function ActionCard({ title, subtitle, onClick, icon }) {
   return (
-    <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} onClick={onClick}
-      className="p-4 rounded-2xl border bg-white hover:shadow-md text-left">
+    <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} onClick={onClick} className="p-4 rounded-2xl border bg-white hover:shadow-md text-left">
       <div className="flex items-center gap-3">
         <div className="size-9 grid place-items-center rounded-xl bg-[#E8FFF5] text-[#0F766E]">{icon}</div>
         <div>
@@ -1777,9 +1308,7 @@ function DropZoneInline({ onPick }) {
 
 function SmallPreset({ title, onClick }) {
   return (
-    <button onClick={onClick} className="rounded-xl border bg-white px-3 py-2 text-xs text-left hover:bg-slate-50">
-      {title}
-    </button>
+    <button onClick={onClick} className="rounded-xl border bg-white px-3 py-2 text-xs text-left hover:bg-slate-50">{title}</button>
   );
 }
 
@@ -1790,13 +1319,7 @@ function ChipGroup({ label, options, value, onToggle, single=false }) {
       <div className="text-[12px] font-semibold text-slate-700 mb-1">{label}</div>
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
-          <button key={opt}
-            onClick={() => {
-              if (single) onToggle(opt);
-              else onToggle(opt);
-            }}
-            className={`px-3 py-1.5 text-xs rounded-lg border ${isActive(opt)? 'bg-[#2BC48A] text-white border-[#2BC48A]':'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'}`}
-          >
+          <button key={opt} onClick={() => { if (single) onToggle(opt); else onToggle(opt); }} className={`px-3 py-1.5 text-xs rounded-lg border ${isActive(opt)? 'bg-[#2BC48A] text-white border-[#2BC48A]':'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'}`}>
             {opt}
           </button>
         ))}
