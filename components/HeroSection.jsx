@@ -1,443 +1,294 @@
 // components/HeroSection.jsx
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 
 /**
- * MintLemon / Studio — Full-width landing
- * - uses ONLY local assets from /public and /public/models
+ * HeroSection — v3 (from scratch)
+ * - Ultra-clean fintech vibes (Tabby/Tamara inspired) with richer aurora gradients
+ * - No stock models. Preview is abstract/synthetic
  * - <img> only (no Next/Image)
- * - No sticky mobile CTA
- * - Mobile-visible header links (scrollable row)
+ * - Fully responsive, mobile-first
+ * - Framer Motion for tasteful micro-interactions
+ *
+ * Optional font tip (use in your layout):
+ *   import { Geist, Geist_Mono } from 'next/font/google'
+ *   export const geistSans = Geist({ subsets: ['latin'] })
+ *   <body className={`${geistSans.className}`}>...</body>
  */
 
-const ease = [0.22, 1, 0.36, 1];
-
-const MODEL_HERO = [
-  '/models/m01.webp',
-  '/models/m03.webp',
-  '/models/m05.webp',
-  '/models/m07.webp',
-  '/models/m09.webp',
-];
-const MODEL_GRID = [
-  '/models/m02.webp',
-  '/models/m04.webp',
-  '/models/m06.webp',
-  '/models/m08.webp',
-];
+const ease = [0.22, 1, 0.36, 1]
 
 export default function HeroSection() {
   return (
-    <main className="min-h-screen w-full bg-gradient-to-b from-[#F3FFF8] via-[#FFFCE8] to-white text-zinc-900">
-      <BackgroundAuras />
+    <section className="relative isolate w-full overflow-hidden bg-gradient-to-b from-[#F3FFF8] via-[#FFFCE8] to-white">
+      <AuroraFX />
       <Header />
-      <Hero />
-      <ModelsSpotlight />
-      <LogosStrip />
-      <HowItWorks />
-      <ProductDemo />
-      <CuratedModelGrid />
-      <FAQ />
-    </main>
-  );
+      <HeroCore />
+      <HeroFooterChips />
+    </section>
+  )
 }
 
-/* --------------------------- UI — HEADER --------------------------- */
+/* -------------------------------- HEADER ------------------------------- */
 function Header() {
   return (
-    <header className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-4">
+    <header className="relative z-20 w-full px-4 sm:px-6 md:px-10 xl:px-16 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/ai-studio.png" alt="Studio logo" className="h-6 w-6 rounded" />
-          <div className="text-xl font-bold tracking-tight">AI Studio</div>
+          <div className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-[#CFFAE2] to-[#FFF0A6] shadow-sm">
+            <span className="text-[10px] font-black tracking-widest text-zinc-900">AI</span>
+          </div>
+          <div className="text-xl font-bold tracking-tight text-zinc-900">Studio</div>
         </div>
-        <nav className="flex gap-2 overflow-x-auto text-sm">
-          <a href="#features" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Features</a>
-          <a href="#how" className="rounded-lg px-3 py-1.5 hover:bg-white/70">How it works</a>
-          <a href="#demo" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Demo</a>
-          <a href="#models" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Models</a>
-          <a href="#faq" className="rounded-lg px-3 py-1.5 hover:bg-white/70">FAQ</a>
+        <nav className="flex gap-2 overflow-x-auto text-sm text-zinc-800">
+          <a href="#tryon" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Try‑On</a>
+          <a href="#enhance" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Enhance</a>
+          <a href="#pricing" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Pricing</a>
+          <a href="#docs" className="rounded-lg px-3 py-1.5 hover:bg-white/70">Docs</a>
         </nav>
       </div>
     </header>
-  );
+  )
 }
 
-/* --------------------------- UI — HERO --------------------------- */
-function Hero() {
-  const rm = useReducedMotion();
+/* ------------------------------- HERO CORE ------------------------------ */
+function HeroCore() {
+  const rm = useReducedMotion()
   return (
-    <section className="relative w-full px-4 sm:px-6 md:px-10 xl:px-16 pb-10 pt-12 sm:pt-16 md:pb-16 md:pt-24">
+    <div className="relative z-10 w-full px-4 sm:px-6 md:px-10 xl:px-16 pb-12 pt-10 sm:pt-16 md:pb-16 md:pt-24">
       <div className="grid items-center gap-10 md:grid-cols-2">
-        <motion.div
-          initial={rm ? { opacity: 1 } : { opacity: 0, y: 18 }}
-          animate={rm ? { opacity: 1 } : { opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease }}
-        >
-          <motion.h1
-            className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl"
-            initial={rm ? { opacity: 1 } : { opacity: 0, y: 10 }}
-            animate={rm ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease, delay: 0.05 }}
-          >
-            AI Enhance & Virtual Try-On — built for teams
-          </motion.h1>
-
-          <p className="mt-4 max-w-[70ch] text-lg text-zinc-700">
-            Premium product shots in seconds. Clean backgrounds, upscale, and place garments on studio-ready models — with audit logs and SSO.
-          </p>
-          <p className="mt-1 text-zinc-600">
-            منصّة للفرق: تعزيز الصور وتجربة الملابس افتراضياً مع خصوصية عالية وتكامل مؤسسي.
-          </p>
-
+        {/* LEFT copy */}
+        <div>
           <motion.div
-            className="mt-6 flex flex-wrap items-center gap-3 text-sm text-zinc-700"
-            initial={rm ? {} : { opacity: 0 }}
-            whileInView={rm ? {} : { opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease }}
+            initial={rm ? { opacity: 1 } : { opacity: 0, y: 16 }}
+            animate={rm ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease }}
           >
-            <Chip icon={<ShieldIcon />}>SSO & SOC-style controls</Chip>
-            <Chip icon={<LockIcon />}>Encrypted at rest</Chip>
-            <Chip icon={<ZapIcon />}>Optimized inference</Chip>
-          </motion.div>
-        </motion.div>
+            <NewBadge />
+            <h1 className="mt-3 text-balance text-4xl font-black leading-[1.05] tracking-tight text-zinc-900 sm:text-5xl md:text-6xl">
+              <span className="bg-gradient-to-r from-emerald-600 via-lime-500 to-amber-500 bg-clip-text text-transparent">Instant AI Try‑On</span>{' '}
+              — no stock models
+            </h1>
+            <p className="mt-4 max-w-[75ch] text-lg text-zinc-700">
+              Upload a garment, describe the model you want, and get a photo‑real result in seconds.
+              Zero stock libraries, full control, enterprise‑ready.
+            </p>
+            <p className="mt-1 text-[15px] text-zinc-600">
+              جرّب الذكاء الاصطناعي لتوليد موديل واقعي 100% حسب وصفك — بدون أي مودلز جاهزين.
+            </p>
 
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <a
+                href="#start"
+                className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-lime-400 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.99]"
+              >
+                Start free
+                <svg className="size-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+              </a>
+              <a
+                href="#demo"
+                className="inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white/70 px-4 py-2.5 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-white"
+              >
+                Live demo
+                <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </a>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-zinc-700">
+              <Chip icon={<ShieldIcon />}>SSO & policy controls</Chip>
+              <Chip icon={<LockIcon />}>Encrypted at rest</Chip>
+              <Chip icon={<ZapIcon />}>4× Upscale</Chip>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* RIGHT preview */}
         <motion.div
           className="relative"
           initial={rm ? { opacity: 1 } : { opacity: 0, scale: 0.98 }}
           animate={rm ? { opacity: 1 } : { opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, ease, delay: 0.05 }}
         >
-          <HeroDemos />
-          {!rm && (
-            <>
-              <motion.div
-                className="absolute -right-4 -top-4 rounded-2xl border border-zinc-200 bg-white/80 px-3 py-2 text-xs shadow-sm"
-                initial={{ y: 0 }}
-                animate={{ y: [0, -6, 0] }}
-                transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
-              >
-                4× Upscale
-              </motion.div>
-              <motion.div
-                className="absolute -left-4 bottom-6 rounded-2xl border border-zinc-200 bg-white/80 px-3 py-2 text-xs shadow-sm"
-                initial={{ y: 0 }}
-                animate={{ y: [0, -8, 0] }}
-                transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
-              >
-                Background Clean
-              </motion.div>
-            </>
-          )}
+          <PreviewCard />
         </motion.div>
       </div>
-    </section>
-  );
-}
-
-function HeroDemos() {
-  return (
-    <div className="grid gap-5 md:grid-cols-2">
-      <DemoCard title="Enhance" subtitle="Before / After">
-        <BeforeAfter beforeUrl="/demo-before.jpg" afterUrl="/demo-after.jpg" />
-      </DemoCard>
-
-      <DemoCard title="Try-On" subtitle="Garment → Model">
-        <TryOnMock />
-      </DemoCard>
     </div>
-  );
+  )
 }
 
-/* ----------------------- MODELS — MARQUEE ------------------------ */
-function ModelsSpotlight() {
-  const rm = useReducedMotion();
+function NewBadge() {
   return (
-    <section id="models" className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-10 md:py-14">
-      <div className="mb-4 flex items-end justify-between">
-        <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Models Spotlight</h2>
-        <span className="text-xs text-zinc-500">Curated — not all models, just the hits</span>
-      </div>
-
-      <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-3 shadow-sm">
-        {/* repeating row for seamless loop */}
-        <div className="relative w-full">
-          <motion.div
-            className="flex gap-3"
-            initial={false}
-            animate={rm ? {} : { x: ['0%', '-50%'] }}
-            transition={rm ? {} : { duration: 28, repeat: Infinity, ease: 'linear' }}
-          >
-            <MarqueeRow images={MODEL_HERO} />
-            <MarqueeRow images={MODEL_HERO} />{/* duplicate for loop */}
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function MarqueeRow({ images }) {
-  return (
-    <div className="flex shrink-0 items-stretch gap-3 pr-3">
-      {images.map((src, i) => (
-        <div
-          key={`${src}-${i}`}
-          className="group relative h-40 w-64 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 md:h-48 md:w-80"
-        >
-          <img
-            loading="lazy"
-            src={src}
-            alt={`Model ${i + 1}`}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-          />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-          <div className="absolute left-3 top-3 rounded-lg bg-white/85 px-2 py-1 text-[10px] font-semibold tracking-wide text-zinc-900">
-            MODEL {String(i + 1).padStart(2, '0')}
-          </div>
-        </div>
-      ))}
+    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+      <span className="inline-grid size-4 place-items-center rounded-full bg-emerald-600 text-white">★</span>
+      New: AI model builder (no stock models)
     </div>
-  );
+  )
 }
 
-/* ----------------------- UI — LOGOS STRIP ------------------------ */
-function LogosStrip() {
-  return (
-    <section className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-10">
-      <div className="rounded-3xl border border-zinc-200 bg-white/70 p-5 text-zinc-500 shadow-sm">
-        <p className="mb-4 text-center text-xs uppercase tracking-wider">Trusted by product teams</p>
-        <div className="grid grid-cols-2 place-items-center gap-6 sm:grid-cols-3 md:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <motion.div
-              key={i}
-              className="h-7 w-24 rounded-md bg-zinc-100"
-              initial={{ opacity: 0, y: 8 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.05, ease }}
-            />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+/* ------------------------------- PREVIEW ------------------------------- */
+function PreviewCard() {
+  const rm = useReducedMotion()
+  const [tone, setTone] = useState('Medium')
+  const [bg, setBg] = useState('Clean studio')
 
-/* ------------------------ UI — HOW IT WORKS ---------------------- */
-function HowItWorks() {
-  const steps = [
-    { title: 'Upload', desc: 'Drop a product photo or a garment + choose Enhance or Try-On.' },
-    { title: 'Tune', desc: 'Pick style strength, background, and output size.' },
-    { title: 'Export', desc: 'Download web-ready images or push to your store.' },
-  ];
+  const toneFill = {
+    Porcelain: '#F2E7DB',
+    Light: '#EDD8C7',
+    Medium: '#D9B69A',
+    Olive: '#C99E7F',
+    Tan: '#B88163',
+    Deep: '#8D563A',
+  }[tone]
+
+  const bgGrad = {
+    'Clean studio': ['#F3FFF8', '#FFFFFF'],
+    'Editorial beige': ['#F6EEE2', '#FFF7EA'],
+    'Streetwear concrete': ['#F3F3F3', '#E8E8E8'],
+    'Lifestyle home': ['#F3FFF8', '#FFFCE8'],
+    'Desert tones': ['#FCE9CC', '#FFF3D1'],
+  }[bg]
 
   return (
-    <section id="how" className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-12 md:py-16">
-      <motion.h2
-        id="features"
-        className="text-center text-2xl font-semibold tracking-tight md:text-3xl"
-        initial={{ opacity: 0, y: 10 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6, ease }}
-      >
-        How it works
-      </motion.h2>
-      <p className="mx-auto mt-2 max-w-[70ch] text-center text-zinc-600">ثلاث خطوات بسيطة لنتائج احترافية.</p>
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-        {steps.map((it, idx) => (
-          <motion.div
-            key={it.title}
-            className="rounded-2xl border border-zinc-200 bg-white/70 p-5 shadow-sm"
-            initial={{ opacity: 0, y: 16, rotate: -0.3 }}
-            whileInView={{ opacity: 1, y: 0, rotate: 0 }}
-            viewport={{ once: true, amount: 0.4 }}
-            transition={{ duration: 0.55, delay: idx * 0.07, ease }}
-          >
-            <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#CFFAE2] to-[#FFF0A6] font-semibold text-zinc-900">
-              {idx + 1}
-            </div>
-            <div className="text-lg font-medium">{it.title}</div>
-            <p className="mt-1 text-sm text-zinc-600">{it.desc}</p>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------- UI — PRODUCT DEMO --------------------- */
-function ProductDemo() {
-  return (
-    <section id="demo" className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-12 md:py-16">
-      <div className="grid gap-6 md:grid-cols-2">
-        <DemoCard title="Product Enhance" subtitle="Before / After slider">
-          <BeforeAfter beforeUrl="/demo-before.jpg" afterUrl="/demo-after.jpg" />
-        </DemoCard>
-        <DemoCard title="Try-On" subtitle="Place garment on model">
-          <TryOnMock />
-        </DemoCard>
-      </div>
-    </section>
-  );
-}
-
-/* --------------------- MODELS — CURATED GRID --------------------- */
-function CuratedModelGrid() {
-  return (
-    <section className="w-full px-4 sm:px-6 md:px-10 xl:px-16 pb-14">
-      <div className="mb-4 flex items-end justify-between">
-        <h3 className="text-xl font-semibold tracking-tight">Editorial styles (curated)</h3>
-        <span className="text-xs text-zinc-500">Hand-picked from /public/models</span>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-        {MODEL_GRID.map((src, i) => (
-          <div key={src} className="group relative h-48 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
-            <img
-              loading="lazy"
-              src={src}
-              alt={`Editorial model ${i + 1}`}
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            />
-            <div className="absolute bottom-3 left-3 rounded-lg bg-white/85 px-2 py-1 text-[10px] font-semibold text-zinc-900">
-              CURATED {String(i + 1).padStart(2, '0')}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------ UI — FAQ ------------------------- */
-function FAQ() {
-  const qa = [
-    { q: 'Do you store my images?', a: 'You control retention. Choose 0–30 days or instant purge. Enterprise can bring its own storage (S3, GCS, Azure).' },
-    { q: 'Can I use my own models?', a: 'Yes. Fine-tune private Try-On mannequins and enhancement styles on Pro+.' },
-    { q: 'Is there an API?', a: 'Absolutely. REST & webhooks for bulk jobs and store pipelines.' },
-  ];
-
-  return (
-    <section id="faq" className="w-full px-4 sm:px-6 md:px-10 xl:px-16 py-12 md:py-16">
-      <motion.h2
-        className="text-center text-3xl font-semibold tracking-tight"
-        initial={{ opacity: 0, y: 10 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6, ease }}
-      >
-        FAQ
-      </motion.h2>
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        {qa.map((item, idx) => (
-          <motion.div
-            key={item.q}
-            className="rounded-2xl border border-zinc-200 bg-white/70 p-5 shadow-sm"
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: idx * 0.06, ease }}
-          >
-            <div className="text-base font-semibold">{item.q}</div>
-            <p className="mt-1 text-sm text-zinc-600">{item.a}</p>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* -------------------------- REUSABLE PIECES ---------------------- */
-function DemoCard({ title, subtitle, children }) {
-  return (
-    <motion.div
-      className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm md:p-5"
-      initial={{ opacity: 0, y: 14, scale: 0.99 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6, ease }}
-    >
+    <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm md:p-5">
       <div className="mb-3 flex items-end justify-between">
         <div>
-          <div className="text-base font-semibold">{title}</div>
-          <div className="text-xs text-zinc-500">{subtitle}</div>
+          <div className="text-base font-semibold text-zinc-900">Synthetic preview</div>
+          <div className="text-xs text-zinc-500">Abstract mannequin — result depends on your spec</div>
         </div>
         <span className="inline-flex h-8 w-20 items-center justify-center rounded-xl bg-gradient-to-br from-[#CFFAE2] to-[#FFF0A6] text-xs font-medium text-zinc-900" />
       </div>
-      {children}
-    </motion.div>
-  );
-}
 
-function BeforeAfter({ beforeUrl, afterUrl }) {
-  const [pos, setPos] = useState(55);
-  return (
-    <div className="relative h-56 w-full overflow-hidden rounded-2xl md:h-64">
-      <img src={beforeUrl} alt="before" className="absolute inset-0 h-full w-full object-cover" />
-      <img
-        src={afterUrl}
-        alt="after"
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
-      />
-      <div
-        className="pointer-events-none absolute inset-y-0 my-2 w-[2px] rounded bg-white/80 shadow"
-        style={{ left: `${pos}%` }}
-      />
-      <input
-        aria-label="Reveal enhanced image"
-        type="range"
-        min={0}
-        max={100}
-        value={pos}
-        onChange={(e) => setPos(parseInt(e.target.value))}
-        className="absolute bottom-3 left-1/2 w-[92%] -translate-x-1/2 cursor-pointer appearance-none rounded-full bg-white/80 p-1 shadow [accent-color:#86EFAC]"
-      />
-    </div>
-  );
-}
+      <div className="relative overflow-hidden rounded-2xl border border-zinc-100">
+        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, ${bgGrad[0]}, ${bgGrad[1]})` }} />
+        {/* aurora ring */}
+        {!rm && (
+          <motion.div
+            className="pointer-events-none absolute -left-24 -top-24 size-64 rounded-full opacity-60 blur-2xl"
+            style={{ background: 'conic-gradient(from 90deg, #9AE6B4, #FDE68A, #60A5FA, #9AE6B4)' }}
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 20, ease: 'linear' }}
+          />
+        )}
 
-function TryOnMock() {
-  const [tab, setTab] = useState('before');
-  return (
-    <div>
-      <div className="relative h-56 w-full overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50 md:h-64">
-        <img
-          src="/ecom-mannequin.webp"
-          alt="model"
-          className="absolute inset-0 h-full w-full object-cover transition-opacity"
-          style={{ opacity: tab === 'before' ? 1 : 0 }}
-        />
-        <img
-          src="/streetwear.webp"
-          alt="model with garment"
-          className="absolute inset-0 h-full w-full object-cover transition-opacity"
-          style={{ opacity: tab === 'after' ? 1 : 0 }}
-        />
+        {/* mannequin */}
+        <div className="relative z-10 grid h-72 place-items-center md:h-[26rem]">
+          <svg viewBox="0 0 220 360" className="h-[78%] w-auto drop-shadow-sm">
+            <defs>
+              <filter id="sblur"><feGaussianBlur stdDeviation="0.4" /></filter>
+              <linearGradient id="garment" x1="0" x2="1"><stop offset="0%" stopColor="#86EFAC" /><stop offset="100%" stopColor="#FDE68A" /></linearGradient>
+            </defs>
+            <g fill={toneFill} filter="url(#sblur)">
+              <circle cx="110" cy="48" r="26" />
+              <rect x="92" y="74" width="36" height="70" rx="18" />
+              <rect x="62" y="140" width="96" height="96" rx="24" />
+              <rect x="70" y="236" width="24" height="74" rx="12" />
+              <rect x="126" y="236" width="24" height="74" rx="12" />
+            </g>
+            {/* garment placeholder */}
+            <path d="M75 145 h70 v55 q0 12 -12 12 h-46 q-12 0 -12 -12 z" fill="url(#garment)" opacity=".9" />
+          </svg>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
+          <span className="rounded-lg bg-white/85 px-2 py-1 text-[10px] font-semibold text-zinc-900">No stock models</span>
+          <span className="rounded-lg bg-white/85 px-2 py-1 text-[10px] font-semibold text-zinc-900">{bg}</span>
+        </div>
       </div>
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          onClick={() => setTab('before')}
-          className={`rounded-xl border px-3 py-1.5 text-sm ${tab === 'before' ? 'border-zinc-900 bg-white' : 'border-zinc-200 bg-white/70'}`}
-        >
-          Before
-        </button>
-        <button
-          onClick={() => setTab('after')}
-          className={`rounded-xl border px-3 py-1.5 text-sm ${tab === 'after' ? 'border-zinc-900 bg-white' : 'border-zinc-200 bg-white/70'}`}
-        >
-          Try-On
-        </button>
+
+      {/* mini controls */}
+      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
+        <MiniSelect label="Tone" value={tone} onChange={setTone} options={["Porcelain","Light","Medium","Olive","Tan","Deep"]} />
+        <MiniSelect label="Background" value={bg} onChange={setBg} options={["Clean studio","Editorial beige","Streetwear concrete","Lifestyle home","Desert tones"]} />
+        <div className="hidden md:block" />
       </div>
     </div>
-  );
+  )
 }
 
+function MiniSelect({ label, value, options, onChange }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white/70 px-2 py-1.5 text-xs">
+      <span className="min-w-16 text-zinc-600">{label}</span>
+      <div className="flex flex-wrap gap-1">
+        {options.map((o) => (
+          <button
+            key={o}
+            onClick={() => onChange(o)}
+            className={`rounded-lg px-2 py-1 ${o === value ? 'bg-white text-zinc-900 shadow-sm' : 'bg-white/50 text-zinc-600 hover:bg-white'}`}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* -------------------------- FOOTER CHIPS -------------------------- */
+function HeroFooterChips() {
+  return (
+    <div className="relative z-10 w-full px-4 sm:px-6 md:px-10 xl:px-16 pb-10">
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+        <BadgeCard title="Enhance" desc="Background clean, lighting fix, 4× upscale" />
+        <BadgeCard title="Try‑On" desc="Describe a model; get a photo‑real result" />
+        <BadgeCard title="Enterprise" desc="SSO, audit logs, BYO storage" />
+      </div>
+    </div>
+  )
+}
+
+function BadgeCard({ title, desc }) {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="inline-grid size-6 place-items-center rounded-md bg-gradient-to-br from-[#CFFAE2] to-[#FFF0A6] text-[12px] font-bold text-zinc-900">✓</span>
+        <div className="text-sm font-semibold text-zinc-900">{title}</div>
+      </div>
+      <p className="text-xs text-zinc-600">{desc}</p>
+    </div>
+  )
+}
+
+/* ------------------------------ AURORA FX ------------------------------ */
+function AuroraFX() {
+  const rm = useReducedMotion()
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      {/* soft base auras */}
+      <div className="absolute -top-32 -left-20 h-80 w-80 rounded-full bg-[#D8FFEA] blur-3xl" />
+      <div className="absolute top-24 -right-24 h-80 w-80 rounded-full bg-[#FFF7B3] blur-3xl" />
+      <div className="absolute bottom-10 left-1/3 h-64 w-64 rounded-full bg-[#E8FFF4] blur-3xl" />
+
+      {/* animated aurora ribbons */}
+      {!rm && (
+        <>
+          <motion.div
+            className="absolute left-1/2 top-[-120px] h-[520px] w-[520px] -translate-x-1/2 rounded-full opacity-40 blur-3xl"
+            style={{ background: 'radial-gradient(closest-side, #9AE6B4 0%, transparent 70%)' }}
+            animate={{ y: [0, 12, 0] }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            className="absolute right-[-160px] top-[20%] h-[460px] w-[460px] rounded-full opacity-35 blur-3xl"
+            style={{ background: 'radial-gradient(closest-side, #FDE68A 0%, transparent 70%)' }}
+            animate={{ y: [0, -14, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            className="absolute left-[-120px] bottom-[8%] h-[460px] w-[460px] rounded-full opacity-30 blur-3xl"
+            style={{ background: 'radial-gradient(closest-side, #BFDBFE 0%, transparent 70%)' }}
+            animate={{ y: [0, 10, 0] }}
+            transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------ REUSABLE ------------------------------ */
 function Chip({ icon, children }) {
   return (
     <motion.div
@@ -448,35 +299,24 @@ function Chip({ icon, children }) {
       transition={{ duration: 0.5, ease }}
     >
       {icon}
-      <span className="whitespace-nowrap">{children}</span>
+      <span className="whitespace-nowrap text-sm text-zinc-800">{children}</span>
     </motion.div>
-  );
+  )
 }
 
-function BackgroundAuras() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      <div className="absolute -top-20 -left-16 h-72 w-72 rounded-full bg-[#D8FFEA] blur-3xl" />
-      <div className="absolute top-24 -right-16 h-72 w-72 rounded-full bg-[#FFF7B3] blur-3xl" />
-      <div className="absolute bottom-10 left-1/3 h-56 w-56 rounded-full bg-[#E8FFF4] blur-3xl" />
-    </div>
-  );
-}
-
-/* ------------------------------ ICONS ---------------------------- */
 function ShieldIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
-  );
+  )
 }
 function ZapIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M13 2L3 14h7l-1 8 11-12h-7l1-8z" />
     </svg>
-  );
+  )
 }
 function LockIcon() {
   return (
@@ -484,5 +324,5 @@ function LockIcon() {
       <rect x="3" y="11" width="18" height="11" rx="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
-  );
+  )
 }
