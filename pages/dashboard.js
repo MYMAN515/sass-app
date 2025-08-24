@@ -1,5 +1,7 @@
 'use client';
 
+// app/dashboard/page.jsx
+
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -11,14 +13,19 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 ------------------------------------------------------- */
 const STORAGE_BUCKET = 'img';
 
+/** Merge classNames succinctly */
+const cx = (...classes) => classes.filter(Boolean).join(' ');
+
+/** Hex → rgba() */
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
   const n = parseInt(v, 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = (n) & 255;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
 
+/** File → dataURL */
 const fileToDataURL = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -27,6 +34,7 @@ const fileToDataURL = (file) =>
     reader.readAsDataURL(file);
   });
 
+/** Try to find an output URL from varied API shapes */
 const pickFirstUrl = (obj) => {
   if (!obj) return '';
   if (typeof obj === 'string') return obj;
@@ -50,9 +58,9 @@ const ENHANCE_PRESETS = [
       lighting: 'large softbox, gentle reflections',
       colorStyle: 'neutral whites, subtle grays',
       realism: 'hyperrealistic details',
-      outputQuality: '4k sharp'
+      outputQuality: '4k sharp',
     },
-    preview: '/clean-studio.webp'
+    preview: '/clean-studio.webp',
   },
   {
     id: 'desert-tones',
@@ -65,9 +73,9 @@ const ENHANCE_PRESETS = [
       lighting: 'golden hour, soft shadows',
       colorStyle: 'sand, beige, amber',
       realism: 'photo-real, crisp textures',
-      outputQuality: '4k'
+      outputQuality: '4k',
     },
-    preview: '/desert-tones.webp'
+    preview: '/desert-tones.webp',
   },
   {
     id: 'editorial-beige',
@@ -80,9 +88,9 @@ const ENHANCE_PRESETS = [
       lighting: 'directional key + fill',
       colorStyle: 'beige monochrome',
       realism: 'realistic',
-      outputQuality: '4k print'
+      outputQuality: '4k print',
     },
-    preview: '/editorial-beige.webp'
+    preview: '/editorial-beige.webp',
   },
   {
     id: 'slate-contrast',
@@ -95,10 +103,10 @@ const ENHANCE_PRESETS = [
       lighting: 'hard key + rim, controlled specular',
       colorStyle: 'cool slate, deep blacks',
       realism: 'high-fidelity',
-      outputQuality: '4k'
+      outputQuality: '4k',
     },
-    preview: '/slate-contrast.webp'
-  }
+    preview: '/slate-contrast.webp',
+  },
 ];
 
 /* -------------------------------------------------------
@@ -106,10 +114,10 @@ const ENHANCE_PRESETS = [
 ------------------------------------------------------- */
 const ARCHETYPES = [
   { id: 'female-catalog-front', label: 'Female • Catalog • Front', spec: { gender: 'Female', Age: 'Adult', bodyType: 'Average', style: 'Catalog', angle: 'Front', background: 'Beige Studio' }, ar: '3:4' },
-  { id: 'female-editorial-34',  label: 'Female • Editorial • 3/4', spec: { gender: 'Female', Age: 'Adult', bodyType: 'Slim',    style: 'Editorial', angle: 'Three-Quarter', background: 'Matte Beige' }, ar: '3:4' },
-  { id: 'male-catalog-front',   label: 'Male • Catalog • Front',   spec: { gender: 'Male',   Age: 'Adult', bodyType: 'Athletic', style: 'Catalog', angle: 'Front', background: 'Neutral Gray' }, ar: '3:4' },
-  { id: 'male-sport-side',      label: 'Male • Sport • Side',      spec: { gender: 'Male',   Age: 'Adult', bodyType: 'Fit',     style: 'Sport',    angle: 'Side', background: 'Slate Studio' }, ar: '3:4' },
-  { id: 'female-modest-front',  label: 'Female • Modest • Front',  spec: { gender: 'Female', Age: 'Adult', bodyType: 'Average', style: 'Catalog', angle: 'Front', background: 'Soft White', modest: true }, ar: '3:4' },
+  { id: 'female-editorial-34', label: 'Female • Editorial • 3/4', spec: { gender: 'Female', Age: 'Adult', bodyType: 'Slim', style: 'Editorial', angle: 'Three-Quarter', background: 'Matte Beige' }, ar: '3:4' },
+  { id: 'male-catalog-front', label: 'Male • Catalog • Front', spec: { gender: 'Male', Age: 'Adult', bodyType: 'Athletic', style: 'Catalog', angle: 'Front', background: 'Neutral Gray' }, ar: '3:4' },
+  { id: 'male-sport-side', label: 'Male • Sport • Side', spec: { gender: 'Male', Age: 'Adult', bodyType: 'Fit', style: 'Sport', angle: 'Side', background: 'Slate Studio' }, ar: '3:4' },
+  { id: 'female-modest-front', label: 'Female • Modest • Front', spec: { gender: 'Female', Age: 'Adult', bodyType: 'Average', style: 'Catalog', angle: 'Front', background: 'Soft White', modest: true }, ar: '3:4' },
 ];
 
 /* -------------------------------------------------------
@@ -124,7 +132,7 @@ function useToasts() {
     return {
       id,
       update: (patch) => setItems((s) => s.map((it) => (it.id === id ? { ...it, ...patch } : it))),
-      close: () => setItems((s) => s.filter((it) => it.id !== id))
+      close: () => setItems((s) => s.filter((it) => it.id !== id)),
     };
   };
   const remove = (id) => setItems((s) => s.filter((it) => it.id !== id));
@@ -133,7 +141,12 @@ function useToasts() {
 
 function ToastHost({ items, onClose }) {
   return (
-    <div className="fixed left-1/2 -translate-x-1/2 bottom-4 z-[999] w-[92vw] max-w-sm sm:max-w-md space-y-2">
+    <div
+      className="fixed left-1/2 -translate-x-1/2 bottom-4 z-[999] w-[92vw] max-w-sm sm:max-w-md space-y-2"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <AnimatePresence initial={false}>
         {items.map((t) => (
           <motion.div
@@ -145,10 +158,10 @@ function ToastHost({ items, onClose }) {
           >
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-zinc-800">{t.msg}</div>
-              <button className="text-xs text-zinc-500 hover:text-zinc-800" onClick={() => onClose(t.id)}>✕</button>
+              <button className="text-xs text-zinc-500 hover:text-zinc-800" onClick={() => onClose(t.id)} aria-label="Close toast">✕</button>
             </div>
             {typeof t.progress === 'number' && (
-              <div className="mt-2 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+              <div className="mt-2 h-1.5 rounded-full bg-zinc-100 overflow-hidden" aria-label="Progress">
                 <div
                   className="h-full bg-gradient-to-r from-[#CFFAE2] to-[#FFF0A6] transition-all"
                   style={{ width: `${Math.min(Math.max(t.progress, 0), 100)}%` }}
@@ -167,17 +180,17 @@ function ToastHost({ items, onClose }) {
 ------------------------------------------------------- */
 const GROUPS = [
   { id: 'product', label: 'Product', icon: BoxIcon },
-  { id: 'people', label: 'People', icon: PersonIcon }
+  { id: 'people', label: 'People', icon: PersonIcon },
 ];
 
 const PRODUCT_TOOLS = [
   { id: 'removeBg', label: 'Remove BG', icon: ScissorsIcon },
-  { id: 'enhance',  label: 'Enhance',   icon: RocketIcon }
+  { id: 'enhance', label: 'Enhance', icon: RocketIcon },
 ];
 
 const PEOPLE_TOOLS = [
-  { id: 'tryon',     label: 'Try-On',     icon: PersonIcon },
-  { id: 'modelSwap', label: 'Model Swap', icon: SwapIcon   }
+  { id: 'tryon', label: 'Try-On', icon: PersonIcon },
+  { id: 'modelSwap', label: 'Model Swap', icon: SwapIcon },
 ];
 
 export default function Dashboard() {
@@ -189,8 +202,8 @@ export default function Dashboard() {
   /* ---------- app state ---------- */
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState('product');
-  const [tool, setTool]   = useState('enhance');
-  const [plan, setPlan]   = useState('Free');
+  const [tool, setTool] = useState('enhance');
+  const [plan, setPlan] = useState('Free');
 
   // single-file work area
   const [file, setFile] = useState(null);
@@ -239,7 +252,10 @@ export default function Dashboard() {
     let mounted = true;
     (async () => {
       if (user === undefined) return;
-      if (!user) { router.replace('/login'); return; }
+      if (!user) {
+        router.replace('/login');
+        return;
+      }
 
       try {
         const { data } = await supabase
@@ -249,38 +265,70 @@ export default function Dashboard() {
           .single();
         if (!mounted) return;
         setPlan(data?.plan || 'Free');
-      } catch {/* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       setLoading(false);
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [user, router, supabase]);
 
   /* ---------- drag & drop / paste (single file area) ---------- */
   useEffect(() => {
-    const el = dropRef.current; if (!el) return;
-    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-emerald-300'); };
-    const leave = () => el.classList.remove('ring-2','ring-emerald-300');
-    const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
-    el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
+    const el = dropRef.current;
+    if (!el) return;
+
+    const over = (e) => {
+      e.preventDefault();
+      el.classList.add('ring-2', 'ring-emerald-300');
+    };
+    const leave = () => el.classList.remove('ring-2', 'ring-emerald-300');
+    const drop = async (e) => {
+      e.preventDefault();
+      leave();
+      const f = e.dataTransfer.files?.[0];
+      if (f) await onPick(f);
+    };
+
+    el.addEventListener('dragover', over);
+    el.addEventListener('dragleave', leave);
+    el.addEventListener('drop', drop);
 
     const onPaste = async (e) => {
-      const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
-      const f = item?.getAsFile?.(); if (f) await onPick(f);
+      const item = Array.from(e.clipboardData?.items || []).find((it) => it.type.startsWith('image/'));
+      const f = item?.getAsFile?.();
+      if (f) await onPick(f);
     };
     window.addEventListener('paste', onPaste);
+
     return () => {
-      el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop);
+      el.removeEventListener('dragover', over);
+      el.removeEventListener('dragleave', leave);
+      el.removeEventListener('drop', drop);
       window.removeEventListener('paste', onPaste);
     };
   }, [tool]);
 
+  // Revoke object URLs when replaced to avoid memory leaks (mobile browsers especially)
+  useEffect(() => {
+    return () => {
+      if (localUrl?.startsWith?.('blob:')) URL.revokeObjectURL(localUrl);
+      if (local1?.startsWith?.('blob:')) URL.revokeObjectURL(local1);
+      if (local2?.startsWith?.('blob:')) URL.revokeObjectURL(local2);
+    };
+  }, [localUrl, local1, local2]);
+
   const onPick = async (f) => {
     setFile(f);
-    setLocalUrl(URL.createObjectURL(f));
+    const url = URL.createObjectURL(f);
+    setLocalUrl(url);
     setResultUrl('');
     setVariants([]);
-    setErr(''); setPhase('idle');
+    setErr('');
+    setPhase('idle');
     if (tool === 'removeBg') setImageData(await fileToDataURL(f));
 
     if (tool === 'tryon') {
@@ -315,39 +363,64 @@ export default function Dashboard() {
           <rect width='100%' height='100%' fill='url(#p)'/>
         </svg>`
       );
-      bgStyle = { backgroundColor: primaryColor, backgroundImage: `url("data:image/svg+xml;utf8,${svg}")`, backgroundSize: '24px 24px' };
+      bgStyle = {
+        backgroundColor: primaryColor,
+        backgroundImage: `url("data:image/svg+xml;utf8,${svg}")`,
+        backgroundSize: '24px 24px',
+      };
     }
     return {
       ...bgStyle,
       borderRadius: `${radius}px`,
       padding: `${padding}px`,
       boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.10), 0 6px 18px rgba(0,0,0,.06)' : 'none',
-      transition: 'all .25s ease'
+      transition: 'all .25s ease',
     };
   }, [bgMode, primaryColor, secondaryColor, angle, radius, padding, shadow, patternOpacity]);
 
   /* ---------- storage ---------- */
-  const uploadToStorage = useCallback(async (f) => {
-    if (!f) throw new Error('no file');
-    const ext = (f.name?.split('.').pop() || 'png').toLowerCase();
-    const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, f, {
-      cacheControl: '3600', upsert: false, contentType: f.type || 'image/*',
-    });
-    if (upErr) throw upErr;
-    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-    if (!data?.publicUrl) throw new Error('no public url');
-    return data.publicUrl;
-  }, [supabase, user]);
+  const uploadToStorage = useCallback(
+    async (f) => {
+      if (!f) throw new Error('no file');
+      const ext = (f.name?.split('.').pop() || 'png').toLowerCase();
+      const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, f, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: f.type || 'image/*',
+      });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+      if (!data?.publicUrl) throw new Error('no public url');
+      return data.publicUrl;
+    },
+    [supabase, user]
+  );
 
   /* ---------- prompt builders ---------- */
   const buildEnhancePrompt = (f) =>
-    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
-      .filter(Boolean).join(', ');
+    [
+      f?.photographyStyle,
+      `background: ${f?.background}`,
+      `lighting: ${f?.lighting}`,
+      `colors: ${f?.colorStyle}`,
+      f?.realism,
+      `output: ${f?.outputQuality}`,
+    ]
+      .filter(Boolean)
+      .join(', ');
 
   const buildKontextPrompt = ({ pieceType, archetypeSpec, hints }) => {
     const region = pieceType === 'upper' ? 'top' : pieceType === 'lower' ? 'bottom' : 'full outfit';
-    const { gender='Female', Age='Adult', bodyType='Average', style='Catalog', angle='Front', background='Beige Studio', modest=false } = archetypeSpec || {};
+    const {
+      gender = 'Female',
+      Age = 'Adult',
+      bodyType = 'Average',
+      style = 'Catalog',
+      angle = 'Front',
+      background = 'Beige Studio',
+      modest = false,
+    } = archetypeSpec || {};
 
     const fitHints = [];
     if (hints?.sleeve) fitHints.push(`${hints.sleeve} sleeves`);
@@ -367,55 +440,98 @@ export default function Dashboard() {
   /* ---------- runners ---------- */
   const runRemoveBg = useCallback(async () => {
     if (!file) return setErr('Pick an image first.');
-    setBusy(true); setErr(''); setPhase('processing');
+    setBusy(true);
+    setErr('');
+    setPhase('processing');
     const t = toasts.push('Removing background…', { progress: 8 });
-    let adv = 8; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
+    let adv = 8;
+    const iv = setInterval(() => {
+      adv = Math.min(adv + 6, 88);
+      t.update({ progress: adv });
+    }, 500);
     try {
       const r = await fetch('/api/remove-bg', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from remove-bg');
+      const out = pickFirstUrl(j);
+      if (!out) throw new Error('No output from remove-bg');
       setResultUrl(out);
-      setHistory(h => [{ tool:'Remove BG', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-      setPhase('ready'); t.update({ progress: 100, msg: 'Background removed ✓' });
+      setHistory((h) => [{ tool: 'Remove BG', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
+      setPhase('ready');
+      t.update({ progress: 100, msg: 'Background removed ✓' });
       setTimeout(() => t.close(), 700);
     } catch (e) {
-      console.error(e); setPhase('error'); setErr('Failed to process.');
-      t.update({ msg: 'Remove BG failed', type: 'error' }); setTimeout(() => t.close(), 1500);
-    } finally { clearInterval(iv); setBusy(false); }
+      console.error(e);
+      setPhase('error');
+      setErr('Failed to process.');
+      t.update({ msg: 'Remove BG failed', type: 'error' });
+      setTimeout(() => t.close(), 1500);
+    } finally {
+      clearInterval(iv);
+      setBusy(false);
+    }
   }, [file, imageData, localUrl, toasts]);
 
-  const runEnhance = useCallback(async (selections) => {
-    if (!file) return setErr('Pick an image first.');
-    setBusy(true); setErr(''); setPhase('processing');
-    const imageUrl = await uploadToStorage(file);
-    const prompt = buildEnhancePrompt(selections);
-    const t = toasts.push('Enhancing…', { progress: 12 });
-    let adv = 12; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
-    try {
-      const r = await fetch('/api/enhance', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email })
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || 'enhance failed');
-      const out = pickFirstUrl(j); if (!out) throw new Error('No output from enhance');
-      setResultUrl(out);
-      setHistory(h => [{ tool:'Enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-      setPhase('ready'); t.update({ progress: 100, msg: 'Enhanced ✓' }); setTimeout(() => t.close(), 700);
-    } catch (e) {
-      console.error(e); setPhase('error'); setErr('Failed to process.');
-      t.update({ msg: 'Enhance failed', type: 'error' }); setTimeout(() => t.close(), 1500);
-    } finally { clearInterval(iv); setBusy(false); }
-  }, [file, uploadToStorage, plan, user, localUrl, toasts]);
+  const runEnhance = useCallback(
+    async (selections) => {
+      if (!file) return setErr('Pick an image first.');
+      setBusy(true);
+      setErr('');
+      setPhase('processing');
+      const imageUrl = await uploadToStorage(file);
+      const prompt = buildEnhancePrompt(selections);
+      const t = toasts.push('Enhancing…', { progress: 12 });
+      let adv = 12;
+      const iv = setInterval(() => {
+        adv = Math.min(adv + 6, 88);
+        t.update({ progress: adv });
+      }, 500);
+      try {
+        const r = await fetch('/api/enhance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j?.error || 'enhance failed');
+        const out = pickFirstUrl(j);
+        if (!out) throw new Error('No output from enhance');
+        setResultUrl(out);
+        setHistory((h) => [{ tool: 'Enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
+        setPhase('ready');
+        t.update({ progress: 100, msg: 'Enhanced ✓' });
+        setTimeout(() => t.close(), 700);
+      } catch (e) {
+        console.error(e);
+        setPhase('error');
+        setErr('Failed to process.');
+        t.update({ msg: 'Enhance failed', type: 'error' });
+        setTimeout(() => t.close(), 1500);
+      } finally {
+        clearInterval(iv);
+        setBusy(false);
+      }
+    },
+    [file, uploadToStorage, plan, user, localUrl, toasts]
+  );
 
   const runTryOn = useCallback(async () => {
-    if (!file)              { setErr('Please upload a clothing image first.'); return; }
-    if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
-    if (!selectedArch)      { setErr('Please select a model archetype.'); return; }
+    if (!file) {
+      setErr('Please upload a clothing image first.');
+      return;
+    }
+    if (!pieceType) {
+      setErr('Please choose the clothing type.');
+      return;
+    }
+    if (!selectedArch) {
+      setErr('Please select a model archetype.');
+      return;
+    }
 
     setBusy(true);
     setErr('');
@@ -423,14 +539,19 @@ export default function Dashboard() {
 
     const toast = toasts.push('Generating try-on…', { progress: 10 });
     let progress = 10;
-    const iv = setInterval(() => { progress = Math.min(progress + 6, 88); toast.update({ progress }); }, 500);
+    const iv = setInterval(() => {
+      progress = Math.min(progress + 6, 88);
+      toast.update({ progress });
+    }, 500);
 
     try {
       const clothUrl = await uploadToStorage(file);
       const prompt = buildKontextPrompt({ pieceType, archetypeSpec: selectedArch.spec, hints: tryonOptions.hints });
 
       let seedToUse = tryonOptions.seedLock
-        ? (typeof tryonOptions.seed === 'number' ? tryonOptions.seed : Math.floor(Math.random() * 1e9))
+        ? typeof tryonOptions.seed === 'number'
+          ? tryonOptions.seed
+          : Math.floor(Math.random() * 1e9)
         : undefined;
       if (tryonOptions.seedLock && typeof seedToUse === 'number' && tryonOptions.seed !== seedToUse) {
         setTryonOptions((s) => ({ ...s, seed: seedToUse }));
@@ -449,7 +570,7 @@ export default function Dashboard() {
           aspect_ratio: tryonOptions.aspect_ratio || selectedArch.ar || '3:4',
           guidance_scale: tryonOptions.guidance_scale,
           safety_tolerance: tryonOptions.safety_tolerance,
-        })
+        }),
       });
 
       const j = await r.json().catch(() => ({}));
@@ -464,7 +585,7 @@ export default function Dashboard() {
       const all = j?.variants && Array.isArray(j.variants) ? j.variants : [main];
       setResultUrl(main);
       setVariants(all);
-      setHistory(h => [ { tool: 'Try-On', inputThumb: localUrl, outputUrl: main, ts: Date.now() }, ...h ].slice(0, 24));
+      setHistory((h) => [{ tool: 'Try-On', inputThumb: localUrl, outputUrl: main, ts: Date.now() }, ...h].slice(0, 24));
 
       setPhase('ready');
       toast.update({ progress: 100, msg: 'Try-On ✓' });
@@ -481,50 +602,88 @@ export default function Dashboard() {
     }
   }, [file, pieceType, selectedArch, uploadToStorage, plan, user, tryonOptions, localUrl, toasts]);
 
-  const runModelSwap = useCallback(async () => {
-    if (!file1 || !file2) return setErr('Pick both images.');
-    setBusy(true); setErr(''); setPhase('processing');
-    const [image1, image2] = await Promise.all([uploadToStorage(file1), uploadToStorage(file2)]);
-    const t = toasts.push('Running Model Swap…', { progress: 10 });
-    let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
-    try {
-      const r = await fetch('/api/model', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image1, image2, prompt: swapPrompt, plan, user_email: user.email })
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || 'model swap failed');
-      const out = pickFirstUrl(j) || j?.url || j?.image;
-      if (!out) throw new Error('No output from model.');
-      setResultUrl(out);
-      setHistory(h => [{ tool:'Model Swap', inputThumb: local1, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
-      setPhase('ready'); t.update({ progress: 100, msg: 'Model Swap done ✓' }); setTimeout(() => t.close(), 700);
-    } catch (e) {
-      console.error(e); setPhase('error'); setErr('Failed to process.');
-      t.update({ msg: 'Model Swap failed', type: 'error' }); setTimeout(() => t.close(), 1500);
-    } finally { clearInterval(iv); setBusy(false); }
-  }, [file1, file2, swapPrompt, uploadToStorage, plan, user, local1, toasts]);
+  const runModelSwap = useCallback(
+    async () => {
+      if (!file1 || !file2) return setErr('Pick both images.');
+      setBusy(true);
+      setErr('');
+      setPhase('processing');
+      const [image1, image2] = await Promise.all([uploadToStorage(file1), uploadToStorage(file2)]);
+      const t = toasts.push('Running Model Swap…', { progress: 10 });
+      let adv = 10;
+      const iv = setInterval(() => {
+        adv = Math.min(adv + 6, 88);
+        t.update({ progress: adv });
+      }, 500);
+      try {
+        const r = await fetch('/api/model', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image1, image2, prompt: swapPrompt, plan, user_email: user.email }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j?.error || 'model swap failed');
+        const out = pickFirstUrl(j) || j?.url || j?.image;
+        if (!out) throw new Error('No output from model.');
+        setResultUrl(out);
+        setHistory((h) => [{ tool: 'Model Swap', inputThumb: local1, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
+        setPhase('ready');
+        t.update({ progress: 100, msg: 'Model Swap done ✓' });
+        setTimeout(() => t.close(), 700);
+      } catch (e) {
+        console.error(e);
+        setPhase('error');
+        setErr('Failed to process.');
+        t.update({ msg: 'Model Swap failed', type: 'error' });
+        setTimeout(() => t.close(), 1500);
+      } finally {
+        clearInterval(iv);
+        setBusy(false);
+      }
+    },
+    [file1, file2, swapPrompt, uploadToStorage, plan, user, local1, toasts]
+  );
 
   /* ---------- handlers ---------- */
   const resetAll = () => {
-    setFile(null); setLocalUrl(''); setResultUrl(''); setVariants([]);
-    setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
-    setErr(''); setPhase('idle'); setCompare(false);
-    setSelectedArch(null); setPieceType(null); setTryonStep('cloth');
+    setFile(null);
+    setLocalUrl('');
+    setResultUrl('');
+    setVariants([]);
+    setFile1(null);
+    setFile2(null);
+    setLocal1('');
+    setLocal2('');
+    setErr('');
+    setPhase('idle');
+    setCompare(false);
+    setSelectedArch(null);
+    setPieceType(null);
+    setTryonStep('cloth');
   };
 
   const switchTool = (nextId) => {
     setTool(nextId);
-    setResultUrl(''); setVariants([]); setErr(''); setPhase('idle'); setCompare(false);
-    setFile(null); setLocalUrl('');
-    setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
-    setSelectedArch(null); setPieceType(null); setTryonStep(nextId==='tryon' ? 'cloth' : 'cloth');
+    setResultUrl('');
+    setVariants([]);
+    setErr('');
+    setPhase('idle');
+    setCompare(false);
+    setFile(null);
+    setLocalUrl('');
+    setFile1(null);
+    setFile2(null);
+    setLocal1('');
+    setLocal2('');
+    setSelectedArch(null);
+    setPieceType(null);
+    setTryonStep(nextId === 'tryon' ? 'cloth' : 'cloth');
   };
 
   const handleRun = () => {
     if (group === 'product') {
       if (tool === 'removeBg') return runRemoveBg();
-      if (tool === 'enhance')  return setShowEnhance(true);
+      if (tool === 'enhance') return setShowEnhance(true);
     } else {
       if (tool === 'tryon') return runTryOn();
       if (tool === 'modelSwap') return runModelSwap();
@@ -534,7 +693,7 @@ export default function Dashboard() {
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
     return (
-      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-[#F3FFF8] to-[#FFFCE8] text-zinc-700">
+      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-[#F5FBF7] to-white text-zinc-700">
         <div className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 border border-zinc-200 shadow-sm text-sm">Loading…</div>
       </main>
     );
@@ -600,9 +759,14 @@ export default function Dashboard() {
                 return (
                   <button
                     key={g.id}
-                    onClick={() => { setGroup(g.id); switchTool(g.id === 'product' ? 'enhance' : 'tryon'); }}
-                    className={[`inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition`,
-                      Active ? 'bg-zinc-900 text-white shadow' : 'text-zinc-700 hover:bg-zinc-100'].join(' ')}
+                    onClick={() => {
+                      setGroup(g.id);
+                      switchTool(g.id === 'product' ? 'enhance' : 'tryon');
+                    }}
+                    className={cx(
+                      'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
+                      Active ? 'bg-zinc-900 text-white shadow' : 'text-zinc-700 hover:bg-zinc-100'
+                    )}
                   >
                     <Icon className="size-4" /> {g.label}
                   </button>
@@ -621,13 +785,15 @@ export default function Dashboard() {
                   <button
                     key={t.id}
                     onClick={() => switchTool(t.id)}
-                    className={[
+                    className={cx(
                       'w-full group flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition',
-                      Active ? 'bg-[#F3FFF8] text-emerald-700 border border-emerald-200'
-                             : 'text-zinc-700 hover:bg-zinc-100 border border-transparent'
-                    ].join(' ')}
+                      Active
+                        ? 'bg-[#F3FFF8] text-emerald-700 border border-emerald-200'
+                        : 'text-zinc-700 hover:bg-zinc-100 border border-transparent'
+                    )}
+                    aria-pressed={Active}
                   >
-                    <Icon className={['size-4', Active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-zinc-700'].join(' ')} />
+                    <Icon className={cx('size-4', Active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-zinc-700')} />
                     <span className="truncate">{t.label}</span>
                   </button>
                 );
@@ -653,20 +819,30 @@ export default function Dashboard() {
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-                  {group === 'product' ? 'Quick Presets' : (tool === 'tryon' ? 'Try-On Flow' : 'Model Swap')}
+                  {group === 'product' ? 'Quick Presets' : tool === 'tryon' ? 'Try-On Flow' : 'Model Swap'}
                 </h1>
                 <p className="text-zinc-600 text-xs sm:text-sm">
-                  {group === 'product'
-                    ? <>Pick a preset or open <span className="font-semibold">Customize</span>.</>
-                    : tool === 'tryon'
-                      ? <>Step 1: upload clothing → Step 2: choose type → Step 3: pick an archetype → Run.</>
-                      : <>Choose two images and run <span className="font-semibold">Model Swap</span>.</>}
+                  {group === 'product' ? (
+                    <>
+                      Pick a preset or open <span className="font-semibold">Customize</span>.
+                    </>
+                  ) : tool === 'tryon' ? (
+                    <>Step 1: upload clothing → Step 2: choose type → Step 3: pick an archetype → Run.</>
+                  ) : (
+                    <>
+                      Choose two images and run <span className="font-semibold">Model Swap</span>.
+                    </>
+                  )}
                 </p>
               </div>
 
               {group === 'product' ? (
                 <button
-                  onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
+                  onClick={() => {
+                    setTool('enhance');
+                    setPendingEnhancePreset(null);
+                    setShowEnhance(true);
+                  }}
                   className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-zinc-50"
                 >
                   ✨ Customize Enhance
@@ -694,7 +870,11 @@ export default function Dashboard() {
                       subtitle={p.subtitle}
                       preview={p.preview}
                       tag={p.tag}
-                      onClick={() => { setTool('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
+                      onClick={() => {
+                        setTool('enhance');
+                        setPendingEnhancePreset(p.config);
+                        setShowEnhance(true);
+                      }}
                     />
                   ))}
                 </div>
@@ -705,14 +885,19 @@ export default function Dashboard() {
 
                 {tryonStep === 'archetype' ? (
                   <div className="mt-3">
-                    <div className="mb-2 text-[12px] font-semibold text-zinc-700">Model Archetypes <span className="ml-1 text-[10px] text-zinc-500">Illustrative only</span></div>
+                    <div className="mb-2 text-[12px] font-semibold text-zinc-700">
+                      Model Archetypes <span className="ml-1 text-[10px] text-zinc-500">Illustrative only</span>
+                    </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       {ARCHETYPES.map((a) => (
                         <ArchetypeCard
                           key={a.id}
                           archetype={a}
                           active={selectedArch?.id === a.id}
-                          onSelect={() => { setSelectedArch(a); if (!tryonOptions.aspect_ratio) setOption('aspect_ratio', a.ar || '3:4'); }}
+                          onSelect={() => {
+                            setSelectedArch(a);
+                            if (!tryonOptions.aspect_ratio) setOption('aspect_ratio', a.ar || '3:4');
+                          }}
                         />
                       ))}
                     </div>
@@ -744,10 +929,11 @@ export default function Dashboard() {
                       <button
                         key={it.id}
                         onClick={() => switchTool(it.id)}
-                        className={[
+                        className={cx(
                           'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
                           Active ? 'bg-zinc-900 text-white shadow' : 'text-zinc-700 hover:bg-zinc-100'
-                        ].join(' ')}
+                        )}
+                        aria-pressed={Active}
                       >
                         <Icon className="size-4" />
                         <span>{it.label}</span>
@@ -757,7 +943,9 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StepBadge phase={phase} />
-                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50">Reset</button>
+                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50">
+                    Reset
+                  </button>
                 </div>
               </div>
 
@@ -768,11 +956,18 @@ export default function Dashboard() {
                   className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-zinc-300/80 bg-white/70 hover:bg-white transition cursor-pointer"
                   onClick={() => inputRef.current?.click()}
                   title="Drag & drop / Click / Paste (Ctrl+V)"
+                  role="button"
+                  aria-label="Upload or drop an image"
                 >
                   <input
                     ref={inputRef}
-                    type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (f) await onPick(f);
+                    }}
                   />
                   {!localUrl && !resultUrl ? (
                     <div className="text-center text-zinc-500 text-sm">
@@ -785,9 +980,13 @@ export default function Dashboard() {
                     <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
                       {compare && localUrl && resultUrl ? (
                         <div className="relative max-w-full max-h-[70vh]">
-                          <img src={resultUrl} alt="after" className="max-w/full max-h-[70vh] object-contain rounded-xl" />
-                          <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
-                               className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none" />
+                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+                          <img
+                            src={localUrl}
+                            alt="before"
+                            style={{ opacity: compareOpacity / 100 }}
+                            className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none"
+                          />
                         </div>
                       ) : (
                         <img
@@ -808,21 +1007,32 @@ export default function Dashboard() {
                       label="Image 1"
                       file={file1}
                       localUrl={local1}
-                      onPick={async (f) => { setFile1(f); setLocal1(URL.createObjectURL(f)); setResultUrl(''); setPhase('idle'); }}
+                      onPick={async (f) => {
+                        setFile1(f);
+                        setLocal1(URL.createObjectURL(f));
+                        setResultUrl('');
+                        setPhase('idle');
+                      }}
                       inputRef={inputRef1}
                     />
                     <FileDrop
                       label="Image 2"
                       file={file2}
                       localUrl={local2}
-                      onPick={async (f) => { setFile2(f); setLocal2(URL.createObjectURL(f)); setResultUrl(''); setPhase('idle'); }}
+                      onPick={async (f) => {
+                        setFile2(f);
+                        setLocal2(URL.createObjectURL(f));
+                        setResultUrl('');
+                        setPhase('idle');
+                      }}
                       inputRef={inputRef2}
                     />
                   </div>
                   <div className="mt-3">
                     <label className="text-xs text-zinc-600">Prompt</label>
                     <input
-                      value={swapPrompt} onChange={(e)=>setSwapPrompt(e.target.value)}
+                      value={swapPrompt}
+                      onChange={(e) => setSwapPrompt(e.target.value)}
                       placeholder="Describe how to combine or arrange the two images…"
                       className="mt-1 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm"
                     />
@@ -844,15 +1054,20 @@ export default function Dashboard() {
                 <button
                   onClick={handleRun}
                   disabled={
-                    busy || (
-                      tool === 'modelSwap' ? (!file1 || !file2) :
-                      tool === 'tryon' ? (!file || !selectedArch || !pieceType) :
-                      !file
-                    )
+                    busy || (tool === 'modelSwap' ? !file1 || !file2 : tool === 'tryon' ? !file || !selectedArch || !pieceType : !file)
                   }
-                  className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-[0_10px_24px_rgba(0,0,0,.14)] transition disabled:opacity-50"
+                  className={cx(
+                    'inline-flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold shadow-[0_10px_24px_rgba(0,0,0,.14)] transition disabled:opacity-50',
+                    'bg-zinc-900 hover:bg-zinc-800 text-white'
+                  )}
                 >
-                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On')}</>)}
+                  {busy ? (
+                    'Processing…'
+                  ) : (
+                    <>
+                      <PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On'}
+                    </>
+                  )}
                 </button>
 
                 {resultUrl && (
@@ -864,13 +1079,17 @@ export default function Dashboard() {
                       ⬇ Download PNG
                     </button>
                     <a
-                      href={resultUrl} target="_blank" rel="noreferrer"
+                      href={resultUrl}
+                      target="_blank"
+                      rel="noreferrer"
                       className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50"
                     >
                       ↗ Open
                     </a>
                     <button
-                      onClick={() => { navigator.clipboard.writeText(resultUrl).catch(()=>{}); }}
+                      onClick={() => {
+                        navigator.clipboard.writeText(resultUrl).catch(() => {});
+                      }}
                       className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50"
                     >
                       🔗 Copy URL
@@ -879,13 +1098,19 @@ export default function Dashboard() {
                     {tool !== 'modelSwap' && localUrl && (
                       <>
                         <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2">
-                          <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
+                          <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
                           Compare
                         </label>
                         {compare && (
                           <div className="flex items-center gap-2">
-                            <input type="range" min={0} max={100} value={compareOpacity}
-                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} className="accent-emerald-500" />
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={compareOpacity}
+                              onChange={(e) => setCompareOpacity(Number(e.target.value))}
+                              className="accent-emerald-500"
+                            />
                             <span className="text-xs w-8 text-right">{compareOpacity}%</span>
                           </div>
                         )}
@@ -901,8 +1126,12 @@ export default function Dashboard() {
               <AnimatePresence>
                 {busy && (
                   <motion.div
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     className="pointer-events-none absolute inset-0 rounded-2xl md:rounded-3xl grid place-items-center bg-white/60"
+                    aria-busy="true"
+                    aria-label="Working"
                   >
                     <div className="text-xs px-3 py-2 rounded-lg bg-white border shadow">Working…</div>
                   </motion.div>
@@ -933,7 +1162,9 @@ export default function Dashboard() {
                     <div className="text-zinc-600 mb-1">Type</div>
                     <div className="flex items-center justify-between">
                       <div className="text-zinc-800">{pieceType ? pieceType : '—'}</div>
-                      <button className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => setShowPieceType(true)}>Change</button>
+                      <button className="rounded-lg border px-2 py-1 text-[11px]" onClick={() => setShowPieceType(true)}>
+                        Change
+                      </button>
                     </div>
                   </div>
 
@@ -955,28 +1186,45 @@ export default function Dashboard() {
                       <select
                         className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
                         value={tryonOptions.aspect_ratio}
-                        onChange={(e)=>setOption('aspect_ratio', e.target.value)}
+                        onChange={(e) => setOption('aspect_ratio', e.target.value)}
                       >
-                        {['3:4','4:3','1:1','2:3','3:2','16:9','9:16'].map((r)=>(<option key={r} value={r}>{r}</option>))}
+                        {['3:4', '4:3', '1:1', '2:3', '3:2', '16:9', '9:16'].map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
                       </select>
                     </Field>
 
                     <Field label="Variants">
                       <div className="flex items-center gap-2">
-                        <input type="range" min={1} max={3} value={tryonOptions.num_images}
-                          onChange={(e)=>setOption('num_images', Number(e.target.value))} className="w-full accent-emerald-500" />
+                        <input
+                          type="range"
+                          min={1}
+                          max={3}
+                          value={tryonOptions.num_images}
+                          onChange={(e) => setOption('num_images', Number(e.target.value))}
+                          className="w-full accent-emerald-500"
+                        />
                         <span className="w-6 text-right">{tryonOptions.num_images}</span>
                       </div>
                     </Field>
 
                     <Field label="Seed Lock">
                       <div className="flex items-center gap-2">
-                        <input type="checkbox" checked={tryonOptions.seedLock} onChange={(e)=>setOption('seedLock', e.target.checked)} />
+                        <input
+                          type="checkbox"
+                          checked={tryonOptions.seedLock}
+                          onChange={(e) => setOption('seedLock', e.target.checked)}
+                        />
                         {tryonOptions.seedLock && (
-                          <input type="number" className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
+                          <input
+                            type="number"
+                            className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
                             value={tryonOptions.seed ?? ''}
-                            onChange={(e)=>setOption('seed', e.target.value === '' ? null : Number(e.target.value))}
-                            placeholder="auto" />
+                            onChange={(e) => setOption('seed', e.target.value === '' ? null : Number(e.target.value))}
+                            placeholder="auto"
+                          />
                         )}
                       </div>
                     </Field>
@@ -985,14 +1233,25 @@ export default function Dashboard() {
                       <summary className="cursor-pointer text-zinc-700">Advanced</summary>
                       <div className="mt-2 space-y-2">
                         <Field label="Guidance">
-                          <input type="number" step="0.1" min={1} max={12} className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
+                          <input
+                            type="number"
+                            step="0.1"
+                            min={1}
+                            max={12}
+                            className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
                             value={tryonOptions.guidance_scale}
-                            onChange={(e)=>setOption('guidance_scale', Number(e.target.value))} />
+                            onChange={(e) => setOption('guidance_scale', Number(e.target.value))}
+                          />
                         </Field>
                         <Field label="Safety">
-                          <input type="number" min={1} max={6} className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
+                          <input
+                            type="number"
+                            min={1}
+                            max={6}
+                            className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
                             value={tryonOptions.safety_tolerance}
-                            onChange={(e)=>setOption('safety_tolerance', Number(e.target.value))} />
+                            onChange={(e) => setOption('safety_tolerance', Number(e.target.value))}
+                          />
                         </Field>
                       </div>
                     </details>
@@ -1002,11 +1261,16 @@ export default function Dashboard() {
                     <div className="rounded-lg border p-3">
                       <div className="text-zinc-600 mb-2">Variants</div>
                       <div className="flex gap-2 overflow-x-auto pb-1">
-                        {variants.map((v,i)=>(
-                          <button key={i} onClick={()=>setResultUrl(v)}
-                            className={`shrink-0 rounded-lg border ${resultUrl===v ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-200'} bg-white/70`}
+                        {variants.map((v, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setResultUrl(v)}
+                            className={cx(
+                              'shrink-0 rounded-lg border bg-white/70',
+                              resultUrl === v ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-200'
+                            )}
                           >
-                            <img src={v} alt={`v${i+1}`} className="h-20 w-20 object-cover rounded-md" />
+                            <img src={v} alt={`v${i + 1}`} className="h-20 w-20 object-cover rounded-md" />
                           </button>
                         ))}
                       </div>
@@ -1016,11 +1280,7 @@ export default function Dashboard() {
                   {resultUrl && (
                     <div className="rounded-lg border p-3">
                       <div className="text-zinc-600 mb-2">Result</div>
-                      <img
-                        src={resultUrl}
-                        alt="final"
-                        className="w-full max-h-64 object-contain rounded-md border bg-white/70"
-                      />
+                      <img src={resultUrl} alt="final" className="w-full max-h-64 object-contain rounded-md border bg-white/70" />
                     </div>
                   )}
                 </div>
@@ -1047,13 +1307,7 @@ export default function Dashboard() {
 
                   {bgMode === 'pattern' && (
                     <Field label="Pattern opacity">
-                      <Range
-                        value={patternOpacity}
-                        onChange={setPatternOpacity}
-                        min={0}
-                        max={0.5}
-                        step={0.01}
-                      />
+                      <Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} />
                     </Field>
                   )}
 
@@ -1065,31 +1319,18 @@ export default function Dashboard() {
                   </Field>
 
                   <label className="mt-1 inline-flex items-center gap-2 text-xs text-zinc-700">
-                    <input
-                      type="checkbox"
-                      checked={shadow}
-                      onChange={(e) => setShadow(e.target.checked)}
-                    />
+                    <input type="checkbox" checked={shadow} onChange={(e) => setShadow(e.target.checked)} />
                     Shadow
                   </label>
 
                   <div className="mt-3">
                     <div className="text-xs text-zinc-500 mb-2">Final Preview</div>
-                    <div
-                      style={frameStyleComputed}
-                      className="relative rounded-xl overflow-hidden border border-zinc-200"
-                    >
+                    <div style={frameStyleComputed} className="relative rounded-xl overflow-hidden border border-zinc-200">
                       <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
                         {resultUrl ? (
-                          <img
-                            src={resultUrl}
-                            alt="final"
-                            className="max-w-full max-h-[38vh] object-contain"
-                          />
+                          <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
                         ) : (
-                          <div className="grid place-items-center h-[140px] text-xs text-zinc-400">
-                            — Run Remove BG first —
-                          </div>
+                          <div className="grid place-items-center h-[140px] text-xs text-zinc-400">— Run Remove BG first —</div>
                         )}
                       </div>
                     </div>
@@ -1106,11 +1347,7 @@ export default function Dashboard() {
                   {resultUrl && (
                     <div className="mt-2 rounded-xl overflow-hidden border border-zinc-200 bg-white/70">
                       <div className="relative w-full min-h-[140px] grid place-items-center">
-                        <img
-                          src={resultUrl}
-                          alt="final"
-                          className="max-w-full max-h-[38vh] object-contain"
-                        />
+                        <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
                       </div>
                     </div>
                   )}
@@ -1124,26 +1361,14 @@ export default function Dashboard() {
                     <div className="text-zinc-600 mb-1">Inputs</div>
                     <div className="grid grid-cols-2 gap-2">
                       {local1 ? (
-                        <img
-                          src={local1}
-                          alt="image1"
-                          className="w-full h-24 object-cover rounded-md border bg-white/70"
-                        />
+                        <img src={local1} alt="image1" className="w-full h-24 object-cover rounded-md border bg-white/70" />
                       ) : (
-                        <div className="h-24 grid place-items-center text-zinc-400 border rounded-md bg-white/70">
-                          — Image 1 —
-                        </div>
+                        <div className="h-24 grid place-items-center text-zinc-400 border rounded-md bg-white/70">— Image 1 —</div>
                       )}
                       {local2 ? (
-                        <img
-                          src={local2}
-                          alt="image2"
-                          className="w-full h-24 object-cover rounded-md border bg-white/70"
-                        />
+                        <img src={local2} alt="image2" className="w-full h-24 object-cover rounded-md border bg-white/70" />
                       ) : (
-                        <div className="h-24 grid place-items-center text-zinc-400 border rounded-md bg-white/70">
-                          — Image 2 —
-                        </div>
+                        <div className="h-24 grid place-items-center text-zinc-400 border rounded-md bg-white/70">— Image 2 —</div>
                       )}
                     </div>
                     {swapPrompt && (
@@ -1156,11 +1381,7 @@ export default function Dashboard() {
                   {resultUrl && (
                     <div className="rounded-lg border p-3">
                       <div className="text-zinc-600 mb-2">Result</div>
-                      <img
-                        src={resultUrl}
-                        alt="model-swap-result"
-                        className="w-full max-h-64 object-contain rounded-md border bg-white/70"
-                      />
+                      <img src={resultUrl} alt="model-swap-result" className="w-full max-h-64 object-contain rounded-md border bg-white/70" />
                     </div>
                   )}
                 </div>
@@ -1176,10 +1397,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="mb-2">
-                  <button
-                    onClick={() => setHistory([])}
-                    className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50"
-                  >
+                  <button onClick={() => setHistory([])} className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50">
                     Clear history
                   </button>
                 </div>
@@ -1190,11 +1408,7 @@ export default function Dashboard() {
                       onClick={() => setResultUrl(h.outputUrl)}
                       className="group relative rounded-xl overflow-hidden border border-zinc-200 hover:border-zinc-300 transition bg-white/70"
                     >
-                      <img
-                        src={h.outputUrl || h.inputThumb}
-                        alt="hist"
-                        className="w-full h-28 object-cover"
-                      />
+                      <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
                       <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
                         {h.tool} • {new Date(h.ts).toLocaleTimeString()}
                       </div>
@@ -1210,12 +1424,7 @@ export default function Dashboard() {
       {/* Modals */}
       <AnimatePresence>
         {showEnhance && (
-          <motion.div
-            className="fixed inset-0 z-[100] grid place-items-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
+          <motion.div className="fixed inset-0 z-[100] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={() => setShowEnhance(false)} />
             <div className="relative w-full max-w-3xl mx-3">
               <EnhanceCustomizer
@@ -1232,12 +1441,7 @@ export default function Dashboard() {
         )}
 
         {showPieceType && (
-          <motion.div
-            className="fixed inset-0 z-[110] grid place-items-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
+          <motion.div className="fixed inset-0 z-[110] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/55" onClick={() => setShowPieceType(false)} />
             <div className="relative w-full max-w-md mx-3">
               <PieceTypeModal
@@ -1268,6 +1472,8 @@ function FileDrop({ label, file, localUrl, onPick, inputRef }) {
     <div
       className="min-h-[220px] grid place-items-center rounded-2xl border-2 border-dashed border-zinc-300/80 bg-white/70 hover:bg-white transition cursor-pointer"
       onClick={() => inputRef.current?.click()}
+      role="button"
+      aria-label={`${label}: click to choose`}
     >
       <input
         ref={inputRef}
@@ -1281,17 +1487,11 @@ function FileDrop({ label, file, localUrl, onPick, inputRef }) {
       />
       {!localUrl ? (
         <div className="text-center text-zinc-500 text-sm">
-          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-zinc-200">
-            ⬆
-          </div>
+          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-zinc-200">⬆</div>
           {label}: Click to choose
         </div>
       ) : (
-        <img
-          src={localUrl}
-          alt={label}
-          className="max-w-full max-h-[45vh] object-contain rounded-xl"
-        />
+        <img src={localUrl} alt={label} className="max-w-full max-h-[45vh] object-contain rounded-xl" />
       )}
     </div>
   );
@@ -1308,9 +1508,7 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
       className="group relative rounded-2xl overflow-hidden border border-zinc-200 hover:border-zinc-300 bg-white shadow-sm transition text-left hover:shadow-md"
     >
       <div className="relative w-full aspect-[4/3] bg-zinc-100">
-        {!loaded && (
-          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-zinc-100 via-white to-zinc-100" />
-        )}
+        {!loaded && <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-zinc-100 via-white to-zinc-100" />}
         <img
           src={preview}
           alt={title}
@@ -1320,9 +1518,7 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
           onError={() => setBroken(true)}
         />
         {tag && (
-          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-zinc-900/80 text-white shadow">
-            {tag}
-          </span>
+          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-zinc-900/80 text-white shadow">{tag}</span>
         )}
         <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
           Use preset
@@ -1352,15 +1548,15 @@ function ArchetypeCard({ archetype, active, onSelect }) {
     'from-amber-500 to-rose-500',
     'from-zinc-500 to-gray-700',
   ];
-  const grad = colors[Math.abs(archetype.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % colors.length];
+  const grad = colors[Math.abs(archetype.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % colors.length];
 
   return (
     <button
       onClick={onSelect}
-      className={[
+      className={cx(
         'group relative rounded-2xl overflow-hidden border bg-white shadow-sm transition text-left',
-        active ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-md',
-      ].join(' ')}
+        active ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-200 hover:border-zinc-300 hover:shadow-md'
+      )}
       title={archetype.label}
     >
       <div className={`relative w-full aspect-[4/5] bg-gradient-to-br ${grad}`}>
@@ -1401,23 +1597,18 @@ function TryOnStepper({ step, pieceType, archetypePicked }) {
               <div className="flex items-center gap-2">
                 <motion.div
                   layout
-                  className={[
+                  className={cx(
                     'size-6 rounded-full grid place-items-center border text-[11px] font-semibold',
                     done
                       ? 'bg-emerald-500 text-white border-emerald-500'
                       : active
                       ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-zinc-600 border-zinc-300',
-                  ].join(' ')}
+                      : 'bg-white text-zinc-600 border-zinc-300'
+                  )}
                 >
                   {done ? '✓' : i + 1}
                 </motion.div>
-                <div
-                  className={[
-                    'text-xs sm:text-[13px]',
-                    done ? 'text-emerald-700' : active ? 'text-indigo-700' : 'text-zinc-600',
-                  ].join(' ')}
-                >
+                <div className={cx('text-xs sm:text-[13px]', done ? 'text-emerald-700' : active ? 'text-indigo-700' : 'text-zinc-600')}>
                   {s.label}
                 </div>
               </div>
@@ -1448,8 +1639,8 @@ function StepBadge({ phase }) {
   };
   const it = map[phase] || map.idle;
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${it.color}`}>
-      <span className={`inline-block size-2 rounded-full ${phase === 'processing' ? 'bg-zinc-700 animate-pulse' : 'bg-zinc-600'}`} />
+    <span className={cx('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs', it.color)}>
+      <span className={cx('inline-block size-2 rounded-full', phase === 'processing' ? 'bg-zinc-700 animate-pulse' : 'bg-zinc-600')} />
       {it.label}
     </span>
   );
@@ -1466,12 +1657,8 @@ function Field({ label, children }) {
 function Color({ value, onChange }) {
   return (
     <div className="flex items-center gap-2">
-      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
-      <input
-        className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Pick color" />
+      <input className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1" value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -1504,10 +1691,8 @@ function ModeTabs({ mode, setMode }) {
         <button
           key={t.id}
           onClick={() => setMode(t.id)}
-          className={[
-            'px-3 py-1.5 text-xs rounded-lg transition',
-            mode === t.id ? 'bg-white shadow text-zinc-900' : 'text-zinc-600 hover:bg-white',
-          ].join(' ')}
+          className={cx('px-3 py-1.5 text-xs rounded-lg transition', mode === t.id ? 'bg-white shadow text-zinc-900' : 'text-zinc-600 hover:bg-white')}
+          aria-pressed={mode === t.id}
         >
           {t.label}
         </button>
@@ -1531,10 +1716,8 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
           <button
             key={o.id}
             onClick={() => setActive(o.id)}
-            className={[
-              'w-full text-left rounded-xl border px-3 py-2 text-sm transition',
-              active === o.id ? 'border-emerald-400 bg-emerald-50' : 'border-zinc-200 hover:bg-zinc-50',
-            ].join(' ')}
+            className={cx('w-full text-left rounded-xl border px-3 py-2 text-sm transition', active === o.id ? 'border-emerald-400 bg-emerald-50' : 'border-zinc-200 hover:bg-zinc-50')}
+            aria-pressed={active === o.id}
           >
             {o.label}
           </button>
@@ -1544,10 +1727,7 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
         <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={onCancel}>
           Cancel
         </button>
-        <button
-          className="rounded-lg bg-zinc-900 text-white px-3 py-1.5 text-xs"
-          onClick={() => onConfirm(active)}
-        >
+        <button className="rounded-lg bg-zinc-900 text-white px-3 py-1.5 text-xs" onClick={() => onConfirm(active)}>
           Continue
         </button>
       </div>
@@ -1558,44 +1738,35 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
 /* ----- Icons (SVG) ----- */
 function SparkleIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" />
     </svg>
   );
 }
 function BoxIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z"
-        fill="currentColor"
-      />
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
+      <path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor" />
     </svg>
   );
 }
 function PersonIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z"
-        fill="currentColor"
-      />
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
+      <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor" />
     </svg>
   );
 }
 function ScissorsIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"
-        fill="currentColor"
-      />
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
+      <path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" />
     </svg>
   );
 }
 function RocketIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" />
       <circle cx="15" cy="9" r="1.5" fill="#fff" />
     </svg>
@@ -1603,14 +1774,14 @@ function RocketIcon(props) {
 }
 function SwapIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor" />
     </svg>
   );
 }
 function PlayIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
+    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
       <path d="M8 5v14l11-7z" fill="currentColor" />
     </svg>
   );
@@ -1620,7 +1791,10 @@ function PlayIcon(props) {
    Export helpers
 ------------------------------------------------------- */
 async function exportPng(url) {
-  const img = await fetch(url).then((r) => r.blob()).then(createImageBitmap);
+  // Why: ensure high-quality PNG export regardless of the original format, while preserving transparency
+  const img = await fetch(url)
+    .then((r) => r.blob())
+    .then((b) => createImageBitmap(b));
   const canvas = document.createElement('canvas');
   canvas.width = img.width;
   canvas.height = img.height;
@@ -1637,18 +1811,50 @@ async function exportPng(url) {
 }
 
 /* -------------------------------------------------------
-   Simple customizer
+   Simple customizer (now controlled)
 ------------------------------------------------------- */
 function EnhanceCustomizer({ initial, onChange, onComplete }) {
+  const [form, setForm] = useState({
+    photographyStyle: initial?.photographyStyle || '',
+    background: initial?.background || '',
+    lighting: initial?.lighting || '',
+    colorStyle: initial?.colorStyle || '',
+    realism: initial?.realism || '',
+    outputQuality: initial?.outputQuality || '',
+  });
+
+  const update = (k) => (e) => {
+    const v = e.target.value;
+    setForm((s) => {
+      const next = { ...s, [k]: v };
+      onChange?.(next);
+      return next;
+    });
+  };
+
+  const reset = () => setForm({
+    photographyStyle: initial?.photographyStyle || '',
+    background: initial?.background || '',
+    lighting: initial?.lighting || '',
+    colorStyle: initial?.colorStyle || '',
+    realism: initial?.realism || '',
+    outputQuality: initial?.outputQuality || '',
+  });
+
   return (
     <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border space-y-3">
-      <div className="text-sm font-semibold">Enhance Settings</div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold">Enhance Settings</div>
+        <button className="text-xs px-2 py-1 rounded-lg border bg-white hover:bg-zinc-50" onClick={reset}>
+          Reset
+        </button>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <label className="space-y-1">
           <span className="text-zinc-600">Style</span>
           <input
-            defaultValue={initial?.photographyStyle || ''}
-            onChange={() => {}}
+            value={form.photographyStyle}
+            onChange={update('photographyStyle')}
             className="w-full rounded-lg border px-2 py-1"
             placeholder="studio product photography, 50mm"
           />
@@ -1656,8 +1862,8 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         <label className="space-y-1">
           <span className="text-zinc-600">Background</span>
           <input
-            defaultValue={initial?.background || ''}
-            onChange={() => {}}
+            value={form.background}
+            onChange={update('background')}
             className="w-full rounded-lg border px-2 py-1"
             placeholder="white seamless"
           />
@@ -1665,8 +1871,8 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         <label className="space-y-1">
           <span className="text-zinc-600">Lighting</span>
           <input
-            defaultValue={initial?.lighting || ''}
-            onChange={() => {}}
+            value={form.lighting}
+            onChange={update('lighting')}
             className="w-full rounded-lg border px-2 py-1"
             placeholder="softbox, gentle reflections"
           />
@@ -1674,15 +1880,33 @@ function EnhanceCustomizer({ initial, onChange, onComplete }) {
         <label className="space-y-1">
           <span className="text-zinc-600">Colors</span>
           <input
-            defaultValue={initial?.colorStyle || ''}
-            onChange={() => {}}
+            value={form.colorStyle}
+            onChange={update('colorStyle')}
             className="w-full rounded-lg border px-2 py-1"
             placeholder="neutral whites, subtle grays"
           />
         </label>
+        <label className="space-y-1">
+          <span className="text-zinc-600">Realism</span>
+          <input
+            value={form.realism}
+            onChange={update('realism')}
+            className="w-full rounded-lg border px-2 py-1"
+            placeholder="hyperrealistic details"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-zinc-600">Output</span>
+          <input
+            value={form.outputQuality}
+            onChange={update('outputQuality')}
+            className="w-full rounded-lg border px-2 py-1"
+            placeholder="4k sharp"
+          />
+        </label>
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onComplete(initial || {})}>
+        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onComplete(form)}>
           Run
         </button>
       </div>
