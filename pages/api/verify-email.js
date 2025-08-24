@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const supabase = createBrowserSupabaseClient();
+  const supabase = createPagesBrowserClient();
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('Verifying your email…');
   const [isError, setIsError] = useState(false);
