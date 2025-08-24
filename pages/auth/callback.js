@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
@@ -68,3 +68,4 @@ export default function GoogleAuthCallback() {
     </div>
   );
 }
+
