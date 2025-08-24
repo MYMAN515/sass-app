@@ -4,10 +4,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
 export default function GoogleAuthCallback() {
-  const supabase = createBrowserSupabaseClient();
+  const supabase = createPagesBrowserClient();
   const router = useRouter();
   const [msg, setMsg] = useState('⏳ Verifying Google login…');
 
@@ -68,4 +68,5 @@ export default function GoogleAuthCallback() {
     </div>
   );
 }
+
 
