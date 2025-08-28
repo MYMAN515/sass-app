@@ -6,13 +6,73 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
 /**
- * Fancy, unified dashboard
- * - Tools: Enhance, Try-On, Model Swap, Remove BG (Remove BG stays on its own API)
- * - Calls /api/ai (nano-banana) with { prompt, imageUrls|imageUrl, user_email, num_images }
- * - Each input supports Upload-to-Supabase or direct URL
- * - Batch outputs up to 3 images (API limit)
- * - Animated, modern styling
+ * Fancy, unified dashboard (with full debugging)
+ * Tools: Enhance, Try-On, Model Swap, Remove BG
+ * Calls /api/ai (nano-banana) with { prompt, imageUrls|imageUrl, user_email, num_images }
+ * Each input supports Upload-to-Supabase or direct URL
+ * Batch outputs up to 3 images (API limit)
  */
+
+/* -------------------------------------------------------
+   Debug helpers
+------------------------------------------------------- */
+// فعّل/عطّل الديبَغ من هنا أو عبر .env: NEXT_PUBLIC_DEBUG=true
+const DEBUG = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_DEBUG === 'true') || true;
+
+const dbg = (...args) => {
+  if (!DEBUG) return;
+  try {
+    // استخدام console.groupCollapsed لقراءة أسهل
+    console.log('[AIStudio]', ...args);
+  } catch {}
+};
+
+// عرض كتلة منظمة
+const dbgGroup = (title, obj) => {
+  if (!DEBUG) return;
+  try {
+    console.groupCollapsed(`🧪 ${title}`);
+    console.log(obj);
+    console.groupEnd();
+  } catch {}
+};
+
+// أصل الموقع (محسّن لبيئات مختلفة)
+const getSiteOrigin = () => {
+  try {
+    if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  } catch {}
+  const envUrl = process.env?.NEXT_PUBLIC_SITE_URL || process.env?.NEXT_PUBLIC_VERCEL_URL || '';
+  if (!envUrl) return '';
+  return envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+};
+
+// يحوّل أي رابط إلى مطلق (http/https) إن كان نسبي
+const toAbsoluteUrl = (u) => {
+  if (!u || typeof u !== 'string') return '';
+  if (/^https?:\/\//i.test(u)) return u;
+  const origin = getSiteOrigin();
+  try {
+    const abs = new URL(u, origin || 'https://example.com').toString();
+    return abs;
+  } catch {
+    return u;
+  }
+};
+
+// فلترة/تحذير لأي رابط غير http/https
+const ensureHttpList = (arr) => {
+  const ok = [];
+  for (const u of arr || []) {
+    const abs = toAbsoluteUrl(u);
+    if (!/^https?:\/\//i.test(abs)) {
+      dbg('⚠️ Ignoring non-http URL:', u);
+      continue;
+    }
+    ok.push(abs);
+  }
+  return ok;
+};
 
 /* -------------------------------------------------------
    Constants & helpers
@@ -39,17 +99,14 @@ const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 /** pick URLs from various API response shapes */
 const pickUrls = (out) => {
   if (!out) return [];
-  // direct array of strings
   if (Array.isArray(out)) return out.filter(Boolean);
 
-  // common keys (new API returns "variants")
   const keys = ['variants', 'urls', 'output', 'images', 'result'];
   for (const k of keys) {
     if (Array.isArray(out[k])) return out[k].filter(Boolean);
     if (typeof out[k] === 'string') return [out[k]];
   }
 
-  // single string or nested single
   if (typeof out === 'string') return [out];
   const one = out.url || out.image || out.result;
   return one ? [one] : [];
@@ -61,7 +118,6 @@ function ModeTabs({ mode, setMode }) {
     { id: 'gradient', label: 'Gradient' },
     { id: 'pattern', label: 'Pattern' },
   ];
-
   return (
     <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
       {tabs.map((t) => (
@@ -247,6 +303,10 @@ export default function Dashboard() {
   const [history, setHistory] = useState([]);
   const [count, setCount] = useState(1); // desired outputs (API supports up to 3)
 
+  // debug info (آخر طلب/استجابة)
+  const [debugInfo, setDebugInfo] = useState(null);
+  const [showDebug, setShowDebug] = useState(true);
+
   // enhance single input
   const [enhMode, setEnhMode] = useState('upload'); // upload|url
   const [enhFile, setEnhFile] = useState(null);
@@ -345,19 +405,28 @@ export default function Dashboard() {
     if (!f) throw new Error('no file');
     const ext = (f.name?.split('.').pop() || 'png').toLowerCase();
     const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    dbg('🗂️ Uploading to Supabase...', { path, type: f.type, size: f.size });
     const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, f, {
       cacheControl: '3600', upsert: false, contentType: f.type || 'image/*',
     });
-    if (upErr) throw upErr;
+    if (upErr) { dbg('❌ Supabase upload error', upErr); throw upErr; }
     const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
     if (!data?.publicUrl) throw new Error('no public url');
+    dbg('✅ Public URL', data.publicUrl);
     return data.publicUrl;
   }, [supabase, user]);
 
   const ensureUrl = useCallback(async (slot) => {
-    if (slot.mode === 'url') return slot.url?.trim();
+    if (slot.mode === 'url') {
+      const abs = toAbsoluteUrl(slot.url?.trim());
+      dbg('🔗 ensureUrl (direct):', { in: slot.url, abs });
+      return abs;
+    }
     if (!slot.file) return '';
-    return await uploadToStorage(slot.file);
+    const url = await uploadToStorage(slot.file);
+    const abs = toAbsoluteUrl(url);
+    dbg('🔗 ensureUrl (uploaded):', { url, abs });
+    return abs;
   }, [uploadToStorage]);
 
   /* ---------- prompt builders ---------- */
@@ -380,17 +449,22 @@ export default function Dashboard() {
     const t = toasts.push(`${mode === 'enhance' ? 'Enhancing' : mode === 'tryon' ? 'Try-On' : 'Model Swap'}…`, { progress: 10 });
     let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 450);
     try {
-      // shape payload for /api/ai (nano-banana):
+      // تأكد أن كل الروابط http(s)
+      const clean = ensureHttpList(image_input);
+      if (clean.length === 0) throw new Error('No valid http(s) image URLs to send');
+
+      // shape payload for /api/ai (nano-banana)
       const payload = {
         prompt,
         user_email: (user?.email || '').toLowerCase(),
-        num_images: clamp(count, 1, 3), // API supports up to 3
+        num_images: clamp(count, 1, 3),
+        // حقل debug غير مستخدم في السيرفر، لكنه مفيد للفحص.
+        _client_debug: { mode, siteOrigin: getSiteOrigin(), sentAt: new Date().toISOString(), imageCount: clean.length }
       };
-      if (Array.isArray(image_input) && image_input.length > 1) {
-        payload.imageUrls = image_input;
-      } else if (Array.isArray(image_input) && image_input.length === 1) {
-        payload.imageUrl = image_input[0];
-      }
+      if (clean.length > 1) payload.imageUrls = clean;
+      else payload.imageUrl = clean[0];
+
+      dbgGroup('⬆️ /api/ai payload', payload);
 
       const r = await fetch('/api/ai', {
         method: 'POST',
@@ -398,22 +472,38 @@ export default function Dashboard() {
         body: JSON.stringify(payload),
       });
 
-      const j = await r.json().catch(() => ({}));
+      const txt = await r.text(); // نقرأ كنص أولًا لنحتفظ به في debug
+      let j = {};
+      try { j = JSON.parse(txt); } catch { j = { raw: txt }; }
+
+      dbgGroup('⬇️ /api/ai response', { status: r.status, ok: r.ok, json: j });
+
+      // حفظ معلومات الديبغ في الواجهة
+      setDebugInfo({
+        when: new Date().toLocaleString(),
+        request: payload,
+        input_urls: clean,
+        response_status: r.status,
+        response_ok: r.ok,
+        response_json: j
+      });
+
       if (!r.ok) throw new Error(j?.error || 'API error');
+
       const urls = pickUrls(j);
       if (!urls.length) throw new Error('No output URLs returned');
 
       setResultUrls(urls);
       setSelectedOutput(urls[0]);
-      setHistory(h => [{ tool: mode, inputs: image_input, outputs: urls, ts: Date.now() }, ...h].slice(0, 36));
+      setHistory(h => [{ tool: mode, inputs: clean, outputs: urls, ts: Date.now() }, ...h].slice(0, 36));
       setPhase('ready');
       t.update({ progress: 100, msg: `${mode} ✓` });
       setTimeout(() => t.close(), 700);
     } catch (e) {
-      console.error(e);
+      dbg('❌ callUnified error', e);
       setPhase('error'); setErr(e?.message || 'Failed');
-      t.update({ msg: `${mode} failed`, type: 'error' });
-      setTimeout(() => t.close(), 1200);
+      t.update({ msg: `${mode} failed: ${e?.message || 'Error'}`, type: 'error' });
+      setTimeout(() => t.close(), 1400);
     } finally {
       clearInterval(iv);
     }
@@ -424,8 +514,9 @@ export default function Dashboard() {
     if (enhMode === 'url' && !enhUrl) { setErr('Enter an image URL.'); return; }
     setErr(''); setPhase('processing'); setBusy(true);
     try {
-      const imageUrl = enhMode === 'url' ? enhUrl.trim() : await uploadToStorage(enhFile);
+      const imageUrl = enhMode === 'url' ? toAbsoluteUrl(enhUrl.trim()) : await uploadToStorage(enhFile);
       const prompt = buildEnhancePrompt(form);
+      dbgGroup('🎛️ Enhance params', { imageUrl, prompt });
       await callUnified({ mode: 'enhance', prompt, image_input: [imageUrl], count });
     } finally {
       setBusy(false);
@@ -440,10 +531,17 @@ export default function Dashboard() {
 
     setErr(''); setPhase('processing'); setBusy(true);
     try {
-      const origin = (typeof window !== 'undefined' && window.location?.origin) || process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
-      const modelAbs = selectedModel.url.startsWith('http') ? selectedModel.url : new URL(selectedModel.url, origin).toString();
+      const modelAbs = toAbsoluteUrl(selectedModel.url);
       const clothUrl = await ensureUrl(tryCloth);
       const prompt = buildTryOnPrompt(pieceType);
+
+      // فحوصات ديبغ مهمة
+      const origin = getSiteOrigin();
+      dbgGroup('🧥 Try-On inputs', { origin, modelOriginal: selectedModel.url, modelAbs, clothUrl, pieceType, count });
+
+      if (!/^https?:\/\//i.test(modelAbs)) throw new Error('Model image is not an http(s) URL');
+      if (!/^https?:\/\//i.test(clothUrl)) throw new Error('Clothing image is not an http(s) URL');
+
       await callUnified({ mode: 'tryon', prompt, image_input: [modelAbs, clothUrl], count });
     } finally {
       setBusy(false);
@@ -460,6 +558,7 @@ export default function Dashboard() {
     try {
       const urlA = await ensureUrl(swapA);
       const urlB = await ensureUrl(swapB);
+      dbgGroup('🔁 ModelSwap inputs', { urlA, urlB, prompt: swapPrompt, count });
       await callUnified({ mode: 'swap', prompt: swapPrompt, image_input: [urlA, urlB], count });
     } finally {
       setBusy(false);
@@ -473,8 +572,11 @@ export default function Dashboard() {
     const t = toasts.push('Removing background…', { progress: 8 });
     let adv = 8; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 450);
     try {
+      dbgGroup('🧼 RemoveBG req', { hasData: !!rbData, local: rbLocal?.slice(0,60) });
       const r = await fetch('/api/remove-bg', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageData: rbData }) });
-      const j = await r.json();
+      const txt = await r.text();
+      let j = {}; try { j = JSON.parse(txt); } catch { j = { raw: txt }; }
+      dbgGroup('🧼 RemoveBG resp', { status: r.status, ok: r.ok, json: j });
       if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
       const urls = pickUrls(j);
       if (!urls.length) throw new Error('No output from remove-bg');
@@ -483,8 +585,9 @@ export default function Dashboard() {
       setPhase('ready'); t.update({ progress: 100, msg: 'Background removed ✓' });
       setTimeout(() => t.close(), 700);
     } catch (e) {
-      console.error(e); setPhase('error'); setErr('Failed to process.');
-      t.update({ msg: 'Remove BG failed', type: 'error' }); setTimeout(() => t.close(), 1200);
+      dbg('❌ removeBg error', e);
+      setPhase('error'); setErr('Failed to process.');
+      t.update({ msg: `Remove BG failed: ${e?.message || 'Error'}`, type: 'error' }); setTimeout(() => t.close(), 1400);
     } finally { clearInterval(iv); setBusy(false); }
   }, [rbFile, rbData, rbLocal, toasts]);
 
@@ -496,7 +599,7 @@ export default function Dashboard() {
     setSwapA({ mode: 'upload', file: null, url: '', local: '' });
     setSwapB({ mode: 'upload', file: null, url: '', local: '' });
     setTryCloth({ mode: 'upload', file: null, url: '', local: '' });
-    setSelectedModel(null); setPieceType(null); setTryonStep(tool==='tryon' ? 'cloth' : 'cloth');
+    setSelectedModel(null); setPieceType(null); setTryonStep('cloth');
   };
 
   const switchTool = (nextId) => {
@@ -638,7 +741,7 @@ export default function Dashboard() {
             ) : tool === 'tryon' ? (
               <div className="mt-4">
                 <TryOnStepper step={tryonStep} pieceType={pieceType} modelPicked={!!selectedModel} />
-                {/* FIX: show models as soon as clothing exists (not only at step==='model') */}
+                {/* show models as soon as clothing exists */}
                 {hasCloth ? (
                   <div className="mt-3">
                     <div className="mb-2 flex items-center justify-between">
@@ -699,6 +802,25 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Debug banner */}
+              {DEBUG && debugInfo && showDebug && (
+                <div className="mx-3 sm:mx-4 md:mx-5 mt-3 rounded-xl border border-amber-300/30 bg-amber-200/10 p-3 text-[11px] text-amber-100">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold">Debug (last call) — {debugInfo.when}</div>
+                    <button className="text-amber-200/80 hover:text-white" onClick={()=>setShowDebug(false)}>Hide</button>
+                  </div>
+                  <pre className="mt-2 whitespace-pre-wrap break-all max-h-56 overflow-auto">
+{JSON.stringify({
+  request: debugInfo.request,
+  input_urls: debugInfo.input_urls,
+  response_status: debugInfo.response_status,
+  response_ok: debugInfo.response_ok,
+  response_json: debugInfo.response_json
+}, null, 2)}
+                  </pre>
+                </div>
+              )}
+
               {/* Tool Work Areas */}
               <div className="m-3 sm:m-4 md:m-5">
                 {tool === 'enhance' && (
@@ -747,7 +869,6 @@ export default function Dashboard() {
 
                     {tryCloth.local && tryCloth.mode==='upload' && (<Thumb src={tryCloth.local} />)}
 
-                    {/* guidance */}
                     {hasCloth && !pieceType && (
                       <div className="text-xs text-zinc-300/90">Choose clothing type to improve fit & placement.</div>
                     )}
@@ -833,6 +954,15 @@ export default function Dashboard() {
                 <div className="text-sm font-semibold">Inspector</div>
                 <span className="text-xs text-zinc-300/80">Tool: {tool}</span>
               </div>
+
+              {/* Quick Debug Toggle */}
+              {DEBUG && (
+                <div className="mt-2">
+                  <button onClick={()=>setShowDebug(v=>!v)} className="text-[11px] rounded-md border border-white/15 bg-white/10 px-2 py-1 hover:bg-white/20">
+                    {showDebug ? 'Hide' : 'Show'} Debug Panel
+                  </button>
+                </div>
+              )}
 
               {/* Enhance inspector */}
               {tool === 'enhance' && (
@@ -1130,7 +1260,7 @@ function StepBadge({ phase }) {
     idle: { label: 'Ready', color: 'bg-white/10 text-white border-white/20' },
     processing: { label: 'Processing', color: 'bg-amber-200/20 text-amber-200 border-amber-200/30' },
     ready: { label: 'Done', color: 'bg-emerald-300/20 text-emerald-200 border-emerald-300/30' },
-  error: { label: 'Error', color: 'bg-rose-300/20 text-rose-200 border-rose-300/30' },
+    error: { label: 'Error', color: 'bg-rose-300/20 text-rose-200 border-rose-300/30' },
   };
   const it = map[phase] || map.idle;
   return (
@@ -1250,66 +1380,10 @@ function Thumb({ src }) {
 }
 
 /* ----- Icons (SVG) ----- */
-function SparkleIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" />
-    </svg>
-  );
-}
-function BoxIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function PersonIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function ScissorsIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function RocketIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" />
-      <circle cx="15" cy="9" r="1.5" fill="#fff" />
-    </svg>
-  );
-}
-function SwapIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path
-        d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-function PlayIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" className={props.className || ''}>
-      <path d="M8 5v14l11-7z" fill="currentColor" />
-    </svg>
-  );
-}
-
+function SparkleIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" /></svg>); }
+function BoxIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor" /></svg>); }
+function PersonIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor" /></svg>); }
+function ScissorsIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" /></svg>); }
+function RocketIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" /><circle cx="15" cy="9" r="1.5" fill="#fff" /></svg>); }
+function SwapIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor" /></svg>); }
+function PlayIcon(props) { return (<svg viewBox="0 0 24 24" className={props.className || ''}><path d="M8 5v14l11-7z" fill="currentColor" /></svg>); }
