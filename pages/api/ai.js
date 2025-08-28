@@ -3,45 +3,27 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import Replicate from 'replicate';
 
 export const config = {
-  api: { bodyParser: true }, // نرسل روابط فقط، ليس ملفات خام
+  api: { bodyParser: true },
 };
 
-// ---------- Settings ----------
 const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 const MODEL_ID = 'google/nano-banana';
 
-// Helpers
 const clamp = (n, min, max) => Math.max(min, Math.min(max, Number.isFinite(n) ? n : min));
 
+// فلترة الروابط
 const ensureHttpList = (arr = []) =>
   arr
     .map((u) => (typeof u === 'string' ? u.trim() : ''))
     .filter((u) => /^https?:\/\//i.test(u));
 
-/**
- * Normalize different output shapes coming from Replicate into a list of URLs.
- * Replicate usually returns an array of strings (urls). Be generous here.
- */
+// استخراج روابط من استجابة Replicate
 const toUrlList = (output) => {
   if (!output) return [];
-
-  // 1) Common: array of url strings
   if (Array.isArray(output)) {
-    const urls = [];
-    for (const x of output) {
-      if (typeof x === 'string') urls.push(x);
-      else if (x && typeof x === 'object') {
-        if (typeof x.url === 'string') urls.push(x.url);
-        if (typeof x.image === 'string') urls.push(x.image);
-      }
-    }
-    return urls.filter(Boolean);
+    return output.filter((x) => typeof x === 'string' && x.startsWith('http'));
   }
-
-  // 2) Single string
   if (typeof output === 'string') return [output];
-
-  // 3) Object with a known field
   if (output && typeof output === 'object') {
     const keys = ['output', 'image', 'images', 'variants', 'urls', 'result'];
     for (const k of keys) {
@@ -50,43 +32,21 @@ const toUrlList = (output) => {
       if (typeof v === 'string') return [v];
     }
   }
-
   return [];
 };
 
-// Replicate client
 const replicate = new Replicate({ auth: REPLICATE_TOKEN });
 
-/**
- * Run nano-banana once.
- * - If there are two images we pass them as input_image_1 / input_image_2 (most compatible).
- * - If there is only one image we pass input_image_1 only.
- * - If nothing comes back, we try a fallback field set (image_input / image) once.
- */
+// تشغيل الموديل الرسمي (always array)
 async function runNanoBananaOnce({ prompt, inputs }) {
-  const [i1, i2] = inputs;
-
-  // Attempt 1: field names used by the model UI on Replicate
-  const attempt1 = await replicate.run(MODEL_ID, {
+  const result = await replicate.run(MODEL_ID, {
     input: {
       prompt,
-      ...(i1 ? { input_image_1: i1 } : {}),
-      ...(i2 ? { input_image_2: i2 } : {}),
+      image_input: inputs,   // مصفوفة صور (صورة أو أكثر)
+      output_format: "jpg",  // أو png حسب رغبتك
     },
   });
-  let urls = toUrlList(attempt1);
-  if (urls.length) return urls;
-
-  // Attempt 2: more generic field names some builds accept
-  const attempt2 = await replicate.run(MODEL_ID, {
-    input: {
-      prompt,
-      image_input: inputs, // as array
-      image: i1,           // single
-    },
-  });
-  urls = toUrlList(attempt2);
-  return urls;
+  return toUrlList(result);
 }
 
 export default async function handler(req, res) {
@@ -100,43 +60,37 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Missing Replicate token' });
     }
 
-    // ---------- Read body ----------
     const {
-      imageUrl,     // optional string
-      imageUrls,    // optional array
-      prompt,       // required
-      user_email,   // required
-      plan,         // optional (client hint)
-      num_images,   // optional desired outputs (<=3)
+      imageUrl,
+      imageUrls,
+      prompt,
+      user_email,
+      plan,
+      num_images,
     } = req.body || {};
 
-    // Gather inputs (urls)
     let inputs = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
     if (!inputs.length && typeof imageUrl === 'string') inputs = [imageUrl];
     inputs = ensureHttpList(inputs).slice(0, 6);
 
     if (!inputs.length || !prompt || !user_email) {
-      console.warn('⚠️ Missing inputs', { inputsLen: inputs.length, hasPrompt: !!prompt, user_email });
       return res.status(400).json({ error: 'Missing required fields: imageUrls/imageUrl, prompt, user_email' });
     }
 
-    console.log('📦 /api/ai payload:', {
-      prompt: prompt?.slice(0, 140),
-      user_email,
-      plan,
+    console.log('📦 Payload to nano-banana:', {
+      prompt: prompt?.slice(0, 120),
       inputsCount: inputs.length,
-      firstInput: inputs[0],
+      first: inputs[0],
     });
 
-    // ---------- Auth via Supabase ----------
+    // Supabase Auth
     const supabase = createPagesServerClient({ req, res });
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (!session || sessionError) {
-      console.error('🔒 Unauthorized');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // ---------- User data ----------
+    // بيانات المستخدم
     const { data: userData, error: userError } = await supabase
       .from('Data')
       .select('credits, plan')
@@ -144,12 +98,10 @@ export default async function handler(req, res) {
       .single();
 
     if (userError || !userData) {
-      console.error('❌ User not found or db error', userError);
       return res.status(404).json({ error: 'User not found' });
     }
 
     if (userData.plan !== 'Pro' && (userData.credits ?? 0) <= 0) {
-      console.warn('💸 No credits left for user:', user_email);
       return res.status(403).json({ error: 'No credits left' });
     }
 
@@ -159,59 +111,49 @@ export default async function handler(req, res) {
     );
 
     const harden = (p) =>
-      `${p} Ensure correct layering and natural fusion of all garments/items; maintain realistic proportions, lighting, and alignment; avoid artifacts or partial crops.`;
+      `${p} Ensure correct layering and natural fusion of all garments/items; maintain realistic proportions, lighting, and alignment.`;
 
-    // ---------- Run model ----------
     let variants = [];
     let firstError = null;
 
     for (let i = 0; i < outputsCount; i++) {
       try {
         let urls = await runNanoBananaOnce({ prompt, inputs });
-
         if (!urls.length) {
-          console.warn(`⏱️ Retry with hardened prompt on attempt ${i + 1}`);
           urls = await runNanoBananaOnce({ prompt: harden(prompt), inputs });
         }
-
-        if (!urls.length) {
+        if (urls.length) {
+          variants.push(urls[0]);
+        } else {
           firstError = 'Model returned no image';
-          continue;
         }
-
-        variants.push(urls[0]);
       } catch (e) {
         console.error('❌ replicate run error:', e);
         firstError = e?.message || 'Replicate run failed';
       }
     }
 
-    // Deduplicate
-    variants = [...new Set(variants)].filter(Boolean);
+    variants = [...new Set(variants)];
 
     if (!variants.length) {
-      console.error('❌ All attempts failed - no image returned');
       return res.status(500).json({ error: firstError || 'No image returned' });
     }
 
-    // ---------- Credit decrement for non-Pro ----------
+    // خصم كريدت لو Free
     if (userData.plan !== 'Pro') {
       try {
         await supabase.rpc('decrement_credit', { user_email });
-        console.log('✅ Credit decremented');
       } catch (e) {
         console.warn('⚠️ Failed to decrement credit:', e?.message || e);
       }
     }
 
-    const first = variants[0];
-
     return res.status(200).json({
       success: true,
-      image: first,
+      image: variants[0],
       variants,
-      inputsCount: inputs.length,
       plan: userData.plan,
+      inputsCount: inputs.length,
     });
   } catch (err) {
     console.error('🔥 /api/ai fatal error:', err);
