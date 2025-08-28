@@ -1,33 +1,20 @@
-// app/dashboard/page.jsx
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
-/**
- * -------------------------------------------------------
- * AI Studio Dashboard – Polished Edition
- * -------------------------------------------------------
- * Goals (pseudocode / architecture):
- * 1) UX polish: clearer flows, resilient file handling, accessible toasts, keyboard shortcuts, dark-mode friendly.
- * 2) Fix bugs: bad template literals, prompt builders, gradient/pattern CSS, Stepper labels, Enhance form state.
- * 3) Business-thinking: frictionless CTA, visible plan, quick actions, history recall.
- * 4) Performance: lazy images, minimal re-renders, cleanup listeners.
- * 5) Safety: try/catch around async, defensive null checks, bounded state.
- */
-
-/* ------------------------------------------------------- Small helpers ------------------------------------------------------- */
+/* -------------------------------------------------------
+   Small helpers
+------------------------------------------------------- */
 const STORAGE_BUCKET = 'img';
 
 const hexToRGBA = (hex, a = 1) => {
-  const c = (hex || '').replace('#', '');
+  const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
-  const n = Number.parseInt(v || '000000', 16);
-  const r = (n >> 16) & 255,
-    g = (n >> 8) & 255,
-    b = n & 255;
+  const n = parseInt(v, 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = (n) & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
 
@@ -43,16 +30,13 @@ const pickFirstUrl = (obj) => {
   if (!obj) return '';
   if (typeof obj === 'string') return obj;
   const keys = ['image', 'image_url', 'output', 'result', 'url'];
-  for (const k of keys) {
-    if (obj[k]) {
-      const v = obj[k];
-      return Array.isArray(v) ? v[0] : v;
-    }
-  }
+  for (const k of keys) if (obj[k]) return Array.isArray(obj[k]) ? obj[k][0] : obj[k];
   return '';
 };
 
-/* ------------------------------------------------------- Presets (images live in /public) ------------------------------------------------------- */
+/* -------------------------------------------------------
+   Presets (images live in /public)
+------------------------------------------------------- */
 const ENHANCE_PRESETS = [
   {
     id: 'clean-studio',
@@ -65,9 +49,9 @@ const ENHANCE_PRESETS = [
       lighting: 'large softbox, gentle reflections',
       colorStyle: 'neutral whites, subtle grays',
       realism: 'hyperrealistic details',
-      outputQuality: '4k sharp',
+      outputQuality: '4k sharp'
     },
-    preview: '/clean-studio.webp',
+    preview: '/clean-studio.webp'
   },
   {
     id: 'desert-tones',
@@ -80,9 +64,9 @@ const ENHANCE_PRESETS = [
       lighting: 'golden hour, soft shadows',
       colorStyle: 'sand, beige, amber',
       realism: 'photo-real, crisp textures',
-      outputQuality: '4k',
+      outputQuality: '4k'
     },
-    preview: '/desert-tones.webp',
+    preview: '/desert-tones.webp'
   },
   {
     id: 'editorial-beige',
@@ -95,9 +79,9 @@ const ENHANCE_PRESETS = [
       lighting: 'directional key + fill',
       colorStyle: 'beige monochrome',
       realism: 'realistic',
-      outputQuality: '4k print',
+      outputQuality: '4k print'
     },
-    preview: '/editorial-beige.webp',
+    preview: '/editorial-beige.webp'
   },
   {
     id: 'slate-contrast',
@@ -110,10 +94,10 @@ const ENHANCE_PRESETS = [
       lighting: 'hard key + rim, controlled specular',
       colorStyle: 'cool slate, deep blacks',
       realism: 'high-fidelity',
-      outputQuality: '4k',
+      outputQuality: '4k'
     },
-    preview: '/slate-contrast.webp',
-  },
+    preview: '/slate-contrast.webp'
+  }
 ];
 
 /** مكتبة المودلز */
@@ -130,16 +114,20 @@ const MODELS = [
   { id: 'm10', name: 'Ali — Casual Half', pose: 'half', url: '/models/m10.webp' },
 ];
 
-/* ------------------------------------------------------- Toast system with progress ------------------------------------------------------- */
+/* -------------------------------------------------------
+   Toast system with progress
+------------------------------------------------------- */
 function useToasts() {
   const [items, setItems] = useState([]);
   const push = (msg, opts = {}) => {
     const id = Math.random().toString(36).slice(2);
     const item = { id, msg, type: opts.type || 'info', progress: opts.progress ?? null };
     setItems((s) => [...s, item]);
-    const update = (patch) => setItems((s) => s.map((it) => (it.id === id ? { ...it, ...patch } : it)));
-    const close = () => setItems((s) => s.filter((it) => it.id !== id));
-    return { id, update, close };
+    return {
+      id,
+      update: (patch) => setItems((s) => s.map((it) => (it.id === id ? { ...it, ...patch } : it))),
+      close: () => setItems((s) => s.filter((it) => it.id !== id))
+    };
   };
   const remove = (id) => setItems((s) => s.filter((it) => it.id !== id));
   return { items, push, remove };
@@ -147,12 +135,7 @@ function useToasts() {
 
 function ToastHost({ items, onClose }) {
   return (
-    <div
-      className="fixed left-1/2 -translate-x-1/2 bottom-4 z-[999] w-[92vw] max-w-sm sm:max-w-md space-y-2"
-      role="region"
-      aria-live="polite"
-      aria-label="Notifications"
-    >
+    <div className="fixed left-1/2 -translate-x-1/2 bottom-4 z-[999] w-[92vw] max-w-sm sm:max-w-md space-y-2">
       <AnimatePresence initial={false}>
         {items.map((t) => (
           <motion.div
@@ -160,22 +143,16 @@ function ToastHost({ items, onClose }) {
             initial={{ y: 16, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 16, opacity: 0, scale: 0.98 }}
-            className="rounded-xl border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700 shadow-lg p-3"
+            className="rounded-2xl border border-emerald-200/70 bg-white/90 backdrop-blur shadow-lg p-3"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-slate-800 dark:text-slate-200">{t.msg}</div>
-              <button
-                className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-                onClick={() => onClose(t.id)}
-                aria-label="Close notification"
-              >
-                ✕
-              </button>
+              <div className="text-sm text-emerald-900">{t.msg}</div>
+              <button className="text-xs text-emerald-600 hover:text-emerald-900" onClick={() => onClose(t.id)}>✕</button>
             </div>
             {typeof t.progress === 'number' && (
-              <div className="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+              <div className="mt-2 h-1.5 rounded-full bg-emerald-100 overflow-hidden">
                 <div
-                  className="h-full bg-slate-900 dark:bg-slate-200 transition-all"
+                  className="h-full bg-emerald-600 transition-all"
                   style={{ width: `${Math.min(Math.max(t.progress, 0), 100)}%` }}
                 />
               </div>
@@ -187,20 +164,22 @@ function ToastHost({ items, onClose }) {
   );
 }
 
-/* ------------------------------------------------------- Dashboard ------------------------------------------------------- */
+/* -------------------------------------------------------
+   Dashboard
+------------------------------------------------------- */
 const GROUPS = [
   { id: 'product', label: 'Product', icon: BoxIcon },
-  { id: 'people', label: 'People', icon: PersonIcon },
+  { id: 'people', label: 'People', icon: PersonIcon }
 ];
 
 const PRODUCT_TOOLS = [
   { id: 'removeBg', label: 'Remove BG', icon: ScissorsIcon },
-  { id: 'enhance', label: 'Enhance', icon: RocketIcon },
+  { id: 'enhance',  label: 'Enhance',   icon: RocketIcon }
 ];
 
 const PEOPLE_TOOLS = [
-  { id: 'tryon', label: 'Try-On', icon: PersonIcon },
-  { id: 'modelSwap', label: 'Model Swap', icon: SwapIcon },
+  { id: 'tryon',     label: 'Try-On',     icon: PersonIcon },
+  { id: 'modelSwap', label: 'Model Swap', icon: SwapIcon   }
 ];
 
 export default function Dashboard() {
@@ -211,30 +190,29 @@ export default function Dashboard() {
 
   /* ---------- app state ---------- */
   const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState('product'); // product | people
-  const [tool, setTool] = useState('enhance'); // active tool per group
-  const [plan, setPlan] = useState('Free');
+  const [group, setGroup] = useState('product');     // product | people
+  const [tool, setTool]   = useState('enhance');     // active tool per group
+  const [plan, setPlan]   = useState('Free');
 
   // single-file work area
   const [file, setFile] = useState(null);
   const [localUrl, setLocalUrl] = useState('');
-  const [imageData, setImageData] = useState(''); // for removeBG dataURL
+  const [imageData, setImageData] = useState('');
   const [resultUrl, setResultUrl] = useState('');
 
-  // model swap (two images)
+  // model swap
   const [file1, setFile1] = useState(null);
   const [file2, setFile2] = useState(null);
   const [local1, setLocal1] = useState('');
   const [local2, setLocal2] = useState('');
   const [swapPrompt, setSwapPrompt] = useState('');
 
-  // Try-On specific (stepper)
-  const [selectedModel, setSelectedModel] = useState(null); // { id, name, url }
-  const [pieceType, setPieceType] = useState(null); // 'upper'|'lower'|'dress'
-  const [tryonStep, setTryonStep] = useState('cloth'); // 'cloth' -> 'piece' -> 'model'
-
-  // UI / state
+  // Try-On (stepper)
+  const [selectedModel, setSelectedModel] = useState(null);
+  const [pieceType, setPieceType] = useState(null);
+  const [tryonStep, setTryonStep] = useState('cloth');
   const [showPieceType, setShowPieceType] = useState(false);
+
   const [phase, setPhase] = useState('idle'); // idle|processing|ready|error
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -245,20 +223,19 @@ export default function Dashboard() {
   const [compareOpacity, setCompareOpacity] = useState(50);
 
   // remove/bg frame
-  const [bgMode, setBgMode] = useState('color'); // color | gradient | pattern
+  const [bgMode, setBgMode] = useState('color');   // color | gradient | pattern
   const [color, setColor] = useState('#ffffff');
-  const [color2, setColor2] = useState('#f1f5f9');
+  const [color2, setColor2] = useState('#ecfccb'); // lime-100
   const [angle, setAngle] = useState(35);
-  const [radius, setRadius] = useState(18);
-  const [padding, setPadding] = useState(20);
+  const [radius, setRadius] = useState(22);
+  const [padding, setPadding] = useState(24);
   const [shadow, setShadow] = useState(true);
   const [patternOpacity, setPatternOpacity] = useState(0.06);
 
-  // enhance modal state
+  // enhance modal
   const [pendingEnhancePreset, setPendingEnhancePreset] = useState(null);
   const [showEnhance, setShowEnhance] = useState(false);
 
-  // refs
   const dropRef = useRef(null);
   const inputRef = useRef(null);
   const inputRef1 = useRef(null);
@@ -269,74 +246,47 @@ export default function Dashboard() {
     let mounted = true;
     (async () => {
       if (user === undefined) return;
-      if (!user) {
-        router.replace('/login');
-        return;
-      }
+      if (!user) { router.replace('/login'); return; }
+
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('Data')
           .select('plan')
           .eq('user_id', user.id)
           .single();
         if (!mounted) return;
-        if (!error) setPlan(data?.plan || 'Free');
-      } catch {
-        // noop
-      }
+        setPlan(data?.plan || 'Free');
+      } catch {/* ignore */}
+
       setLoading(false);
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [user, router, supabase]);
 
   /* ---------- drag & drop / paste (single file area) ---------- */
   useEffect(() => {
-    const el = dropRef.current;
-    if (!el) return;
-
-    const over = (e) => {
-      e.preventDefault();
-      el.classList.add('ring-2', 'ring-slate-400');
-    };
-    const leave = () => el.classList.remove('ring-2', 'ring-slate-400');
-    const drop = async (e) => {
-      e.preventDefault();
-      leave();
-      const f = e.dataTransfer?.files?.[0];
-      if (f) await onPick(f);
-    };
+    const el = dropRef.current; if (!el) return;
+    const over  = (e) => { e.preventDefault(); el.classList.add('ring-2','ring-emerald-300'); };
+    const leave = () => el.classList.remove('ring-2','ring-emerald-300');
+    const drop  = async (e) => { e.preventDefault(); leave(); const f = e.dataTransfer.files?.[0]; if (f) await onPick(f); };
+    el.addEventListener('dragover', over); el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
 
     const onPaste = async (e) => {
-      const item = Array.from(e.clipboardData?.items || []).find((it) => it.type?.startsWith('image/'));
-      const f = item?.getAsFile?.();
-      if (f) await onPick(f);
+      const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
+      const f = item?.getAsFile?.(); if (f) await onPick(f);
     };
-
-    el.addEventListener('dragover', over);
-    el.addEventListener('dragleave', leave);
-    el.addEventListener('drop', drop);
     window.addEventListener('paste', onPaste);
     return () => {
-      el.removeEventListener('dragover', over);
-      el.removeEventListener('dragleave', leave);
-      el.removeEventListener('drop', drop);
+      el.removeEventListener('dragover', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop);
       window.removeEventListener('paste', onPaste);
     };
   }, [tool]);
 
   const onPick = async (f) => {
-    if (!f) return;
-    if (!f.type?.startsWith('image/')) {
-      setErr('Please choose an image file.');
-      return;
-    }
     setFile(f);
     setLocalUrl(URL.createObjectURL(f));
     setResultUrl('');
-    setErr('');
-    setPhase('idle');
+    setErr(''); setPhase('idle');
     if (tool === 'removeBg') setImageData(await fileToDataURL(f));
     if (tool === 'tryon') {
       setTryonStep('piece');
@@ -352,176 +302,113 @@ export default function Dashboard() {
     } else if (bgMode === 'gradient') {
       bgStyle = { background: `linear-gradient(${angle}deg, ${color}, ${color2})` };
     } else {
-      const svgStr = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'>
-        <defs><pattern id='p' width='24' height='24' patternUnits='userSpaceOnUse'>
-          <path d='M0 12h24M12 0v24' stroke='${hexToRGBA('#000000', patternOpacity)}' stroke-width='1' opacity='0.2'/>
-        </pattern></defs>
-        <rect width='100%' height='100%' fill='${color}'/>
-        <rect width='100%' height='100%' fill='url(#p)'/>
-      </svg>`;
-      const encoded = encodeURIComponent(svgStr)
-        // keep URLs short & safe
-        .replace(/%20/g, ' ');
-      bgStyle = {
-        backgroundColor: color,
-        backgroundImage: `url("data:image/svg+xml;utf8,${encoded}")`,
-        backgroundSize: '24px 24px',
-      };
+      const svg = encodeURIComponent(
+        `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'>
+          <defs><pattern id='p' width='24' height='24' patternUnits='userSpaceOnUse'>
+            <path d='M0 12h24M12 0v24' stroke='${hexToRGBA('#000000', patternOpacity)}' stroke-width='1' opacity='0.18'/>
+          </pattern></defs>
+          <rect width='100%' height='100%' fill='${color}'/>
+          <rect width='100%' height='100%' fill='url(#p)'/>
+        </svg>`
+      );
+      bgStyle = { backgroundColor: color, backgroundImage: `url("data:image/svg+xml;utf8,${svg}")`, backgroundSize: '24px 24px' };
     }
     return {
       ...bgStyle,
       borderRadius: `${radius}px`,
       padding: `${padding}px`,
-      boxShadow: shadow ? '0 18px 50px rgba(0,0,0,.12), 0 6px 18px rgba(0,0,0,.06)' : 'none',
-      transition: 'all .25s ease',
+      boxShadow: shadow ? '0 18px 50px rgba(16,185,129,.12), 0 6px 18px rgba(16,185,129,.06)' : 'none',
+      transition: 'all .25s ease'
     };
   }, [bgMode, color, color2, angle, radius, padding, shadow, patternOpacity]);
 
   /* ---------- storage ---------- */
-  const uploadToStorage = useCallback(
-    async (f) => {
-      if (!f) throw new Error('no file');
-      const ext = (f.name?.split('.').pop() || 'png').toLowerCase();
-      const uid = user?.id || 'anon';
-      const path = `${uid}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, f, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: f.type || 'image/*',
-      });
-      if (upErr) throw upErr;
-      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-      if (!data?.publicUrl) throw new Error('no public url');
-      return data.publicUrl;
-    },
-    [supabase, user]
-  );
+  const uploadToStorage = useCallback(async (f) => {
+    if (!f) throw new Error('no file');
+    const ext = (f.name?.split('.').pop() || 'png').toLowerCase();
+    const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, f, {
+      cacheControl: '3600', upsert: false, contentType: f.type || 'image/*',
+    });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+    if (!data?.publicUrl) throw new Error('no public url');
+    return data.publicUrl;
+  }, [supabase, user]);
 
   /* ---------- prompt builders ---------- */
-  const buildEnhancePrompt = (cfg) => {
-    if (!cfg) return '';
-    const parts = [
-      cfg.photographyStyle,
-      `background: ${cfg.background}`,
-      `lighting: ${cfg.lighting}`,
-      `colors: ${cfg.colorStyle}`,
-      cfg.realism,
-      `output: ${cfg.outputQuality}`,
-    ].filter(Boolean);
-    return parts.join(', ');
-  };
+  const buildEnhancePrompt = (f) =>
+    [f?.photographyStyle, `background: ${f?.background}`, `lighting: ${f?.lighting}`, `colors: ${f?.colorStyle}`, f?.realism, `output: ${f?.outputQuality}`]
+      .filter(Boolean).join(', ');
 
-  const buildTryOnPrompt = (pt) => {
-    const scope =
-      pt === 'upper'
-        ? 'Replace the person’s TOP with the uploaded garment.'
-        : pt === 'lower'
-        ? 'Replace the person’s BOTTOM (pants/skirt) with the uploaded garment.'
-        : 'Replace the person’s FULL OUTFIT with the uploaded garment as a one-piece dress.';
+  const buildTryOnPrompt = (pieceType) => {
+    const region =
+      pieceType === 'upper' ? 'the TOP' :
+      pieceType === 'lower' ? 'the BOTTOM' :
+      'the FULL OUTFIT';
     return [
-      'Virtual try-on task. Photorealistic.',
-      scope,
-      'Use the uploaded garment exactly; match its fabric, color, pattern, buttons, collar and pockets.',
-      'Remove/replace any existing clothing in that region; do not stack clothes.',
-      'Keep the original person IDENTICAL: face, hair, hands, body shape, skin tone, pose, camera and lighting must stay the same.',
-      'Fit and drape naturally: correct scaling and perspective, shoulder seams aligned, sleeve length accurate, neckline shape from the garment, realistic wrinkles and shadows.',
-      'Preserve the ORIGINAL BACKGROUND unchanged.',
-      'No extra accessories, no cropping, no text.',
-      'High-detail, sharp, 4k realistic output.',
+      `Make the model wear the cloth , make it fit and look exatilcy as the cloth photo , make 2 virions of the photo with same cloth in the another pic ,Put the cloth  on ${region} of the person `
     ].join(' ');
   };
 
   /* ---------- runners ---------- */
   const runRemoveBg = useCallback(async () => {
     if (!file) return setErr('Pick an image first.');
-    setBusy(true);
-    setErr('');
-    setPhase('processing');
+    setBusy(true); setErr(''); setPhase('processing');
     const t = toasts.push('Removing background…', { progress: 8 });
-    let adv = 8;
-    const iv = setInterval(() => {
-      adv = Math.min(adv + 6, 88);
-      t.update({ progress: adv });
-    }, 500);
+    let adv = 8; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
     try {
       const r = await fetch('/api/remove-bg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData })
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || 'remove-bg failed');
-      const out = pickFirstUrl(j);
-      if (!out) throw new Error('No output from remove-bg');
+      const out = pickFirstUrl(j); if (!out) throw new Error('No output from remove-bg');
       setResultUrl(out);
-      setHistory((h) => [{ tool: 'Remove BG', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
-      setPhase('ready');
-      t.update({ progress: 100, msg: 'Background removed ✓' });
+      setHistory(h => [{ tool:'Remove BG', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
+      setPhase('ready'); t.update({ progress: 100, msg: 'Background removed ✓' });
       setTimeout(() => t.close(), 700);
     } catch (e) {
-      console.error(e);
-      setPhase('error');
-      setErr('Failed to process.');
-      t.update({ msg: 'Remove BG failed', type: 'error' });
-      setTimeout(() => t.close(), 1500);
-    } finally {
-      clearInterval(iv);
-      setBusy(false);
-    }
+      console.error(e); setPhase('error'); setErr('Failed to process.');
+      t.update({ msg: 'Remove BG failed', type: 'error' }); setTimeout(() => t.close(), 1500);
+    } finally { clearInterval(iv); setBusy(false); }
   }, [file, imageData, localUrl, toasts]);
 
-  const runEnhance = useCallback(
-    async (selections) => {
-      if (!file) return setErr('Pick an image first.');
-      setBusy(true);
-      setErr('');
-      setPhase('processing');
-      const imageUrl = await uploadToStorage(file);
-      const prompt = buildEnhancePrompt(selections);
-      const t = toasts.push('Enhancing…', { progress: 12 });
-      let adv = 12;
-      const iv = setInterval(() => {
-        adv = Math.min(adv + 6, 88);
-        t.update({ progress: adv });
-      }, 500);
-      try {
-        const r = await fetch('/api/enhance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user?.email }),
-        });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j?.error || 'enhance failed');
-        const out = pickFirstUrl(j);
-        if (!out) throw new Error('No output from enhance');
-        setResultUrl(out);
-        setHistory((h) => [{ tool: 'Enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
-        setPhase('ready');
-        t.update({ progress: 100, msg: 'Enhanced ✓' });
-        setTimeout(() => t.close(), 700);
-      } catch (e) {
-        console.error(e);
-        setPhase('error');
-        setErr('Failed to process.');
-        t.update({ msg: 'Enhance failed', type: 'error' });
-        setTimeout(() => t.close(), 1500);
-      } finally {
-        clearInterval(iv);
-        setBusy(false);
-      }
-    },
-    [file, uploadToStorage, plan, user, localUrl, toasts]
-  );
+  const runEnhance = useCallback(async (selections) => {
+    if (!file) return setErr('Pick an image first.');
+    setBusy(true); setErr(''); setPhase('processing');
+    const imageUrl = await uploadToStorage(file);
+    const prompt = buildEnhancePrompt(selections);
+    const t = toasts.push('Enhancing…', { progress: 12 });
+    let adv = 12; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
+    try {
+      const r = await fetch('/api/enhance', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl, selections, prompt, plan, user_email: user.email })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || 'enhance failed');
+      const out = pickFirstUrl(j); if (!out) throw new Error('No output from enhance');
+      setResultUrl(out);
+      setHistory(h => [{ tool:'Enhance', inputThumb: localUrl, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
+      setPhase('ready'); t.update({ progress: 100, msg: 'Enhanced ✓' }); setTimeout(() => t.close(), 700);
+    } catch (e) {
+      console.error(e); setPhase('error'); setErr('Failed to process.');
+      t.update({ msg: 'Enhance failed', type: 'error' }); setTimeout(() => t.close(), 1500);
+    } finally { clearInterval(iv); setBusy(false); }
+  }, [file, uploadToStorage, plan, user, localUrl, toasts]);
 
   const runTryOn = useCallback(async () => {
-    if (!selectedModel?.url) return setErr('Pick a model first.');
-    if (!file) return setErr('Upload a clothing image first.');
-    if (!pieceType) return setErr('Choose clothing type.');
+    if (!file)              { setErr('Please upload a clothing image first.'); return; }
+    if (!selectedModel?.url){ setErr('Please select a model first.'); return; }
+    if (!pieceType)         { setErr('Please choose the clothing type.'); return; }
 
     const origin =
-      typeof window !== 'undefined' && window.location?.origin
-        ? window.location.origin
-        : process.env.NEXT_PUBLIC_SITE_URL || 'https://aistoreassistant.app';
+      (typeof window !== 'undefined' && window.location?.origin) ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      'https://aistoreassistant.app';
+
     const modelUrlAbs = selectedModel.url.startsWith('http')
       ? selectedModel.url
       : new URL(selectedModel.url, origin).toString();
@@ -529,43 +416,62 @@ export default function Dashboard() {
     setBusy(true);
     setErr('');
     setPhase('processing');
+
     const prompt = buildTryOnPrompt(pieceType);
-    const t = toasts.push('Generating try-on…', { progress: 10 });
-    let adv = 10;
+
+    const toast = toasts.push('Generating try-on…', { progress: 10 });
+    let progress = 10;
     const iv = setInterval(() => {
-      adv = Math.min(adv + 6, 88);
-      t.update({ progress: adv });
+      progress = Math.min(progress + 6, 88);
+      toast.update({ progress });
     }, 500);
+
     try {
       const clothUrl = await uploadToStorage(file);
+
       const r = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          modelUrl: modelUrlAbs,
-          clothUrl,
-          prompt,
-          negativePrompt:
-            'lowres, bad hands, deformed, extra limbs, wrong background, different pose, different face, text, watermark',
+          image1: modelUrlAbs,
+          image2: clothUrl,
+          pieceType,
           plan,
-          user_email: user?.email,
-        }),
+          user_email: user.email
+        })
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || 'try-on failed');
-      const out = pickFirstUrl(j);
-      if (!out) throw new Error('No output from try-on');
+
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg =
+          j?.error ||
+          (r.status === 400 ? 'Missing required fields.' :
+           r.status === 401 ? 'Unauthorized.' :
+           r.status === 403 ? 'No credits left.' :
+           r.status === 404 ? 'User not found.' :
+           r.status === 500 ? 'Generation failed on the server.' :
+           `Unexpected error (${r.status}).`);
+        throw new Error(msg);
+      }
+
+      const out = j?.image || j?.url || j?.result || (Array.isArray(j?.output) ? j.output[0] : '');
+      if (!out) throw new Error('No output image returned from the API.');
+
       setResultUrl(out);
-      setHistory((h) => [{ tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
+      setHistory(h => [
+        { tool: 'Try-On', inputThumb: selectedModel.url, outputUrl: out, ts: Date.now() },
+        ...h
+      ].slice(0, 24));
+
       setPhase('ready');
-      t.update({ progress: 100, msg: 'Try-On ✓' });
-      setTimeout(() => t.close(), 700);
+      toast.update({ progress: 100, msg: 'Try-On ✓' });
+      setTimeout(() => toast.close(), 700);
     } catch (e) {
       console.error(e);
       setPhase('error');
-      setErr('Failed to process.');
-      t.update({ msg: 'Try-On failed', type: 'error' });
-      setTimeout(() => t.close(), 1500);
+      setErr(e?.message || 'Processing failed.');
+      toast.update({ msg: `Try-On failed: ${e?.message || 'Error'}`, type: 'error' });
+      setTimeout(() => toast.close(), 1500);
     } finally {
       clearInterval(iv);
       setBusy(false);
@@ -574,104 +480,59 @@ export default function Dashboard() {
 
   const runModelSwap = useCallback(async () => {
     if (!file1 || !file2) return setErr('Pick both images.');
-    setBusy(true);
-    setErr('');
-    setPhase('processing');
+    setBusy(true); setErr(''); setPhase('processing');
     const [image1, image2] = await Promise.all([uploadToStorage(file1), uploadToStorage(file2)]);
     const t = toasts.push('Running Model Swap…', { progress: 10 });
-    let adv = 10;
-    const iv = setInterval(() => {
-      adv = Math.min(adv + 6, 88);
-      t.update({ progress: adv });
-    }, 500);
+    let adv = 10; const iv = setInterval(() => { adv = Math.min(adv + 6, 88); t.update({ progress: adv }); }, 500);
     try {
       const r = await fetch('/api/model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image1, image2, prompt: swapPrompt, plan, user_email: user?.email }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image1, image2, prompt: swapPrompt, plan, user_email: user.email })
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || 'model swap failed');
       const out = pickFirstUrl(j) || j?.url || j?.image;
       if (!out) throw new Error('No output from model.');
       setResultUrl(out);
-      setHistory((h) => [{ tool: 'Model Swap', inputThumb: local1, outputUrl: out, ts: Date.now() }, ...h].slice(0, 24));
-      setPhase('ready');
-      t.update({ progress: 100, msg: 'Model Swap done ✓' });
-      setTimeout(() => t.close(), 700);
+      setHistory(h => [{ tool:'Model Swap', inputThumb: local1, outputUrl: out, ts: Date.now() }, ...h].slice(0,24));
+      setPhase('ready'); t.update({ progress: 100, msg: 'Model Swap done ✓' }); setTimeout(() => t.close(), 700);
     } catch (e) {
-      console.error(e);
-      setPhase('error');
-      setErr('Failed to process.');
-      t.update({ msg: 'Model Swap failed', type: 'error' });
-      setTimeout(() => t.close(), 1500);
-    } finally {
-      clearInterval(iv);
-      setBusy(false);
-    }
+      console.error(e); setPhase('error'); setErr('Failed to process.');
+      t.update({ msg: 'Model Swap failed', type: 'error' }); setTimeout(() => t.close(), 1500);
+    } finally { clearInterval(iv); setBusy(false); }
   }, [file1, file2, swapPrompt, uploadToStorage, plan, user, local1, toasts]);
 
   /* ---------- handlers ---------- */
   const resetAll = () => {
-    setFile(null);
-    setLocalUrl('');
-    setResultUrl('');
-    setFile1(null);
-    setFile2(null);
-    setLocal1('');
-    setLocal2('');
-    setErr('');
-    setPhase('idle');
-    setCompare(false);
-    setSelectedModel(null);
-    setPieceType(null);
-    setTryonStep('cloth');
+    setFile(null); setLocalUrl(''); setResultUrl('');
+    setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
+    setErr(''); setPhase('idle'); setCompare(false);
+    setSelectedModel(null); setPieceType(null); setTryonStep(tool==='tryon' ? 'cloth' : 'cloth');
   };
 
   const switchTool = (nextId) => {
     setTool(nextId);
-    setResultUrl('');
-    setErr('');
-    setPhase('idle');
-    setCompare(false);
-    setFile(null);
-    setLocalUrl('');
-    setFile1(null);
-    setFile2(null);
-    setLocal1('');
-    setLocal2('');
-    setSelectedModel(null);
-    setPieceType(null);
-    setTryonStep(nextId === 'tryon' ? 'cloth' : 'cloth');
+    setResultUrl(''); setErr(''); setPhase('idle'); setCompare(false);
+    setFile(null); setLocalUrl('');
+    setFile1(null); setFile2(null); setLocal1(''); setLocal2('');
+    setSelectedModel(null); setPieceType(null); setTryonStep(nextId==='tryon' ? 'cloth' : 'cloth');
   };
 
   const handleRun = () => {
     if (group === 'product') {
       if (tool === 'removeBg') return runRemoveBg();
-      if (tool === 'enhance') return setShowEnhance(true);
+      if (tool === 'enhance')  return setShowEnhance(true);
     } else {
       if (tool === 'tryon') return runTryOn();
       if (tool === 'modelSwap') return runModelSwap();
     }
   };
 
-  // keyboard shortcut: Cmd/Ctrl + Enter → Run
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleRun();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-
   /* ---------- UI ---------- */
   if (loading || user === undefined) {
     return (
-      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-slate-50 to-slate-100 text-slate-600 dark:from-slate-900 dark:to-black">
-        <div className="rounded-2xl bg-white/80 dark:bg-slate-800/60 backdrop-blur px-4 py-3 border shadow-sm text-sm">Loading…</div>
+      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-emerald-50 via-lime-50 to-white text-emerald-700">
+        <div className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 border border-emerald-200 shadow-sm text-sm">Loading…</div>
       </main>
     );
   }
@@ -684,44 +545,31 @@ export default function Dashboard() {
   })();
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
+    <main className="min-h-screen bg-[linear-gradient(120deg,#ecfeff_0%,#f0fdf4_45%,#fefce8_100%)] text-emerald-950">
       <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6 px-3 md:px-6 py-4 md:py-6">
-        {/* Sidebar */}
-        <aside className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/60 shadow-sm sticky top-3 md:top-4 self-start h-fit">
-          <div className="px-4 py-4 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
-                <SparkleIcon className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="font-semibold tracking-tight">AI Studio</div>
-                <div className="text-[10px] text-slate-500">Plan: <span className="font-medium">{plan}</span></div>
-              </div>
+
+        {/* Sidebar — glassy, mint/lemon */}
+        <aside className="rounded-3xl border border-emerald-200/70 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm sticky top-3 md:top-4 self-start h-fit">
+          <div className="px-4 py-4 flex items-center gap-3 border-b border-emerald-100/80">
+            <div className="grid place-items-center size-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-lime-400 text-white shadow">
+              <SparkleIcon className="w-4 h-4" />
             </div>
-            <a
-              href="/billing"
-              className="text-[11px] rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700"
-            >
-              Upgrade
-            </a>
+            <div className="font-semibold tracking-tight text-emerald-900">AI Studio</div>
           </div>
 
           <div className="px-3 py-3">
-            <div className="text-xs font-semibold text-slate-500 mb-1">Workspace</div>
-            <div className="inline-flex rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
+            <div className="text-[11px] font-semibold text-emerald-600 mb-1">Workspace</div>
+            <div className="inline-flex rounded-full border border-emerald-200 bg-white p-1">
               {GROUPS.map((g) => {
                 const Active = group === g.id;
                 const Icon = g.icon;
                 return (
                   <button
                     key={g.id}
-                    onClick={() => {
-                      setGroup(g.id);
-                      switchTool(g.id === 'product' ? 'enhance' : 'tryon');
-                    }}
+                    onClick={() => { setGroup(g.id); switchTool(g.id === 'product' ? 'enhance' : 'tryon'); }}
                     className={[
                       'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                      Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800',
+                      Active ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 hover:bg-emerald-50'
                     ].join(' ')}
                   >
                     <Icon className="size-4" /> {g.label}
@@ -732,7 +580,7 @@ export default function Dashboard() {
           </div>
 
           <div className="px-3 pb-3">
-            <div className="text-xs font-semibold text-slate-500 mb-1">Tools</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mb-1">Tools</div>
             <div className="space-y-1">
               {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((t) => {
                 const Active = tool === t.id;
@@ -742,15 +590,13 @@ export default function Dashboard() {
                     key={t.id}
                     onClick={() => switchTool(t.id)}
                     className={[
-                      'w-full group flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition',
+                      'w-full group flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm transition border',
                       Active
-                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-400/10 dark:text-indigo-300 dark:border-indigo-900'
-                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent',
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'text-emerald-900 hover:bg-emerald-50 border-transparent'
                     ].join(' ')}
                   >
-                    <Icon
-                      className={['size-4', Active ? 'text-indigo-600' : 'text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-200'].join(' ')}
-                    />
+                    <Icon className={['size-4', Active ? 'text-emerald-600' : 'text-emerald-500 group-hover:text-emerald-700'].join(' ')} />
                     <span className="truncate">{t.label}</span>
                   </button>
                 );
@@ -758,13 +604,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="px-4 py-3 border-t border-emerald-100/80">
             <div className="flex items-center gap-3">
-              <div className="grid place-items-center size-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold">
-                {initials}
-              </div>
+              <div className="grid place-items-center size-10 rounded-full bg-emerald-50 text-emerald-800 font-bold">{initials}</div>
               <div className="text-sm">
-                <div className="font-medium leading-tight">{user?.user_metadata?.name || user?.email}</div>
+                <div className="font-medium leading-tight text-emerald-900">{user.user_metadata?.name || user.email}</div>
               </div>
             </div>
           </div>
@@ -772,35 +616,27 @@ export default function Dashboard() {
 
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
+
           {/* Presets / Model Flow */}
-          <div className="rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/60 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
+          <div className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-                  {group === 'product' ? 'Quick Presets' : tool === 'tryon' ? 'Try-On Flow' : 'Pick a Model'}
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-emerald-900">
+                  {group === 'product' ? 'Quick Presets' : (tool === 'tryon' ? 'Try-On Flow' : 'Pick a Model')}
                 </h1>
-                <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm">
-                  {group === 'product' ? (
-                    <>
-                      Pick a preset or open <span className="font-semibold">Customize</span>.
-                    </>
-                  ) : tool === 'tryon' ? (
-                    <>Step 1: upload clothing → Step 2: choose type → Step 3: pick a model → Run.</>
-                  ) : (
-                    <>
-                      Choose two images and run <span className="font-semibold">Model Swap</span>.
-                    </>
-                  )}
+                <p className="text-emerald-700/80 text-xs sm:text-sm">
+                  {group === 'product'
+                    ? <>Pick a preset or open <span className="font-semibold text-emerald-900">Customize</span>.</>
+                    : tool === 'tryon'
+                      ? <>Step 1: upload clothing → Step 2: choose type → Step 3: pick a model → Run.</>
+                      : <>Choose two images and run <span className="font-semibold text-emerald-900">Model Swap</span>.</>}
                 </p>
               </div>
+
               {group === 'product' ? (
                 <button
-                  onClick={() => {
-                    setTool('enhance');
-                    setPendingEnhancePreset(null);
-                    setShowEnhance(true);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700"
+                  onClick={() => { setTool('enhance'); setPendingEnhancePreset(null); setShowEnhance(true); }}
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-emerald-50 text-emerald-900"
                 >
                   ✨ Customize Enhance
                 </button>
@@ -808,7 +644,7 @@ export default function Dashboard() {
                 pieceType ? (
                   <button
                     onClick={() => setShowPieceType(true)}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700"
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-emerald-50 text-emerald-900"
                   >
                     Change clothing type
                   </button>
@@ -818,7 +654,7 @@ export default function Dashboard() {
 
             {group === 'product' ? (
               <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700 dark:text-slate-300">Enhance</div>
+                <div className="mb-2 text-[12px] font-semibold text-emerald-700">Enhance</div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {ENHANCE_PRESETS.map((p) => (
                     <PresetCard
@@ -827,49 +663,49 @@ export default function Dashboard() {
                       subtitle={p.subtitle}
                       preview={p.preview}
                       tag={p.tag}
-                      onClick={() => {
-                        setTool('enhance');
-                        setPendingEnhancePreset(p.config);
-                        setShowEnhance(true);
-                      }}
+                      onClick={() => { setTool('enhance'); setPendingEnhancePreset(p.config); setShowEnhance(true); }}
                     />
                   ))}
                 </div>
               </div>
             ) : tool === 'tryon' ? (
               <div className="mt-4">
-                {/* Stepper */}
                 <TryOnStepper step={tryonStep} pieceType={pieceType} modelPicked={!!selectedModel} />
-                {/* Only show model gallery AFTER pieceType is chosen (step === 'model') */}
                 {tryonStep === 'model' ? (
                   <div className="mt-3">
-                    <div className="mb-2 text-[12px] font-semibold text-slate-700 dark:text-slate-300">Models</div>
+                    <div className="mb-2 text-[12px] font-semibold text-emerald-700">Models</div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       {MODELS.map((m) => (
-                        <ModelCard key={m.id} model={m} active={selectedModel?.id === m.id} onSelect={() => setSelectedModel(m)} />
+                        <ModelCard
+                          key={m.id}
+                          model={m}
+                          active={selectedModel?.id === m.id}
+                          onSelect={() => setSelectedModel(m)}
+                        />
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-4 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/40">
+                  <div className="mt-3 rounded-2xl border border-dashed border-emerald-300/70 p-4 text-xs text-emerald-700 bg-emerald-50/50">
                     Upload clothing first, then choose type. Models will appear next.
                   </div>
                 )}
               </div>
             ) : (
               <div className="mt-4">
-                <div className="mb-2 text-[12px] font-semibold text-slate-700 dark:text-slate-300">Model Swap</div>
-                <div className="text-xs text-slate-600 dark:text-slate-300">Upload two images below and write a short instruction.</div>
+                <div className="mb-2 text-[12px] font-semibold text-emerald-700">Model Swap</div>
+                <div className="text-xs text-emerald-700/80">Upload two images below and write a short instruction.</div>
               </div>
             )}
           </div>
 
           {/* Workbench */}
           <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_340px]">
+
             {/* Canvas Panel */}
-            <section className="rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm relative">
+            <section className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur relative shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
-                <div className="inline-flex rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-1">
+                <div className="inline-flex rounded-full border border-emerald-200 bg-white p-1">
                   {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((it) => {
                     const Active = tool === it.id;
                     const Icon = it.icon;
@@ -879,9 +715,8 @@ export default function Dashboard() {
                         onClick={() => switchTool(it.id)}
                         className={[
                           'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                          Active ? 'bg-slate-900 text-white shadow' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800',
+                          Active ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-900 hover:bg-emerald-50'
                         ].join(' ')}
-                        aria-pressed={Active}
                       >
                         <Icon className="size-4" />
                         <span>{it.label}</span>
@@ -891,9 +726,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StepBadge phase={phase} />
-                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
-                    Reset
-                  </button>
+                  <button onClick={resetAll} className="text-xs px-2 py-1 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-900">Reset</button>
                 </div>
               </div>
 
@@ -901,26 +734,18 @@ export default function Dashboard() {
               {tool !== 'modelSwap' ? (
                 <div
                   ref={dropRef}
-                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="m-3 sm:m-4 md:m-5 min-h-[240px] sm:min-h-[300px] md:min-h-[360px] grid place-items-center rounded-3xl border-2 border-dashed border-emerald-300/80 bg-emerald-50/40 hover:bg-emerald-50 transition cursor-pointer"
                   onClick={() => inputRef.current?.click()}
                   title="Drag & drop / Click / Paste (Ctrl+V)"
                 >
                   <input
                     ref={inputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      if (f) await onPick(f);
-                    }}
+                    type="file" accept="image/*" className="hidden"
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await onPick(f); }}
                   />
-
                   {!localUrl && !resultUrl ? (
-                    <div className="text-center text-slate-500 dark:text-slate-300 text-sm">
-                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                        ⬆
-                      </div>
+                    <div className="text-center text-emerald-700 text-sm">
+                      <div className="mx-auto mb-3 grid place-items-center size-10 sm:size-12 rounded-full bg-white border border-emerald-200">⬆</div>
                       {tool === 'tryon'
                         ? 'Upload a clothing image (PNG/JPG). Transparent PNG preferred.'
                         : 'Drag & drop an image here, click to choose, or paste (Ctrl+V)'}
@@ -929,19 +754,15 @@ export default function Dashboard() {
                     <div className="relative w-full h-full grid place-items-center p-2 sm:p-3">
                       {compare && localUrl && resultUrl ? (
                         <div className="relative max-w-full max-h-[70vh]">
-                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
-                          <img
-                            src={localUrl}
-                            alt="before"
-                            style={{ opacity: compareOpacity / 100 }}
-                            className="absolute inset-0 w-full h-full object-contain rounded-xl pointer-events-none"
-                          />
+                          <img src={resultUrl} alt="after" className="max-w-full max-h-[70vh] object-contain rounded-2xl" />
+                          <img src={localUrl} alt="before" style={{opacity: compareOpacity/100}}
+                               className="absolute inset-0 w-full h-full object-contain rounded-2xl pointer-events-none" />
                         </div>
                       ) : (
                         <img
                           src={resultUrl || localUrl}
                           alt="preview"
-                          className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                          className="max-w-full max-h-[70vh] object-contain rounded-2xl"
                           draggable={false}
                           loading="lazy"
                         />
@@ -957,12 +778,7 @@ export default function Dashboard() {
                       label="Image 1"
                       file={file1}
                       localUrl={local1}
-                      onPick={async (f) => {
-                        setFile1(f);
-                        setLocal1(URL.createObjectURL(f));
-                        setResultUrl('');
-                        setPhase('idle');
-                      }}
+                      onPick={async (f) => { setFile1(f); setLocal1(URL.createObjectURL(f)); setResultUrl(''); setPhase('idle'); }}
                       inputRef={inputRef1}
                     />
                     {/* Image 2 */}
@@ -970,30 +786,24 @@ export default function Dashboard() {
                       label="Image 2"
                       file={file2}
                       localUrl={local2}
-                      onPick={async (f) => {
-                        setFile2(f);
-                        setLocal2(URL.createObjectURL(f));
-                        setResultUrl('');
-                        setPhase('idle');
-                      }}
+                      onPick={async (f) => { setFile2(f); setLocal2(URL.createObjectURL(f)); setResultUrl(''); setPhase('idle'); }}
                       inputRef={inputRef2}
                     />
                   </div>
                   <div className="mt-3">
-                    <label className="text-xs text-slate-600 dark:text-slate-300">Prompt</label>
+                    <label className="text-xs text-emerald-700">Prompt</label>
                     <input
-                      value={swapPrompt}
-                      onChange={(e) => setSwapPrompt(e.target.value)}
+                      value={swapPrompt} onChange={(e)=>setSwapPrompt(e.target.value)}
                       placeholder="Describe how to combine or arrange the two images…"
-                      className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm"
+                      className="mt-1 w-full rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm"
                     />
                   </div>
-                  {/* Result preview for model swap */}
+
                   {resultUrl && (
                     <div className="mt-4">
-                      <div className="text-xs text-slate-600 dark:text-slate-300 mb-2">Result</div>
-                      <div className="w-full rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2 grid place-items-center">
-                        <img src={resultUrl} alt="result" className="max-w-full max-h-[60vh] object-contain rounded-lg" />
+                      <div className="text-xs text-emerald-700 mb-2">Result</div>
+                      <div className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/40 p-2 grid place-items-center">
+                        <img src={resultUrl} alt="result" className="max-w-full max-h-[60vh] object-contain rounded-xl" />
                       </div>
                     </div>
                   )}
@@ -1005,62 +815,48 @@ export default function Dashboard() {
                 <button
                   onClick={handleRun}
                   disabled={
-                    busy ||
-                    (tool === 'modelSwap'
-                      ? !file1 || !file2
-                      : tool === 'tryon'
-                      ? !file || !selectedModel || !pieceType
-                      : !file)
+                    busy || (
+                      tool === 'modelSwap' ? (!file1 || !file2) :
+                      tool === 'tryon' ? (!file || !selectedModel || !pieceType) :
+                      !file
+                    )
                   }
-                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white px-3 sm:px-4 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-50"
                 >
-                  {busy ? 'Processing…' : (
-                    <>
-                      <PlayIcon className="size-4" /> Run{' '}
-                      {tool === 'modelSwap' ? 'Model Swap' : tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On'}
-                    </>
-                  )}
+                  {busy ? 'Processing…' : (<><PlayIcon className="size-4" /> Run {tool === 'modelSwap' ? 'Model Swap' : (tool === 'removeBg' ? 'Remove BG' : tool === 'enhance' ? 'Enhance' : 'Try-On')}</>)}
                 </button>
 
                 {resultUrl && (
                   <>
                     <button
                       onClick={() => exportPng(resultUrl)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-emerald-50 text-emerald-900"
                     >
                       ⬇ Download PNG
                     </button>
                     <a
-                      href={resultUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700"
+                      href={resultUrl} target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-emerald-50 text-emerald-900"
                     >
                       ↗ Open
                     </a>
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(resultUrl).catch(() => {});
-                      }}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700"
+                      onClick={() => { navigator.clipboard.writeText(resultUrl).catch(()=>{}); }}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2.5 py-2 text-xs font-semibold hover:bg-emerald-50 text-emerald-900"
                     >
                       🔗 Copy URL
                     </button>
 
                     {tool !== 'modelSwap' && localUrl && (
                       <>
-                        <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2">
-                          <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Compare
+                        <label className="inline-flex items-center gap-2 text-xs ml-1 sm:ml-2 text-emerald-900">
+                          <input type="checkbox" checked={compare} onChange={(e)=>setCompare(e.target.checked)} />
+                          Compare
                         </label>
                         {compare && (
                           <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={0}
-                              max={100}
-                              value={compareOpacity}
-                              onChange={(e) => setCompareOpacity(Number(e.target.value))}
-                            />
+                            <input type="range" min={0} max={100} value={compareOpacity}
+                              onChange={(e)=>setCompareOpacity(Number(e.target.value))} className="accent-emerald-600"/>
                             <span className="text-xs w-8 text-right">{compareOpacity}%</span>
                           </div>
                         )}
@@ -1076,62 +872,65 @@ export default function Dashboard() {
               <AnimatePresence>
                 {busy && (
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="pointer-events-none absolute inset-0 rounded-2xl md:rounded-3xl grid place-items-center bg-white/60 dark:bg-slate-900/60"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="pointer-events-none absolute inset-0 rounded-3xl grid place-items-center bg-white/60"
                   >
-                    <div className="text-xs px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-700 shadow">Working…</div>
+                    <div className="text-xs px-3 py-2 rounded-lg bg-white border border-emerald-200 shadow">Working…</div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </section>
 
             {/* Inspector */}
-            <aside className="rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 md:pb-5">
+            <aside className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur p-4 md:pb-5 shadow-sm">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Inspector</div>
-                <span className="text-xs text-slate-500 dark:text-slate-400">Tool: {tool}</span>
+                <div className="text-sm font-semibold text-emerald-900">Inspector</div>
+                <span className="text-xs text-emerald-700">Tool: {tool}</span>
               </div>
 
               {/* Try-On summary */}
               {tool === 'tryon' && (
                 <div className="space-y-3 mt-3 text-xs">
-                  <div className="rounded-lg border dark:border-slate-700 p-3">
-                    <div className="text-slate-600 dark:text-slate-300 mb-1">Clothing</div>
+                  <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                    <div className="text-emerald-700 mb-1">Clothing</div>
                     {localUrl ? (
-                      <img src={localUrl} alt="cloth" className="w-full max-h-48 object-contain rounded-md border bg-slate-50 dark:bg-slate-900/40" />
+                      <img src={localUrl} alt="cloth" className="w-full max-h-48 object-contain rounded-lg border border-emerald-100 bg-emerald-50/40" />
                     ) : (
-                      <div className="text-slate-400">— Upload a clothing image —</div>
+                      <div className="text-emerald-400">— Upload a clothing image —</div>
                     )}
                   </div>
-                  <div className="rounded-lg border dark:border-slate-700 p-3">
-                    <div className="text-slate-600 dark:text-slate-300 mb-1">Type</div>
+
+                  <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                    <div className="text-emerald-700 mb-1">Type</div>
                     <div className="flex items-center justify-between">
-                      <div className="text-slate-800 dark:text-slate-200">{pieceType ? pieceType : '—'}</div>
-                      <button className="rounded-lg border dark:border-slate-700 px-2 py-1 text-[11px]" onClick={() => setShowPieceType(true)}>
-                        Change
-                      </button>
+                      <div className="text-emerald-900">{pieceType ? pieceType : '—'}</div>
+                      <button className="rounded-lg border border-emerald-200 px-2 py-1 text-[11px] bg-white hover:bg-emerald-50" onClick={() => setShowPieceType(true)}>Change</button>
                     </div>
                   </div>
-                  <div className="rounded-lg border dark:border-slate-700 p-3">
-                    <div className="text-slate-600 dark:text-slate-300 mb-1">Selected Model</div>
+
+                  <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                    <div className="text-emerald-700 mb-1">Selected Model</div>
                     {selectedModel ? (
                       <div className="flex items-center gap-2">
-                        <img src={selectedModel.url} alt={selectedModel.name} className="w-10 h-10 rounded-md object-cover border" />
+                        <img src={selectedModel.url} alt={selectedModel.name} className="w-10 h-10 rounded-md object-cover border border-emerald-100" />
                         <div>
-                          <div className="font-semibold text-slate-900 dark:text-slate-100">{selectedModel.name}</div>
-                          <div className="text-[11px] text-slate-500">Pose: {selectedModel.pose}</div>
+                          <div className="font-semibold text-emerald-900">{selectedModel.name}</div>
+                          <div className="text-[11px] text-emerald-600">Pose: {selectedModel.pose}</div>
                         </div>
                       </div>
                     ) : (
-                      <div className="text-slate-400">— Pick a model above —</div>
+                      <div className="text-emerald-400">— Pick a model above —</div>
                     )}
                   </div>
+
                   {resultUrl && (
-                    <div className="rounded-lg border dark:border-slate-700 p-3">
-                      <div className="text-slate-600 dark:text-slate-300 mb-2">Result</div>
-                      <img src={resultUrl} alt="final" className="w-full max-h-64 object-contain rounded-md border bg-slate-50 dark:bg-slate-900/40" />
+                    <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                      <div className="text-emerald-700 mb-2">Result</div>
+                      <img
+                        src={resultUrl}
+                        alt="final"
+                        className="w-full max-h-64 object-contain rounded-md border border-emerald-100 bg-emerald-50/40"
+                      />
                     </div>
                   )}
                 </div>
@@ -1144,6 +943,7 @@ export default function Dashboard() {
                   <Field label="Primary">
                     <Color value={color} onChange={setColor} />
                   </Field>
+
                   {bgMode === 'gradient' && (
                     <>
                       <Field label="Secondary">
@@ -1154,29 +954,52 @@ export default function Dashboard() {
                       </Field>
                     </>
                   )}
+
                   {bgMode === 'pattern' && (
                     <Field label="Pattern opacity">
-                      <Range value={patternOpacity} onChange={setPatternOpacity} min={0} max={0.5} step={0.01} />
+                      <Range
+                        value={patternOpacity}
+                        onChange={setPatternOpacity}
+                        min={0}
+                        max={0.5}
+                        step={0.01}
+                      />
                     </Field>
                   )}
+
                   <Field label="Radius">
                     <Range value={radius} onChange={setRadius} min={0} max={48} />
                   </Field>
                   <Field label="Padding">
                     <Range value={padding} onChange={setPadding} min={0} max={64} />
                   </Field>
-                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-                    <input type="checkbox" checked={shadow} onChange={(e) => setShadow(e.target.checked)} /> Shadow
+
+                  <label className="mt-1 inline-flex items-center gap-2 text-xs text-emerald-800">
+                    <input
+                      type="checkbox"
+                      checked={shadow}
+                      onChange={(e) => setShadow(e.target.checked)}
+                    />
+                    Shadow
                   </label>
 
                   <div className="mt-3">
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Final Preview</div>
-                    <div style={frameStyle} className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+                    <div className="text-xs text-emerald-700 mb-2">Final Preview</div>
+                    <div
+                      style={frameStyle}
+                      className="relative rounded-xl overflow-hidden border border-emerald-200"
+                    >
                       <div className="relative w-full min-h-[140px] sm:min-h-[160px] grid place-items-center">
                         {resultUrl ? (
-                          <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
+                          <img
+                            src={resultUrl}
+                            alt="final"
+                            className="max-w-full max-h-[38vh] object-contain"
+                          />
                         ) : (
-                          <div className="grid place-items-center h-[140px] text-xs text-slate-400">— Run Remove BG first —</div>
+                          <div className="grid place-items-center h-[140px] text-xs text-emerald-400">
+                            — Run Remove BG first —
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1186,14 +1009,18 @@ export default function Dashboard() {
 
               {/* Enhance inspector */}
               {tool === 'enhance' && (
-                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300 mt-3">
+                <div className="space-y-2 text-xs text-emerald-700 mt-3">
                   <div>
-                    Choose a preset above or press <span className="font-semibold">Customize</span>.
+                    Choose a preset above or press <span className="font-semibold text-emerald-900">Customize</span>.
                   </div>
                   {resultUrl && (
-                    <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
+                    <div className="mt-2 rounded-2xl overflow-hidden border border-emerald-200 bg-emerald-50/40">
                       <div className="relative w-full min-h-[140px] grid place-items-center">
-                        <img src={resultUrl} alt="final" className="max-w-full max-h-[38vh] object-contain" />
+                        <img
+                          src={resultUrl}
+                          alt="final"
+                          className="max-w-full max-h-[38vh] object-contain"
+                        />
                       </div>
                     </div>
                   )}
@@ -1202,31 +1029,48 @@ export default function Dashboard() {
 
               {/* Model Swap inspector */}
               {tool === 'modelSwap' && (
-                <div className="text-xs text-slate-600 dark:text-slate-300 mt-3 space-y-3">
-                  <div className="rounded-lg border dark:border-slate-700 p-3">
-                    <div className="text-slate-600 dark:text-slate-300 mb-1">Inputs</div>
+                <div className="text-xs text-emerald-700 mt-3 space-y-3">
+                  <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                    <div className="text-emerald-700 mb-1">Inputs</div>
                     <div className="grid grid-cols-2 gap-2">
                       {local1 ? (
-                        <img src={local1} alt="image1" className="w-full h-24 object-cover rounded-md border bg-slate-50 dark:bg-slate-900/40" />
+                        <img
+                          src={local1}
+                          alt="image1"
+                          className="w-full h-24 object-cover rounded-md border border-emerald-100 bg-emerald-50/40"
+                        />
                       ) : (
-                        <div className="h-24 grid place-items-center text-slate-400 border rounded-md bg-slate-50 dark:bg-slate-900/40">— Image 1 —</div>
+                        <div className="h-24 grid place-items-center text-emerald-400 border border-emerald-100 rounded-md bg-emerald-50/40">
+                          — Image 1 —
+                        </div>
                       )}
                       {local2 ? (
-                        <img src={local2} alt="image2" className="w-full h-24 object-cover rounded-md border bg-slate-50 dark:bg-slate-900/40" />
+                        <img
+                          src={local2}
+                          alt="image2"
+                          className="w-full h-24 object-cover rounded-md border border-emerald-100 bg-emerald-50/40"
+                        />
                       ) : (
-                        <div className="h-24 grid place-items-center text-slate-400 border rounded-md bg-slate-50 dark:bg-slate-900/40">— Image 2 —</div>
+                        <div className="h-24 grid place-items-center text-emerald-400 border border-emerald-100 rounded-md bg-emerald-50/40">
+                          — Image 2 —
+                        </div>
                       )}
                     </div>
                     {swapPrompt && (
-                      <div className="mt-2 text-[11px] text-slate-500">
-                        Prompt: <span className="text-slate-700 dark:text-slate-200">{swapPrompt}</span>
+                      <div className="mt-2 text-[11px] text-emerald-600">
+                        Prompt: <span className="text-emerald-800">{swapPrompt}</span>
                       </div>
                     )}
                   </div>
+
                   {resultUrl && (
-                    <div className="rounded-lg border dark:border-slate-700 p-3">
-                      <div className="text-slate-600 dark:text-slate-300 mb-2">Result</div>
-                      <img src={resultUrl} alt="model-swap-result" className="w-full max-h-64 object-contain rounded-md border bg-slate-50 dark:bg-slate-900/40" />
+                    <div className="rounded-xl border border-emerald-200 p-3 bg-white">
+                      <div className="text-emerald-700 mb-2">Result</div>
+                      <img
+                        src={resultUrl}
+                        alt="model-swap-result"
+                        className="w-full max-h-64 object-contain rounded-md border border-emerald-100 bg-emerald-50/40"
+                      />
                     </div>
                   )}
                 </div>
@@ -1235,30 +1079,33 @@ export default function Dashboard() {
           </div>
 
           {/* History */}
-          <div className="rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 md:p-5">
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">History</div>
+          <div className="rounded-3xl border border-emerald-200 bg-white/70 backdrop-blur p-4 md:p-5 shadow-sm">
+            <div className="text-sm font-semibold text-emerald-900 mb-2">History</div>
             {history.length === 0 ? (
-              <div className="text-xs text-slate-500 dark:text-slate-400 px-1 py-4">— No renders yet —</div>
+              <div className="text-xs text-emerald-600 px-1 py-4">— No renders yet —</div>
             ) : (
               <>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2">
                   <button
                     onClick={() => setHistory([])}
-                    className="text-xs px-2 py-1 rounded-lg border bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
+                    className="text-xs px-2 py-1 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-900"
                   >
                     Clear history
                   </button>
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">{history.length} item(s)</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
                   {history.map((h, i) => (
                     <button
                       key={i}
                       onClick={() => setResultUrl(h.outputUrl)}
-                      className="group relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition bg-slate-50 dark:bg-slate-900/40"
+                      className="group relative rounded-2xl overflow-hidden border border-emerald-200 hover:border-emerald-300 transition bg-emerald-50/40"
                     >
-                      <img src={h.outputUrl || h.inputThumb} alt="hist" className="w-full h-28 object-cover" />
-                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-black/35 text-white backdrop-blur">
+                      <img
+                        src={h.outputUrl || h.inputThumb}
+                        alt="hist"
+                        className="w-full h-28 object-cover"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 text-[10px] px-2 py-1 bg-emerald-700/50 text-white backdrop-blur">
                         {h.tool} • {new Date(h.ts).toLocaleTimeString()}
                       </div>
                     </button>
@@ -1273,8 +1120,13 @@ export default function Dashboard() {
       {/* Modals */}
       <AnimatePresence>
         {showEnhance && (
-          <motion.div className="fixed inset-0 z-[100] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-black/55" onClick={() => setShowEnhance(false)} />
+          <motion.div
+            className="fixed inset-0 z-[100] grid place-items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-emerald-900/40" onClick={() => setShowEnhance(false)} />
             <div className="relative w-full max-w-3xl mx-3">
               <EnhanceCustomizer
                 initial={pendingEnhancePreset || undefined}
@@ -1288,9 +1140,15 @@ export default function Dashboard() {
             </div>
           </motion.div>
         )}
+
         {showPieceType && (
-          <motion.div className="fixed inset-0 z-[110] grid place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-black/55" onClick={() => setShowPieceType(false)} />
+          <motion.div
+            className="fixed inset-0 z-[110] grid place-items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-emerald-900/40" onClick={() => setShowPieceType(false)} />
             <div className="relative w-full max-w-md mx-3">
               <PieceTypeModal
                 initial={pieceType || 'upper'}
@@ -1312,11 +1170,13 @@ export default function Dashboard() {
   );
 }
 
-/* ------------------------------------------------------- Reusable UI widgets ------------------------------------------------------- */
+/* -------------------------------------------------------
+   Reusable UI widgets
+------------------------------------------------------- */
 function FileDrop({ label, file, localUrl, onPick, inputRef }) {
   return (
     <div
-      className="min-h-[220px] grid place-items-center rounded-2xl border-2 border-dashed border-slate-300/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+      className="min-h-[220px] grid place-items-center rounded-2xl border-2 border-dashed border-emerald-300/80 bg-emerald-50/40 hover:bg-emerald-50 transition cursor-pointer"
       onClick={() => inputRef.current?.click()}
     >
       <input
@@ -1330,12 +1190,18 @@ function FileDrop({ label, file, localUrl, onPick, inputRef }) {
         }}
       />
       {!localUrl ? (
-        <div className="text-center text-slate-500 dark:text-slate-300 text-sm">
-          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"> ⬆ </div>
+        <div className="text-center text-emerald-700 text-sm">
+          <div className="mx-auto mb-3 grid place-items-center size-10 rounded-full bg-white border border-emerald-200">
+            ⬆
+          </div>
           {label}: Click to choose
         </div>
       ) : (
-        <img src={localUrl} alt={label} className="max-w-full max-h-[45vh] object-contain rounded-xl" />
+        <img
+          src={localUrl}
+          alt={label}
+          className="max-w-full max-h-[45vh] object-contain rounded-xl"
+        />
       )}
     </div>
   );
@@ -1345,13 +1211,16 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
   if (broken) return null;
+
   return (
     <button
       onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900 shadow-sm transition text-left hover:shadow-md"
+      className="group relative rounded-2xl overflow-hidden border border-emerald-200 hover:border-emerald-300 bg-white/80 backdrop-blur shadow-sm transition text-left hover:shadow-md"
     >
-      <div className="relative w-full aspect-[4/3] bg-slate-100 dark:bg-slate-800">
-        {!loaded && <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800" />}
+      <div className="relative w-full aspect-[4/3] bg-emerald-50/60">
+        {!loaded && (
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-emerald-50 via-white to-lime-50" />
+        )}
         <img
           src={preview}
           alt={title}
@@ -1360,14 +1229,18 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
           onLoad={() => setLoaded(true)}
           onError={() => setBroken(true)}
         />
-        {tag && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 text-white shadow">{tag}</span>}
-        <div className="absolute top-2 right-2 rounded-full bg-white/90 dark:bg-slate-800/90 backdrop-blur px-2 py-1 text-[11px] border border-white dark:border-slate-700 shadow-sm">
+        {tag && (
+          <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-700/80 text-white shadow">
+            {tag}
+          </span>
+        )}
+        <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
           Use preset
         </div>
       </div>
       <div className="p-3">
-        <div className="font-semibold">{title}</div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</div>
+        <div className="font-semibold text-emerald-900">{title}</div>
+        <div className="text-xs text-emerald-700">{subtitle}</div>
       </div>
     </button>
   );
@@ -1378,34 +1251,43 @@ function ModelCard({ model, active, onSelect }) {
     <button
       onClick={onSelect}
       className={[
-        'group relative rounded-2xl overflow-hidden border bg-white dark:bg-slate-900 shadow-sm transition',
-        active ? 'border-indigo-400 ring-2 ring-indigo-300/70' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md',
+        'group relative rounded-2xl overflow-hidden border bg-white/80 backdrop-blur shadow-sm transition',
+        active
+          ? 'border-emerald-400 ring-2 ring-emerald-300'
+          : 'border-emerald-200 hover:border-emerald-300 hover:shadow-md',
       ].join(' ')}
       title={model.name}
     >
-      <div className="relative w-full aspect-[4/5] bg-slate-100 dark:bg-slate-800">
-        <img src={model.url} alt={model.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-        <div className="absolute top-2 left-2 rounded-full bg-white/90 dark:bg-slate-800/90 backdrop-blur px-2 py-1 text-[11px] border border-white dark:border-slate-700 shadow-sm">
+      <div className="relative w-full aspect-[4/5] bg-emerald-50/60">
+        <img
+          src={model.url}
+          alt={model.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
+        <div className="absolute top-2 left-2 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-[11px] border border-white shadow-sm">
           {active ? 'Selected' : 'Use model'}
         </div>
       </div>
       <div className="p-3">
-        <div className="font-semibold truncate">{model.name}</div>
-        <div className="text-[11px] text-slate-500">Pose: {model.pose}</div>
+        <div className="font-semibold truncate text-emerald-900">{model.name}</div>
+        <div className="text-[11px] text-emerald-600">Pose: {model.pose}</div>
       </div>
     </button>
   );
 }
 
-/** Stepper أنيق لتدفق الـ Try-On */
+/** Stepper */
 function TryOnStepper({ step, pieceType, modelPicked }) {
   const map = { cloth: 0, piece: 1, model: 2 };
   const idx = map[step] ?? 0;
+
   const steps = [
     { id: 'cloth', label: 'Upload clothing' },
     { id: 'piece', label: pieceType ? `Type: ${pieceType}` : 'Choose type' },
     { id: 'model', label: modelPicked ? 'Model selected' : 'Pick a model' },
   ];
+
   return (
     <div className="w-full">
       <div className="flex items-center justify-between gap-2">
@@ -1422,8 +1304,8 @@ function TryOnStepper({ step, pieceType, modelPicked }) {
                     done
                       ? 'bg-emerald-500 text-white border-emerald-500'
                       : active
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700',
+                      ? 'bg-lime-500 text-emerald-950 border-lime-500'
+                      : 'bg-white text-emerald-700 border-emerald-200',
                   ].join(' ')}
                 >
                   {done ? '✓' : i + 1}
@@ -1431,19 +1313,22 @@ function TryOnStepper({ step, pieceType, modelPicked }) {
                 <div
                   className={[
                     'text-xs sm:text-[13px]',
-                    done ? 'text-emerald-700' : active ? 'text-indigo-700' : 'text-slate-600 dark:text-slate-300',
+                    done ? 'text-emerald-700' : active ? 'text-emerald-900' : 'text-emerald-700/80',
                   ].join(' ')}
                 >
                   {s.label}
                 </div>
               </div>
               {i < steps.length - 1 && (
-                <motion.div layout className="h-1 mt-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                <motion.div
+                  layout
+                  className="h-1 mt-2 rounded-full bg-emerald-100 overflow-hidden"
+                >
                   <motion.div
                     initial={false}
                     animate={{ width: i < idx ? '100%' : '0%' }}
                     transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-                    className="h-full bg-indigo-600"
+                    className="h-full bg-emerald-600"
                   />
                 </motion.div>
               )}
@@ -1457,15 +1342,19 @@ function TryOnStepper({ step, pieceType, modelPicked }) {
 
 function StepBadge({ phase }) {
   const map = {
-    idle: { label: 'Ready', color: 'bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700' },
-    processing: { label: 'Processing', color: 'bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-400/20 dark:text-amber-200 dark:border-amber-400/40' },
-    ready: { label: 'Done', color: 'bg-emerald-200 text-emerald-900 border-emerald-300 dark:bg-emerald-400/20 dark:text-emerald-200 dark:border-emerald-400/40' },
-    error: { label: 'Error', color: 'bg-rose-200 text-rose-900 border-rose-300 dark:bg-rose-400/20 dark:text-rose-200 dark:border-rose-400/40' },
+    idle: { label: 'Ready', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    processing: { label: 'Processing', color: 'bg-lime-100 text-lime-800 border-lime-200' },
+    ready: { label: 'Done', color: 'bg-teal-100 text-teal-800 border-teal-200' },
+    error: { label: 'Error', color: 'bg-rose-100 text-rose-800 border-rose-200' },
   };
   const it = map[phase] || map.idle;
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${it.color}`}>
-      <span className={`inline-block size-2 rounded-full ${phase === 'processing' ? 'bg-slate-700 dark:bg-slate-200 animate-pulse' : 'bg-slate-600 dark:bg-slate-300'}`} />
+      <span
+        className={`inline-block size-2 rounded-full ${
+          phase === 'processing' ? 'bg-emerald-700 animate-pulse' : 'bg-emerald-700'
+        }`}
+      />
       {it.label}
     </span>
   );
@@ -1473,26 +1362,24 @@ function StepBadge({ phase }) {
 
 function Field({ label, children }) {
   return (
-    <label className="flex items-center justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
+    <label className="flex items-center justify-between gap-3 text-xs text-emerald-800">
       <span className="min-w-28">{label}</span>
       <div className="flex-1">{children}</div>
     </label>
   );
 }
-
 function Color({ value, onChange }) {
   return (
     <div className="flex items-center gap-2">
       <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
       <input
-        className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1"
+        className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
     </div>
   );
 }
-
 function Range({ value, onChange, min, max, step = 1 }) {
   return (
     <div className="flex items-center gap-2">
@@ -1503,7 +1390,7 @@ function Range({ value, onChange, min, max, step = 1 }) {
         max={max}
         step={step}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-indigo-600"
+        className="w-full accent-emerald-600"
       />
       <span className="w-10 text-right">{typeof value === 'number' ? value : ''}</span>
     </div>
@@ -1517,14 +1404,14 @@ function ModeTabs({ mode, setMode }) {
     { id: 'pattern', label: 'Pattern' },
   ];
   return (
-    <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-1">
+    <div className="inline-flex rounded-xl border border-emerald-200 bg-emerald-50/50 p-1">
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => setMode(t.id)}
           className={[
             'px-3 py-1.5 text-xs rounded-lg transition',
-            mode === t.id ? 'bg-white dark:bg-slate-800 shadow text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/60',
+            mode === t.id ? 'bg-white shadow text-emerald-900' : 'text-emerald-700 hover:bg-white'
           ].join(' ')}
         >
           {t.label}
@@ -1542,8 +1429,8 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
     { id: 'dress', label: 'Full Dress (One-piece)' },
   ];
   return (
-    <div className="rounded-2xl bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-lg border border-slate-200 dark:border-slate-800 space-y-3">
-      <div className="text-sm font-semibold">Choose clothing type</div>
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border border-emerald-200 space-y-3">
+      <div className="text-sm font-semibold text-emerald-900">Choose clothing type</div>
       <div className="grid grid-cols-1 gap-2">
         {options.map((o) => (
           <button
@@ -1551,7 +1438,7 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
             onClick={() => setActive(o.id)}
             className={[
               'w-full text-left rounded-xl border px-3 py-2 text-sm transition',
-              active === o.id ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950/40' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800',
+              active === o.id ? 'border-emerald-400 bg-emerald-50' : 'border-emerald-200 hover:bg-emerald-50/50',
             ].join(' ')}
           >
             {o.label}
@@ -1559,10 +1446,13 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
         ))}
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border dark:border-slate-700 px-3 py-1.5 text-xs" onClick={onCancel}>
+        <button className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs bg-white hover:bg-emerald-50 text-emerald-900" onClick={onCancel}>
           Cancel
         </button>
-        <button className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs" onClick={() => onConfirm(active)}>
+        <button
+          className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 text-xs"
+          onClick={() => onConfirm(active)}
+        >
           Continue
         </button>
       </div>
@@ -1573,155 +1463,131 @@ function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
 /* ----- Icons (SVG) ----- */
 function SparkleIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={props.className || ''}>
       <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" fill="currentColor" />
     </svg>
   );
 }
-
 function BoxIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z" fill="currentColor" />
+    <svg viewBox="0 0 24 24" className={props.className || ''}>
+      <path
+        d="M12 2l8 4v12l-8 4-8-4V6l8-4zm0 2l-6 3 6 3 6-3-6-3zm-6 5v8l6 3V12l-6-3zm8 3v8l6-3V9l-6 3z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
-
 function PersonIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z" fill="currentColor" />
+    <svg viewBox="0 0 24 24" className={props.className || ''}>
+      <path
+        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.33 0-8 2.17-8 4.5V21h16v-2.5C20 16.17 16.33 14 12 14z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
-
 function ScissorsIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
-      <path d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor" />
+    <svg viewBox="0 0 24 24" className={props.className || ''}>
+      <path
+        d="M14.7 6.3a1 1 0 1 1 1.4 1.4L13.83 10l2.27 2.27a1 1 0 1 1-1.42 1.42L12.4 11.4l-2.3 2.3a3 3 0 1 1-1.41-1.41l2.3-2.3-2.3-2.3A3 3 0 1 1 10.1 6.3l2.3 2.3 2.3-2.3zM7 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
-
 function RocketIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={props.className || ''}>
       <path d="M5 14s2-6 9-9c0 0 1.5 3.5-1 7 0 0 3.5-1 7-1-3 7-9 9-9 9 0-3-6-6-6-6z" fill="currentColor" />
       <circle cx="15" cy="9" r="1.5" fill="#fff" />
     </svg>
   );
 }
-
 function SwapIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={props.className || ''}>
       <path d="M7 7h9l-2-2 1.4-1.4L20.8 7l-5.4 3.4L14 9l2-2H7V7zm10 10H8l2 2-1.4 1.4L3.2 17l5.4-3.4L10 15l-2 2h9v0z" fill="currentColor" />
     </svg>
   );
 }
-
 function PlayIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" className={props.className || ''} aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={props.className || ''}>
       <path d="M8 5v14l11-7z" fill="currentColor" />
     </svg>
   );
 }
 
-/* ------------------------------------------------------- Export helpers ------------------------------------------------------- */
+/* -------------------------------------------------------
+   Export helpers
+------------------------------------------------------- */
 async function exportPng(url) {
-  try {
-    const blob = await fetch(url, { mode: 'cors' }).then((r) => r.blob());
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'studio-output.png';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-  } catch {
-    // Fallback when CORS blocks download
-    window.open(url, '_blank');
-  }
+  const img = await fetch(url).then((r) => r.blob()).then(createImageBitmap);
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d', { alpha: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0);
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'studio-output.png';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
-/* ------------------------------------------------------- Simple customizer ------------------------------------------------------- */
-function EnhanceCustomizer({ initial, onComplete }) {
-  const [form, setForm] = useState({
-    photographyStyle: initial?.photographyStyle || '',
-    background: initial?.background || '',
-    lighting: initial?.lighting || '',
-    colorStyle: initial?.colorStyle || '',
-    realism: initial?.realism || 'realistic',
-    outputQuality: initial?.outputQuality || '4k',
-  });
-
-  const set = (k, v) => setForm((s) => ({ ...s, [k]: v }));
-
+/* -------------------------------------------------------
+   Simple customizer
+------------------------------------------------------- */
+function EnhanceCustomizer({ initial, onChange, onComplete }) {
   return (
-    <div className="rounded-2xl bg-white dark:bg-slate-900 p-4 sm:p-5 shadow border border-slate-200 dark:border-slate-800 space-y-3">
-      <div className="text-sm font-semibold">Enhance Settings</div>
+    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-lg border border-emerald-200 space-y-3">
+      <div className="text-sm font-semibold text-emerald-900">Enhance Settings</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <label className="space-y-1">
-          <span className="text-slate-600 dark:text-slate-300">Style</span>
+          <span className="text-emerald-700">Style</span>
           <input
-            value={form.photographyStyle}
-            onChange={(e) => set('photographyStyle', e.target.value)}
-            className="w-full rounded-lg border px-2 py-1 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+            defaultValue={initial?.photographyStyle || ''}
+            onChange={() => {}}
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="studio product photography, 50mm"
           />
         </label>
         <label className="space-y-1">
-          <span className="text-slate-600 dark:text-slate-300">Background</span>
+          <span className="text-emerald-700">Background</span>
           <input
-            value={form.background}
-            onChange={(e) => set('background', e.target.value)}
-            className="w-full rounded-lg border px-2 py-1 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+            defaultValue={initial?.background || ''}
+            onChange={() => {}}
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="white seamless"
           />
         </label>
         <label className="space-y-1">
-          <span className="text-slate-600 dark:text-slate-300">Lighting</span>
+          <span className="text-emerald-700">Lighting</span>
           <input
-            value={form.lighting}
-            onChange={(e) => set('lighting', e.target.value)}
-            className="w-full rounded-lg border px-2 py-1 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+            defaultValue={initial?.lighting || ''}
+            onChange={() => {}}
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="softbox, gentle reflections"
           />
         </label>
         <label className="space-y-1">
-          <span className="text-slate-600 dark:text-slate-300">Colors</span>
+          <span className="text-emerald-700">Colors</span>
           <input
-            value={form.colorStyle}
-            onChange={(e) => set('colorStyle', e.target.value)}
-            className="w-full rounded-lg border px-2 py-1 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+            defaultValue={initial?.colorStyle || ''}
+            onChange={() => {}}
+            className="w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-900"
             placeholder="neutral whites, subtle grays"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600 dark:text-slate-300">Realism</span>
-          <input
-            value={form.realism}
-            onChange={(e) => set('realism', e.target.value)}
-            className="w-full rounded-lg border px-2 py-1 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
-            placeholder="realistic / hyperrealistic"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-slate-600 dark:text-slate-300">Output</span>
-          <input
-            value={form.outputQuality}
-            onChange={(e) => set('outputQuality', e.target.value)}
-            className="w-full rounded-lg border px-2 py-1 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
-            placeholder="4k / print / web"
           />
         </label>
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
-        <button
-          className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs"
-          onClick={() => onComplete(form)}
-        >
+        <button className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs bg-white hover:bg-emerald-50 text-emerald-900" onClick={() => onComplete(initial || {})}>
           Run
         </button>
       </div>
