@@ -5,85 +5,68 @@ export const config = {
   api: { bodyParser: true },
 };
 
-// --------- إعدادات ---------
 const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 const MODEL_ID = 'google/nano-banana';
 
-// حدود آمنة
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n || 0));
 
-// عميل Replicate
 const replicate = new Replicate({
-  // يقرأ التوكن من env تلقائياً، لكن نمرّره صراحة لتفادي أي لبس
   auth: REPLICATE_TOKEN,
 });
 
-// محاولة استخراج رابط من مخرجات متنوعة الشكل
+// ✅ تحسين toUrlList لمخرجات nano-banana
 const toUrlList = (output) => {
-  // بعض الموديلات ترجع string أو Array<string>
   if (!output) return [];
+
   if (typeof output === 'string') return [output];
+  if (output?.url && typeof output.url === 'string') return [output.url];
 
-  // File-like object مع دالة url()
-  if (typeof output?.url === 'function') {
-    const u = output.url();
-    return typeof u === 'string' ? [u] : [];
-  }
-
-  // Array من عناصر مختلفة
   if (Array.isArray(output)) {
-    const urls = [];
-    for (const item of output) {
-      if (typeof item === 'string') {
-        urls.push(item);
-      } else if (item && typeof item.url === 'function') {
-        const u = item.url();
-        if (typeof u === 'string') urls.push(u);
-      }
-    }
-    return urls;
+    return output
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item?.url && typeof item.url === 'string') return item.url;
+        return null;
+      })
+      .filter(Boolean);
   }
 
   return [];
 };
 
-// تشغيل الموديل مرة واحدة
+// ✅ Logging + تشغيل الموديل مرة واحدة
 async function runNanoBananaOnce({ prompt, image_input }) {
+  console.log('[AIStudio] 🚀 Running nano-banana with:', { prompt, image_input });
+
   const output = await replicate.run(MODEL_ID, {
     input: {
       prompt,
-      image_input, // array of urls
+      image_input,
     },
   });
-  return toUrlList(output);
+
+  console.log('[AIStudio] ✅ Raw output from replicate:', output);
+
+  const urls = toUrlList(output);
+  console.log('[AIStudio] 📷 Extracted URLs:', urls);
+
+  return urls;
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Only POST allowed' });
 
-  // ---- تحقّق التوكن ----
   if (!REPLICATE_TOKEN) {
     console.error('❌ Missing REPLICATE_API_TOKEN');
     return res.status(500).json({ error: 'Missing Replicate token' });
   }
 
-  // ---- مدخلات ----
-  const {
-    imageUrl,      // تَوافق: لو وصلك واحد فقط
-    imageUrls,     // الجديد: Array<string> لعدة صور
-    prompt,
-    user_email,
-    plan,          // اختياري من الواجهة؛ القرار الحقيقي من جدول Data
-    // خيارات قديمة/إضافية (تُتجاهل هنا إن لم يدعمها الموديل):
-    num_images,    // عدد التنويعات المطلوبة (نشغّل الموديل أكثر من مرة)
-  } = req.body || {};
+  const { imageUrl, imageUrls, prompt, user_email, plan, num_images } = req.body || {};
 
-  // تطبيع الصور: نقبل imageUrl أو imageUrls
   let inputs = [];
   if (Array.isArray(imageUrls)) inputs = imageUrls.filter(Boolean);
   if (!inputs.length && typeof imageUrl === 'string') inputs = [imageUrl];
 
-  // حد عملي للمدخلات (اندماج متعدد) — تقدر تزود/تقلّل حسب تجربتك
   const MAX_INPUTS = 6;
   inputs = inputs.slice(0, MAX_INPUTS);
 
@@ -91,17 +74,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing required fields: imageUrls/imageUrl, prompt, user_email' });
   }
 
-  // ---- Supabase Session/Auth ----
+  // ✅ Log: Input payload
+  console.log('[AIStudio] 📨 Received payload:', {
+    imageUrls: inputs,
+    prompt,
+    user_email,
+    plan,
+    num_images,
+  });
+
   const supabase = createPagesServerClient({ req, res });
   const {
     data: { session },
     error: sessionError,
   } = await supabase.auth.getSession();
+
   if (!session || sessionError) {
+    console.warn('🔒 Invalid session or not logged in');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // ---- بيانات المستخدم (الخطة/الكريدت) ----
   const { data: userData, error: userError } = await supabase
     .from('Data')
     .select('credits, plan')
@@ -109,6 +101,7 @@ export default async function handler(req, res) {
     .single();
 
   if (userError || !userData) {
+    console.warn('👤 User not found:', user_email);
     return res.status(404).json({ error: 'User not found' });
   }
 
@@ -116,13 +109,12 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'No credits left' });
   }
 
-  // ---- عدد التنويعات (نشغّل الموديل أكثر من مرة) ----
   const outputsCount = clamp(
     typeof num_images === 'number' ? num_images : (userData.plan === 'Pro' ? 2 : 1),
-    1, 3
+    1,
+    3
   );
 
-  // ---- تشغيل أساسي + Retry ببرومبت مشدّد إذا لزم ----
   const harden = (p) =>
     `${p} Ensure correct layering and natural fusion of all garments/items; maintain realistic proportions, lighting, and alignment; avoid artifacts or partial crops.`;
 
@@ -130,12 +122,11 @@ export default async function handler(req, res) {
   let firstError = null;
 
   try {
-    // نشغّل بعدد التنويعات المطلوبة
     for (let i = 0; i < outputsCount; i++) {
       let urls = await runNanoBananaOnce({ prompt, image_input: inputs });
 
-      // Retry ببرومبت مشدّد إذا ما في ناتج
       if (!urls.length) {
+        console.warn(`⚠️ No image returned. Retrying with hardened prompt...`);
         urls = await runNanoBananaOnce({ prompt: harden(prompt), image_input: inputs });
       }
 
@@ -144,38 +135,37 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // nano-banana عادة يعطي ملف/رابط واحد — لكن ندمجه كتنويعات
       variants.push(urls[0]);
     }
   } catch (e) {
-    console.error('nano-banana error:', e);
+    console.error('🔥 Error during replicate run:', e);
     return res.status(500).json({ error: e?.message || 'Replicate run failed' });
   }
 
-  // إزالة التكرارات (لو رجع نفس الرابط)
   variants = [...new Set(variants)];
 
   if (!variants.length) {
+    console.warn('❌ All attempts failed — no image returned');
     return res.status(500).json({ error: firstError || 'No image returned' });
   }
 
   const first = variants[0];
 
-  // ---- خصم كريدت لغير الـ Pro ----
   if (userData.plan !== 'Pro') {
     try {
       await supabase.rpc('decrement_credit', { user_email });
     } catch (e) {
-      console.warn('decrement_credit failed:', e?.message || e);
+      console.warn('⚠️ Failed to decrement credit:', e?.message || e);
     }
   }
 
-  // ---- استجابة ----
+  console.log('[AIStudio] ✅ Success! Returning response');
+
   return res.status(200).json({
     success: true,
     image: first,
-    variants, // قائمة روابط (تنويعات من عدة تشغيلات)
-    seed: null, // هذا الموديل لا يدعم seed حالياً
+    variants,
+    seed: null,
     plan: userData.plan,
     inputsCount: inputs.length,
   });
