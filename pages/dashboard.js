@@ -5,11 +5,11 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 
 /**
  * Unified AI Studio Dashboard (pages/dashboard.js)
- * - Tools: Enhance, Try-On (+ accessories), Model Swap, Remove BG
+ * - Tools: Enhance, Try-On (multi-items), Model Swap, Remove BG
  * - Upload to Supabase or paste URL
  * - Sends to /api/ai (nano-banana) with { prompt, imageUrl|imageUrls, user_email, num_images }
- * - Max outputs: 1 (UI يرسل count=1)
- * - NOTE: Pages Router page (no "use client" pragma needed).
+ * - Max outputs: 1 (count=1)
+ * - NOTE: Pages Router page (no "use client" pragma needed)
  */
 
 /* -------------------------------------------------------
@@ -77,6 +77,8 @@ const ensureHttpList = (arr) => {
    Constants & helpers
 ------------------------------------------------------- */
 const STORAGE_BUCKET = 'img';
+const MAX_ITEMS = 4;
+
 const hexToRGBA = (hex, a = 1) => {
   const c = hex.replace('#', '');
   const v = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c;
@@ -96,6 +98,9 @@ const fileToDataURL = (file) =>
   });
 
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+const uid = () =>
+  Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 /** pick URLs from various API response shapes */
 const pickUrls = (out) => {
@@ -129,7 +134,7 @@ function ModeTabs({ mode, setMode }) {
           key={t.id}
           onClick={() => setMode(t.id)}
           className={[
-            'px-3 py-1.5 text-xs rounded-lg transition',
+            'px-3 py-1.5 text-xs rounded-lg transition focus:outline-none focus:ring-2 focus:ring-violet-400/70',
             mode === t.id
               ? 'bg-white text-zinc-900 shadow'
               : 'text-zinc-200 hover:bg-white/10',
@@ -152,7 +157,8 @@ const ENHANCE_PRESETS = [
     subtitle: 'Soft studio • glossy rim',
     tag: 'Popular',
     config: {
-      photographyStyle: 'studio product photography, 50mm prime, editorial minimal',
+      photographyStyle:
+        'studio product photography, 50mm prime, editorial minimal',
       background: 'white cyclorama, subtle falloff',
       lighting: 'big softbox + rim, soft reflections',
       colorStyle: 'neutral whites, pearl highlights',
@@ -209,13 +215,13 @@ const ENHANCE_PRESETS = [
 ];
 
 const MODELS = [
-  { id: 'm01', name: 'Ava — Studio Front', pose: 'front', url: '/models/m01.webp' },
+  { id: 'm01', name: 'Ava — Studio Front', pose: 'front', url: 'https://www.aistoreassistant.app/models/m01.webp' },
   { id: 'm02', name: 'Maya — Side Pose', pose: 'side', url: '/models/m02.webp' },
   { id: 'm03', name: 'Lina — Half Body', pose: 'half', url: '/models/m03.webp' },
   { id: 'm04', name: 'Zoe — Studio 3/4', pose: '34', url: '/models/m04.webp' },
   { id: 'm05', name: 'Noah — Casual Front', pose: 'front', url: '/models/m05.webp' },
   { id: 'm06', name: 'Omar — Studio Side', pose: 'side', url: '/models/m06.webp' },
-  { id: 'm07', name: 'Yara — Full Body', pose: 'full', url: '/models/m07.webp' },
+  { id: 'm07', name: 'Yara — Full Body', pose: 'full', url: 'https://www.aistoreassistant.app/models/m07.webp' },
   { id: 'm08', name: 'Sara — 3/4 Smile', pose: '34', url: '/models/m08.webp' },
   { id: 'm09', name: 'Jude — Front Studio', pose: 'front', url: '/models/m09.webp' },
   { id: 'm10', name: 'Ali — Casual Half', pose: 'half', url: '/models/m10.webp' },
@@ -321,7 +327,8 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [history, setHistory] = useState([]);
-  const [count] = useState(1); // ثابت = مخرَج واحد
+  const [count] = useState(1); // ثابت = مخرج واحد
+  const [progress, setProgress] = useState(null); // null | 0..100
 
   // enhance single input
   const [enhMode, setEnhMode] = useState('upload'); // upload|url
@@ -357,27 +364,34 @@ export default function Dashboard() {
     url: '',
     local: '',
   });
-  const [swapPrompt, setSwapPrompt] = useState('Clean composite, photorealistic.');
+  const [swapPrompt, setSwapPrompt] = useState(
+    'Clean composite, photorealistic.'
+  );
 
-  // try-on
-  const [tryCloth, setTryCloth] = useState({
-    mode: 'upload',
-    file: null,
-    url: '',
-    local: '',
-  });
+  // try-on multi-items
+  const [tryItems, setTryItems] = useState([
+    {
+      id: uid(),
+      mode: 'upload', // upload|url
+      file: null,
+      url: '',
+      local: '',
+      type: 'upper', // upper|lower|dress|hat|accessory
+      autoRemoveBg: false, // UI فقط الآن
+    },
+  ]);
   const [selectedModel, setSelectedModel] = useState(null);
-  const [pieceType, setPieceType] = useState(null); // upper|lower|dress
-  const [tryonStep, setTryonStep] = useState('cloth');
-  const [showPieceType, setShowPieceType] = useState(false);
+  const [tryonStep, setTryonStep] = useState('items'); // items|model|run
 
-  // derived
-  const hasCloth = useMemo(() => {
-    return (
-      (tryCloth.mode === 'upload' && !!tryCloth.file) ||
-      (tryCloth.mode === 'url' && !!tryCloth.url?.trim())
-    );
-  }, [tryCloth]);
+  const hasItems = useMemo(
+    () =>
+      tryItems.some(
+        (it) =>
+          (it.mode === 'upload' && !!it.file) ||
+          (it.mode === 'url' && !!it.url?.trim())
+      ),
+    [tryItems]
+  );
 
   /* ---------- auth/init ---------- */
   useEffect(() => {
@@ -409,11 +423,10 @@ export default function Dashboard() {
   /* ---------- auto-step for Try-On ---------- */
   useEffect(() => {
     if (tool !== 'tryon') return;
-    if (hasCloth) {
-      setTryonStep('piece');
-      if (!pieceType) setShowPieceType(true);
-    }
-  }, [tool, hasCloth, pieceType]);
+    if (!hasItems) setTryonStep('items');
+    else if (!selectedModel) setTryonStep('model');
+    else setTryonStep('run');
+  }, [tool, hasItems, selectedModel]);
 
   /* ---------- computed styles ---------- */
   const frameStyle = useMemo(() => {
@@ -496,24 +509,98 @@ export default function Dashboard() {
     [uploadToStorage]
   );
 
-  /* ---------- prompt builders ---------- */
-  const buildEnhancePrompt = (f) =>
-    [
-      f?.photographyStyle && `${f.photographyStyle}`,
-      f?.background && `background: ${f.background}`,
-      f?.lighting && `lighting: ${f.lighting}`,
-      f?.colorStyle && `colors: ${f.colorStyle}`,
-      f?.realism,
-      f?.outputQuality && `output: ${f.outputQuality}`,
-    ]
-      .filter(Boolean)
-      .join(', ');
+  const ensureUrlItem = useCallback(async (item) => {
+    return ensureUrl(item);
+  }, [ensureUrl]);
 
-  const buildTryOnPrompt = (ptype) => {
-    const region =
-      ptype === 'upper' ? 'the TOP' : ptype === 'lower' ? 'the BOTTOM' : 'the FULL OUTFIT';
-    return `Dress the selected model with the garment on ${region}. Preserve realistic skin, hands, and body. Align fit, drape, and garment perspective to the pose; keep true color and texture; avoid artifacts. Output a single photorealistic image.`;
-  };
+  /* ---------- prompt builders ---------- */
+  /* ---------- prompt builders ---------- */
+const buildEnhancePrompt = (f) =>
+  [
+    f?.photographyStyle && `${f.photographyStyle}`,
+    f?.background && `background: ${f.background}`,
+    f?.lighting && `lighting: ${f.lighting}`,
+    f?.colorStyle && `colors: ${f.colorStyle}`,
+    f?.realism,
+    f?.outputQuality && `output: ${f.outputQuality}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+// دالة واحدة فقط — لا تكررها مرة ثانية
+const labelForType = (t = 'upper') =>
+  t === 'upper' ? 'TOP'
+  : t === 'lower' ? 'BOTTOM'
+  : t === 'dress' ? 'FULL OUTFIT'
+  : t === 'hat'   ? 'HAT'
+  : 'ACCESSORY';
+
+// برومبت try-on المحسّن (يمنع التكرار ويستبدل اللبس القديم ويحافظ على الجودة)
+const buildTryOnPrompt = (items = []) => {
+  const ready = items.filter(
+    it => (it.mode === 'upload' && it.file) || (it.mode === 'url' && it.url?.trim())
+  );
+  if (ready.length === 0) {
+    return "Apply try-on to the existing model image. Output one photorealistic image only.";
+  }
+
+  const identityPolicy =
+    "Use the same person, face, body, pose, camera, framing and background; do not generate a new person.";
+  const deDupePolicy =
+    "Output exactly one image with one person; do not duplicate, mirror or add extra bodies, faces or limbs.";
+  const replacePolicy =
+    "If the model already wears an item in the same region, REPLACE it with the provided one (no double layering). For jackets/outerwear, place on top only if provided. If a hat is provided, remove any previous hat.";
+  const layeringPolicy =
+    "Layering order: DRESS replaces TOP and BOTTOM; TOP sits on torso; BOTTOM on hips/legs; HAT on head above hair with a soft shadow; ACCESSORIES placed naturally with correct scale.";
+  const fitPolicy =
+    "Align fit and drape to anatomy and pose; match neckline/shoulders/waist/hips; respect occlusions with arms, hands and hair; realistic wrinkles and thickness; clean edges without halos.";
+  const colorLightPolicy =
+    "Preserve garment color/texture; match scene lighting and shadows; no color shifts.";
+  const qualityPolicy =
+    "High-fidelity photorealistic output (~4k), sharp and clean; no artifacts, no watermarks, no extra text.";
+  const backgroundPolicy =
+    "Do not change or blur the background; minimal reframing only if needed.";
+
+  if (ready.length === 1) {
+    const region = labelForType(ready[0].type);
+    return [
+      `Dress the model with the provided ${region}.`,
+      identityPolicy,
+      deDupePolicy,
+      replacePolicy,
+      layeringPolicy,
+      fitPolicy,
+      colorLightPolicy,
+      qualityPolicy,
+      backgroundPolicy,
+      "Output exactly one photorealistic image."
+    ].join(' ');
+  }
+
+  const counts = ready.reduce((m, it) => {
+    const k = it.type || 'accessory';
+    m[k] = (m[k] || 0) + 1;
+    return m;
+  }, {});
+  const parts = Object.entries(counts)
+    .map(([k, v]) => `${v}× ${labelForType(k)}`)
+    .join(', ');
+
+  return [
+    `Compose all provided items on the SAME model in a single output (${parts}).`,
+    identityPolicy,
+    deDupePolicy,
+    layeringPolicy,
+    replacePolicy,
+    "If multiple items target the same region, use the LAST provided item as the visible garment; do not show duplicates.",
+    fitPolicy,
+    colorLightPolicy,
+    qualityPolicy,
+    backgroundPolicy,
+    "Output exactly one photorealistic image."
+  ].join(' ');
+};
+
 
   /* ---------- unified runners (all except Remove BG) ---------- */
   const callUnified = useCallback(
@@ -523,9 +610,11 @@ export default function Dashboard() {
         { progress: 10 }
       );
       let adv = 10;
+      setProgress(10);
       const iv = setInterval(() => {
         adv = Math.min(adv + 6, 88);
         t.update({ progress: adv });
+        setProgress(adv);
       }, 450);
       try {
         const clean = ensureHttpList(image_input);
@@ -571,11 +660,12 @@ export default function Dashboard() {
         setResultUrls(urls);
         setSelectedOutput(urls[0]);
         setHistory((h) =>
-          [{ tool: mode, inputs: clean, outputs: urls, ts: Date.now() }, ...h].slice(0, 36)
+          [{ tool: mode, inputs: clean, outputs: urls, ts: Date.now() }, ...h].slice(0, 48)
         );
         setPhase('ready');
         t.update({ progress: 100, msg: `${mode} ✓` });
-        setTimeout(() => t.close(), 700);
+        setProgress(100);
+        setTimeout(() => t.close(), 600);
       } catch (e) {
         dbg('❌ callUnified error', e);
         setPhase('error');
@@ -584,6 +674,7 @@ export default function Dashboard() {
         setTimeout(() => t.close(), 1400);
       } finally {
         clearInterval(iv);
+        setTimeout(() => setProgress(null), 500);
       }
     },
     [toasts, user]
@@ -620,17 +711,12 @@ export default function Dashboard() {
       setErr('Select a model.');
       return;
     }
-    if (!pieceType) {
-      setErr('Choose clothing type.');
-      setShowPieceType(true);
-      return;
-    }
-    if (tryCloth.mode === 'upload' && !tryCloth.file) {
-      setErr('Upload the clothing image.');
-      return;
-    }
-    if (tryCloth.mode === 'url' && !tryCloth.url) {
-      setErr('Enter clothing image URL.');
+    const ready = tryItems.filter(
+      (it) =>
+        (it.mode === 'upload' && it.file) || (it.mode === 'url' && it.url?.trim())
+    );
+    if (ready.length === 0) {
+      setErr('Add at least one item.');
       return;
     }
 
@@ -639,35 +725,38 @@ export default function Dashboard() {
     setBusy(true);
     try {
       const modelAbs = toAbsoluteUrl(selectedModel.url);
-      const clothUrl = await ensureUrl(tryCloth);
+      const itemUrls = [];
+      for (const it of ready) {
+        const u = await ensureUrlItem(it);
+        if (u) itemUrls.push(u);
+      }
 
-      const prompt = buildTryOnPrompt(pieceType);
+      const prompt = buildTryOnPrompt(ready);
 
       const origin = getSiteOrigin();
       dbgGroup('🧥 Try-On inputs', {
         origin,
         modelOriginal: selectedModel.url,
         modelAbs,
-        clothUrl,
-        pieceType,
+        itemCount: itemUrls.length,
         count,
       });
 
       if (!/^https?:\/\//i.test(modelAbs))
         throw new Error('Model image is not an http(s) URL');
-      if (!/^https?:\/\//i.test(clothUrl))
-        throw new Error('Clothing image is not an http(s) URL');
+
+      const image_input = [modelAbs, ...itemUrls];
 
       await callUnified({
         mode: 'tryon',
         prompt,
-        image_input: [modelAbs, clothUrl],
+        image_input,
         count,
       });
     } finally {
       setBusy(false);
     }
-  }, [selectedModel, pieceType, tryCloth, count, ensureUrl, callUnified]);
+  }, [selectedModel, tryItems, count, ensureUrlItem, callUnified]);
 
   const runModelSwap = useCallback(async () => {
     if (swapA.mode === 'upload' && !swapA.file) {
@@ -719,6 +808,7 @@ export default function Dashboard() {
     const iv = setInterval(() => {
       adv = Math.min(adv + 6, 88);
       t.update({ progress: adv });
+      setProgress(adv);
     }, 450);
     try {
       dbgGroup('🧼 RemoveBG req', { hasData: !!rbData, local: rbLocal?.slice(0, 60) });
@@ -743,12 +833,13 @@ export default function Dashboard() {
       setHistory((h) =>
         [{ tool: 'removeBg', inputs: [rbLocal], outputs: urls, ts: Date.now() }, ...h].slice(
           0,
-          36
+          48
         )
       );
       setPhase('ready');
       t.update({ progress: 100, msg: 'Background removed ✓' });
-      setTimeout(() => t.close(), 700);
+      setProgress(100);
+      setTimeout(() => t.close(), 600);
     } catch (e) {
       dbg('❌ removeBg error', e);
       setPhase('error');
@@ -757,6 +848,7 @@ export default function Dashboard() {
       setTimeout(() => t.close(), 1400);
     } finally {
       clearInterval(iv);
+      setTimeout(() => setProgress(null), 500);
       setBusy(false);
     }
   }, [rbFile, rbData, rbLocal, toasts]);
@@ -776,10 +868,12 @@ export default function Dashboard() {
     setRbData('');
     setSwapA({ mode: 'upload', file: null, url: '', local: '' });
     setSwapB({ mode: 'upload', file: null, url: '', local: '' });
-    setTryCloth({ mode: 'upload', file: null, url: '', local: '' });
+    setTryItems([
+      { id: uid(), mode: 'upload', file: null, url: '', local: '', type: 'upper', autoRemoveBg: false },
+    ]);
     setSelectedModel(null);
-    setPieceType(null);
-    setTryonStep('cloth');
+    setTryonStep('items');
+    setProgress(null);
   };
 
   const switchTool = (nextId) => {
@@ -788,8 +882,10 @@ export default function Dashboard() {
     setPhase('idle');
     setResultUrls([]);
     setSelectedOutput('');
-    setTryonStep(nextId === 'tryon' ? 'cloth' : 'cloth');
+    if (nextId === 'tryon') setTryonStep('items');
   };
+
+  const allowedTools = (g) => (g === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map(t => t.id);
 
   if (loading || user === undefined) {
     return (
@@ -839,11 +935,15 @@ export default function Dashboard() {
                   <button
                     key={g.id}
                     onClick={() => {
-                      setGroup(g.id);
-                      switchTool(g.id === 'product' ? 'enhance' : 'tryon');
+                      const nextGroup = g.id;
+                      setGroup(nextGroup);
+                      // لا تغيّر الأداة تلقائيًا إلا إذا لم تكن ضمن المجموعة الجديدة
+                      if (!allowedTools(nextGroup).includes(tool)) {
+                        setTool(nextGroup === 'product' ? 'enhance' : 'tryon');
+                      }
                     }}
                     className={[
-                      'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
+                      'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition focus:outline-none focus:ring-2 focus:ring-violet-400/70',
                       Active
                         ? 'bg-white/90 text-zinc-900 shadow'
                         : 'text-zinc-200 hover:bg-white/10',
@@ -867,7 +967,7 @@ export default function Dashboard() {
                     key={t.id}
                     onClick={() => switchTool(t.id)}
                     className={[
-                      'w-full group flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition',
+                      'w-full group flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-violet-400/70',
                       Active
                         ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 border border-violet-400/30'
                         : 'hover:bg-white/5 border border-white/5',
@@ -905,7 +1005,7 @@ export default function Dashboard() {
 
         {/* Main column */}
         <section className="space-y-5 md:space-y-6">
-          {/* Presets / Try-On Models */}
+          {/* Header / Presets / Try-On Models */}
           <motion.div
             layout
             className="rounded-3xl border border-white/10 bg-white/[.06] backdrop-blur p-4 sm:p-5 md:p-6 shadow-xl"
@@ -916,7 +1016,7 @@ export default function Dashboard() {
                   {group === 'product'
                     ? 'Premium Presets'
                     : tool === 'tryon'
-                    ? 'Try-On Flow'
+                    ? 'AI Studio — Try-On'
                     : 'Model Swap'}
                 </h1>
                 <p className="text-zinc-300/90 text-xs sm:text-sm">
@@ -925,7 +1025,7 @@ export default function Dashboard() {
                       Pick a preset or open <span className="font-semibold">Customize</span>.
                     </>
                   ) : tool === 'tryon' ? (
-                    <>Step 1: clothing → Step 2: choose type → Step 3: pick a model → Run.</>
+                    <>Step 1: items → Step 2: model → Step 3: run.</>
                   ) : (
                     <>
                       Upload/URL for two images then run{' '}
@@ -942,7 +1042,7 @@ export default function Dashboard() {
                     setPendingPreset(null);
                     setShowEnhance(true);
                   }}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/20"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-violet-400/70"
                 >
                   ✨ Customize Enhance
                 </button>
@@ -971,21 +1071,88 @@ export default function Dashboard() {
               </div>
             ) : tool === 'tryon' ? (
               <div className="mt-4">
-                <TryOnStepper
-                  step={tryonStep}
-                  pieceType={pieceType}
-                  modelPicked={!!selectedModel}
-                />
-                {hasCloth ? (
-                  <div className="mt-3">
+                <TryOnStepper step={tryonStep} />
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-[12px] font-semibold text-zinc-300">
+                      Clothing & Accessories (multi)
+                    </div>
+                    <button
+                      onClick={() =>
+                        setTryItems((s) =>
+                          s.length >= MAX_ITEMS
+                            ? s
+                            : [
+                                ...s,
+                                {
+                                  id: uid(),
+                                  mode: 'upload',
+                                  file: null,
+                                  url: '',
+                                  local: '',
+                                  type: 'upper',
+                                  autoRemoveBg: false,
+                                },
+                              ]
+                        )
+                      }
+                      disabled={tryItems.length >= MAX_ITEMS}
+                      className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] hover:bg-white/20 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-violet-400/70"
+                      title="Add another item"
+                    >
+                      + Add Item
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {tryItems.map((it, idx) => (
+                      <TryItemCard
+                        key={it.id}
+                        index={idx}
+                        item={it}
+                        onMode={(m) =>
+                          setTryItems((s) =>
+                            s.map((x) => (x.id === it.id ? { ...x, mode: m } : x))
+                          )
+                        }
+                        onFile={(f) =>
+                          setTryItems((s) =>
+                            s.map((x) =>
+                              x.id === it.id
+                                ? {
+                                    ...x,
+                                    file: f,
+                                    local: f ? URL.createObjectURL(f) : '',
+                                    url: '',
+                                  }
+                                : x
+                            )
+                          )
+                        }
+                        onUrl={(u) =>
+                          setTryItems((s) =>
+                            s.map((x) => (x.id === it.id ? { ...x, url: u } : x))
+                          )
+                        }
+                        onType={(t) =>
+                          setTryItems((s) =>
+                            s.map((x) => (x.id === it.id ? { ...x, type: t } : x))
+                          )
+                        }
+                        onRemove={() =>
+                          setTryItems((s) => s.filter((x) => x.id !== it.id))
+                        }
+                      />
+                    ))}
+                  </div>
+
+                  <div className="mt-2 text-xs text-zinc-300/90">
+                    All items will be composited onto the same model in a single output.
+                  </div>
+
+                  <div className="mt-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <div className="text-[12px] font-semibold text-zinc-300">Models</div>
-                      <button
-                        className="text-[11px] rounded-md border border-white/15 bg-white/10 px-2 py-1 hover:bg-white/20"
-                        onClick={() => setShowPieceType(true)}
-                      >
-                        {pieceType ? `Type: ${pieceType}` : 'Choose type'}
-                      </button>
+                      <div className="text-[12px] font-semibold text-zinc-300">Model</div>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       {MODELS.map((m) => (
@@ -993,24 +1160,12 @@ export default function Dashboard() {
                           key={m.id}
                           model={m}
                           active={selectedModel?.id === m.id}
-                          onSelect={() => {
-                            if (!pieceType) {
-                              setShowPieceType(true);
-                              return;
-                            }
-                            setSelectedModel(m);
-                            setTryonStep('model');
-                          }}
+                          onSelect={() => setSelectedModel(m)}
                         />
                       ))}
                     </div>
                   </div>
-                ) : (
-                  <div className="mt-3 rounded-xl border border-white/10 p-4 text-xs text-zinc-300/90 bg-white/5">
-                    Upload/paste clothing first, then choose type. Models will appear
-                    automatically.
-                  </div>
-                )}
+                </div>
               </div>
             ) : (
               <div className="mt-2 text-xs text-zinc-300/90">
@@ -1023,33 +1178,15 @@ export default function Dashboard() {
           <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_360px]">
             {/* Canvas Panel */}
             <section className="rounded-3xl border border-white/10 bg-white/[.06] shadow-xl relative">
+              {/* Top bar: status + reset (بدون تكرار الأدوات) */}
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 md:px-5 pt-3 md:pt-4">
-                <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur">
-                  {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((it) => {
-                    const Active = tool === it.id;
-                    const Icon = it.icon;
-                    return (
-                      <button
-                        key={it.id}
-                        onClick={() => switchTool(it.id)}
-                        className={[
-                          'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition',
-                          Active
-                            ? 'bg-white text-zinc-900 shadow'
-                            : 'text-zinc-200 hover:bg-white/10',
-                        ].join(' ')}
-                      >
-                        <Icon className="size-4" />
-                        <span>{it.label}</span>
-                      </button>
-                    );
-                  })}
+                <div className="text-sm font-medium">
+                  <StepBadge phase={phase} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <StepBadge phase={phase} />
                   <button
                     onClick={resetAll}
-                    className="text-xs px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                    className="text-xs px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-violet-400/70"
                   >
                     Reset
                   </button>
@@ -1091,6 +1228,9 @@ export default function Dashboard() {
                         setPhase('idle');
                       }}
                     />
+                    <div className="text-[11px] text-zinc-300/80">
+                      <span className="font-semibold">Note:</span> Preview frame does not affect the final output file.
+                    </div>
                   </div>
                 )}
 
@@ -1131,64 +1271,63 @@ export default function Dashboard() {
 
                 {tool === 'tryon' && (
                   <div className="grid gap-3">
-                    <InputSlot
-                      label="Clothing"
-                      mode={tryCloth.mode}
-                      setMode={(m) => setTryCloth((s) => ({ ...s, mode: m }))}
-                      file={tryCloth.file}
-                      setFile={(f) =>
-                        setTryCloth((s) => ({
-                          ...s,
-                          file: f,
-                          local: f ? URL.createObjectURL(f) : '',
-                        }))
-                      }
-                      url={tryCloth.url}
-                      setUrl={(u) => setTryCloth((s) => ({ ...s, url: u }))}
-                      hint="Transparent PNG recommended"
-                    />
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setShowPieceType(true)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs hover:bg-white/10"
-                      >
-                        {pieceType ? `Type: ${pieceType}` : 'Choose type'}
-                      </button>
-                      {pieceType && (
-                        <span className="text-xs text-zinc-300/90">Ready ✓</span>
-                      )}
-                    </div>
-
-                    {tryCloth.local && tryCloth.mode === 'upload' && (
-                      <Thumb src={tryCloth.local} />
-                    )}
-
-                    {hasCloth && !pieceType && (
-                      <div className="text-xs text-zinc-300/90">
-                        Choose clothing type to improve fit & placement.
-                      </div>
-                    )}
+                    {/* Nothing here، تمَّت إدارة العناصر والموديلات في البطاقة أعلاه */}
                   </div>
                 )}
 
                 {/* Result preview (single) */}
-                {resultUrls.length > 0 && (
-                  <div className="mt-4">
-                    <div className="text-xs text-zinc-300/90 mb-2">Result</div>
-                    <div
-                      className="rounded-2xl overflow-hidden border border-white/10 grid place-items-center"
-                      style={frameStyle}
-                    >
+                <div className="mt-4">
+                  <div className="text-xs text-zinc-300/90 mb-2">Result</div>
+                  <div
+                    className="rounded-2xl overflow-hidden border border-white/10 grid place-items-center relative"
+                    style={frameStyle}
+                  >
+                    {progress !== null && (
+                      <div className="absolute inset-0 grid place-items-center bg-black/50">
+                        <div className="text-3xl font-bold">{progress}%</div>
+                      </div>
+                    )}
+                    {resultUrls[0] ? (
                       <img
                         src={resultUrls[0]}
                         alt="result"
                         className="max-w-full max-h-[62vh] object-contain rounded-xl"
                       />
-                    </div>
+                    ) : (
+                      <div className="text-xs text-zinc-300/70 py-16">— No result yet —</div>
+                    )}
                   </div>
-                )}
+
+                  {/* Output toolbar */}
+                  {resultUrls[0] && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        onClick={() => window.open(resultUrls[0], '_blank')}
+                        className="text-xs px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                      >
+                        Open
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(resultUrls[0]);
+                        }}
+                        className="text-xs px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                      >
+                        Copy Link
+                      </button>
+                      <a
+                        href={resultUrls[0]}
+                        download
+                        className="text-xs px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                      >
+                        Download
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Run button pinned to inspector (we also add here for desktop flow) */}
             </section>
 
             {/* Inspector */}
@@ -1219,15 +1358,25 @@ export default function Dashboard() {
               {tool === 'tryon' && (
                 <div className="space-y-3">
                   <div className="text-xs text-zinc-300/90">
-                    Select clothing, type and a model, then Run.
+                    Add items and pick a model, then Run.
                   </div>
                   <button
                     onClick={runTryOn}
-                    disabled={busy || !hasCloth || !pieceType || !selectedModel}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-white text-zinc-900 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                    disabled={busy || !hasItems || !selectedModel}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-3 py-2 text-sm font-semibold disabled:opacity-50"
                   >
-                    <PlayIcon className="w-4 h-4" /> Run Try-On
+                    <PlayIcon className="w-4 h-4" /> Run Try-On (Combine)
                   </button>
+                  {!hasItems && (
+                    <div className="text-[11px] text-amber-200/90">
+                      Add at least one clothing/accessory item.
+                    </div>
+                  )}
+                  {hasItems && !selectedModel && (
+                    <div className="text-[11px] text-amber-200/90">
+                      Select a model to enable Run.
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1340,22 +1489,50 @@ export default function Dashboard() {
             {history.length === 0 ? (
               <div className="text-xs text-zinc-300/80 px-1 py-4">— No renders yet —</div>
             ) : (
-              <ul className="mt-3 space-y-1 text-[12px] text-zinc-300/90">
-                {history.map((h, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <span className="inline-block size-2 rounded-full bg-white/50" />
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {history.map((h, i) => {
+                  const thumb = h.outputs?.[0];
+                  const tag =
+                    h.tool === 'tryon'
+                      ? `Try-On (${Math.max((h.inputs?.length || 1) - 1, 0)} items)`
+                      : h.tool === 'swap'
+                      ? 'Model Swap'
+                      : h.tool === 'removeBg'
+                      ? 'Remove BG'
+                      : 'Enhance';
+                  return (
                     <button
-                      className="hover:underline"
+                      key={i}
                       onClick={() => {
                         setResultUrls(h.outputs);
                         setSelectedOutput(h.outputs?.[0] || '');
                       }}
+                      className="group rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 text-left"
+                      title={tag}
                     >
-                      {h.tool} • {new Date(h.ts).toLocaleTimeString()}
+                      <div className="relative aspect-[4/3]">
+                        {thumb ? (
+                          <img
+                            src={thumb}
+                            alt={tag}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 grid place-items-center text-[11px] text-zinc-300/80">
+                            No image
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <div className="text-[11px] font-medium">{tag}</div>
+                        <div className="text-[10px] text-zinc-400">
+                          {new Date(h.ts).toLocaleTimeString()}
+                        </div>
+                      </div>
                     </button>
-                  </li>
-                ))}
-              </ul>
+                  );
+                })}
+              </div>
             )}
           </div>
         </section>
@@ -1378,28 +1555,6 @@ export default function Dashboard() {
                   setShowEnhance(false);
                   setPendingPreset(null);
                   runEnhance(form);
-                }}
-              />
-            </div>
-          </motion.div>
-        )}
-
-        {showPieceType && (
-          <motion.div
-            className="fixed inset-0 z-[110] grid place-items-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="absolute inset-0 bg-black/60" onClick={() => setShowPieceType(false)} />
-            <div className="relative w-full max-w-md mx-3">
-              <PieceTypeModal
-                initial={pieceType || 'upper'}
-                onCancel={() => setShowPieceType(false)}
-                onConfirm={(type) => {
-                  setPieceType(type);
-                  setShowPieceType(false);
-                  setTryonStep('model');
                 }}
               />
             </div>
@@ -1461,7 +1616,7 @@ function InputSlot({ label, mode, setMode, file, setFile, url, setUrl, hint }) {
           <button
             onClick={() => setMode('upload')}
             className={[
-              'px-2 py-1 text-[11px]',
+              'px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-violet-400/70',
               mode === 'upload' ? 'bg-white text-zinc-900' : 'text-zinc-200 hover:bg-white/10',
             ].join(' ')}
           >
@@ -1470,7 +1625,7 @@ function InputSlot({ label, mode, setMode, file, setFile, url, setUrl, hint }) {
           <button
             onClick={() => setMode('url')}
             className={[
-              'px-2 py-1 text-[11px]',
+              'px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-violet-400/70',
               mode === 'url' ? 'bg-white text-zinc-900' : 'text-zinc-200 hover:bg-white/10',
             ].join(' ')}
           >
@@ -1515,7 +1670,7 @@ function InputSlot({ label, mode, setMode, file, setFile, url, setUrl, hint }) {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://public-image.jpg"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/70"
         />
       )}
     </div>
@@ -1529,7 +1684,7 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
   return (
     <button
       onClick={onClick}
-      className="group relative rounded-2xl overflow-hidden border border-white/10 hover:border-white/20 bg-white/5 shadow transition text-left hover:shadow-2xl"
+      className="group relative rounded-2xl overflow-hidden border border-white/10 hover:border-white/20 bg-white/5 shadow transition text-left hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-violet-400/70"
     >
       <div className="relative w-full aspect-[4/3] bg-white/5">
         {!loaded && (
@@ -1565,7 +1720,7 @@ function ModelCard({ model, active, onSelect }) {
     <button
       onClick={onSelect}
       className={[
-        'group relative rounded-2xl overflow-hidden border bg-white/5 shadow transition',
+        'group relative rounded-2xl overflow-hidden border bg-white/5 shadow transition focus:outline-none focus:ring-2 focus:ring-violet-400/70',
         active
           ? 'border-violet-400/50 ring-2 ring-violet-400/30'
           : 'border-white/10 hover:border-white/20 hover:shadow-2xl',
@@ -1591,14 +1746,13 @@ function ModelCard({ model, active, onSelect }) {
   );
 }
 
-function TryOnStepper({ step, pieceType, modelPicked }) {
-  const map = { cloth: 0, piece: 1, model: 2 };
-  const idx = map[step] ?? 0;
+function TryOnStepper({ step }) {
   const steps = [
-    { id: 'cloth', label: 'Clothing' },
-    { id: 'piece', label: pieceType ? `Type: ${pieceType}` : 'Choose type' },
-    { id: 'model', label: modelPicked ? 'Model selected' : 'Pick a model' },
+    { id: 'items', label: 'Items' },
+    { id: 'model', label: 'Model' },
+    { id: 'run', label: 'Run' },
   ];
+  const idx = steps.findIndex((s) => s.id === step);
   return (
     <div className="w-full">
       <div className="flex items-center justify-between gap-2">
@@ -1720,40 +1874,47 @@ function Range({ value, onChange, min, max, step = 1 }) {
   );
 }
 
-function PieceTypeModal({ initial = 'upper', onCancel, onConfirm }) {
-  const [active, setActive] = useState(initial);
-  const options = [
-    { id: 'upper', label: 'Upper (T-shirt/Shirt/Jacket)' },
-    { id: 'lower', label: 'Lower (Pants/Jeans/Skirt)' },
-    { id: 'dress', label: 'Full Dress (One-piece)' },
-  ];
+/* ---- Try-On item card ---- */
+function TryItemCard({ index, item, onMode, onFile, onUrl, onType, onRemove }) {
   return (
-    <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-2xl border space-y-3 text-zinc-900">
-      <div className="text-sm font-semibold">Choose clothing type</div>
-      <div className="grid grid-cols-1 gap-2">
-        {options.map((o) => (
-          <button
-            key={o.id}
-            onClick={() => setActive(o.id)}
-            className={[
-              'w-full text-left rounded-xl border px-3 py-2 text-sm transition',
-              active === o.id ? 'border-violet-400 bg-violet-50' : 'border-zinc-200 hover:bg-zinc-50',
-            ].join(' ')}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={onCancel}>
-          Cancel
-        </button>
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs text-zinc-300">Item {index + 1}</div>
         <button
-          className="rounded-lg bg-zinc-900 text-white px-3 py-1.5 text-xs"
-          onClick={() => onConfirm(active)}
+          onClick={onRemove}
+          className="text-[11px] px-2 py-1 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-violet-400/70"
         >
-          Continue
+          Remove
         </button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+        <InputSlot
+          label="Image"
+          mode={item.mode}
+          setMode={onMode}
+          file={item.file}
+          setFile={onFile}
+          url={item.url}
+          setUrl={onUrl}
+          hint="Transparent PNG recommended"
+        />
+        <div className="grid gap-2 content-start">
+          <label className="text-[11px] text-zinc-300/90">Type</label>
+          <select
+            value={item.type}
+            onChange={(e) => onType(e.target.value)}
+            className="rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/70"
+          >
+            <option value="upper">Upper</option>
+            <option value="lower">Lower</option>
+            <option value="dress">Dress</option>
+            <option value="hat">Hat</option>
+            <option value="accessory">Accessory</option>
+          </select>
+          <div className="text-[11px] text-zinc-400">
+            All items are layered automatically; you can add up to {MAX_ITEMS}.
+          </div>
+        </div>
       </div>
     </div>
   );
