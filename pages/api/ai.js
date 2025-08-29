@@ -9,7 +9,8 @@ export const config = {
 const REPLICATE_TOKEN = process.env.REPLICATE_API_TOKEN;
 const MODEL_ID = 'google/nano-banana';
 
-const clamp = (n, min, max) => Math.max(min, Math.min(max, Number.isFinite(n) ? n : min));
+const clamp = (n, min, max) =>
+  Math.max(min, Math.min(max, Number.isFinite(n) ? n : min));
 
 // فلترة الروابط
 const ensureHttpList = (arr = []) =>
@@ -17,36 +18,33 @@ const ensureHttpList = (arr = []) =>
     .map((u) => (typeof u === 'string' ? u.trim() : ''))
     .filter((u) => /^https?:\/\//i.test(u));
 
-// استخراج روابط من استجابة Replicate
-const toUrlList = (output) => {
-  if (!output) return [];
-  if (Array.isArray(output)) {
-    return output.filter((x) => typeof x === 'string' && x.startsWith('http'));
-  }
-  if (typeof output === 'string') return [output];
-  if (output && typeof output === 'object') {
-    const keys = ['output', 'image', 'images', 'variants', 'urls', 'result'];
-    for (const k of keys) {
-      const v = output[k];
-      if (Array.isArray(v)) return v.filter(Boolean);
-      if (typeof v === 'string') return [v];
-    }
-  }
-  return [];
-};
-
 const replicate = new Replicate({ auth: REPLICATE_TOKEN });
 
-// تشغيل الموديل الرسمي (always array)
+// تشغيل الموديل (باستخدام predictions.create + wait)
 async function runNanoBananaOnce({ prompt, inputs }) {
-  const result = await replicate.run(MODEL_ID, {
+  const prediction = await replicate.predictions.create({
+    model: MODEL_ID,
     input: {
       prompt,
-      image_input: inputs,   // مصفوفة صور (صورة أو أكثر)
-      output_format: "jpg",  // أو png حسب رغبتك
+      image_input: inputs,
+      output_format: 'jpg',
     },
   });
-  return toUrlList(result);
+
+  const result = await replicate.wait(prediction);
+
+  let images = [];
+  if (result?.output) {
+    if (typeof result.output === 'string') {
+      images = [result.output];
+    } else if (Array.isArray(result.output)) {
+      images = result.output;
+    } else if (result.output?.url) {
+      images = [result.output.url];
+    }
+  }
+
+  return images;
 }
 
 export default async function handler(req, res) {
@@ -60,21 +58,16 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Missing Replicate token' });
     }
 
-    const {
-      imageUrl,
-      imageUrls,
-      prompt,
-      user_email,
-      plan,
-      num_images,
-    } = req.body || {};
+    const { imageUrl, imageUrls, prompt, user_email, num_images } = req.body || {};
 
     let inputs = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
     if (!inputs.length && typeof imageUrl === 'string') inputs = [imageUrl];
     inputs = ensureHttpList(inputs).slice(0, 6);
 
     if (!inputs.length || !prompt || !user_email) {
-      return res.status(400).json({ error: 'Missing required fields: imageUrls/imageUrl, prompt, user_email' });
+      return res.status(400).json({
+        error: 'Missing required fields: imageUrls/imageUrl, prompt, user_email',
+      });
     }
 
     console.log('📦 Payload to nano-banana:', {
@@ -83,14 +76,14 @@ export default async function handler(req, res) {
       first: inputs[0],
     });
 
-    // Supabase Auth
+    // ✅ Supabase Auth
     const supabase = createPagesServerClient({ req, res });
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (!session || sessionError) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // بيانات المستخدم
+    // ✅ بيانات المستخدم
     const { data: userData, error: userError } = await supabase
       .from('Data')
       .select('credits, plan')
@@ -105,9 +98,15 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'No credits left' });
     }
 
+    // ✅ عدد المخرجات
     const outputsCount = clamp(
-      typeof num_images === 'number' ? num_images : (userData.plan === 'Pro' ? 2 : 1),
-      1, 3
+      typeof num_images === 'number'
+        ? num_images
+        : userData.plan === 'Pro'
+        ? 2
+        : 1,
+      1,
+      3
     );
 
     const harden = (p) =>
@@ -136,10 +135,12 @@ export default async function handler(req, res) {
     variants = [...new Set(variants)];
 
     if (!variants.length) {
-      return res.status(500).json({ error: firstError || 'No image returned' });
+      return res
+        .status(500)
+        .json({ error: firstError || 'No image returned' });
     }
 
-    // خصم كريدت لو Free
+    // ✅ خصم كريدت لو Free
     if (userData.plan !== 'Pro') {
       try {
         await supabase.rpc('decrement_credit', { user_email });
@@ -157,6 +158,8 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('🔥 /api/ai fatal error:', err);
-    return res.status(500).json({ error: err?.message || 'Internal error' });
+    return res
+      .status(500)
+      .json({ error: err?.message || 'Internal error' });
   }
 }
