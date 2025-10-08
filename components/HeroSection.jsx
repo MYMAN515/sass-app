@@ -1,841 +1,544 @@
-import React, { useEffect, useId, useRef, useState, memo } from "react";
-import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
+import React, { useMemo } from "react";
+import { motion } from "framer-motion";
 
-/**
- * Ultra Landing v2 — JSX
- * - DPR-correct canvas drawing & clearing
- * - No TS types, pure JSX
- * - SSR-safe (no document/window at module scope)
- * - A11y: keyboard & screen reader support
- * - Performance: throttled resize, offscreen pause, reduced-motion friendly
- */
+const fadeUp = {
+  hidden: { opacity: 0, y: 40 },
+  show: (delay = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay, duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
+
+const staggered = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.2,
+    },
+  },
+};
+
+const stats = [
+  { label: "Avg. conversion lift", value: "+28%" },
+  { label: "Photos generated", value: "12M" },
+  { label: "Campaign launch time", value: "2hrs" },
+];
+
+const features = [
+  {
+    title: "AI Product Studio",
+    description: "Generate lifestyle-ready imagery that adapts to every audience and platform in seconds.",
+    icon: "🎨",
+    accent: "from-violet-500/80 to-fuchsia-500/80",
+  },
+  {
+    title: "Smart Brand Controls",
+    description: "Upload brand kits once and let our guardrails keep every asset perfectly on-brand.",
+    icon: "🛡️",
+    accent: "from-blue-500/80 to-indigo-500/80",
+  },
+  {
+    title: "Omnichannel Delivery",
+    description: "Push finished assets directly to Shopify, Klaviyo, Meta, and more with one click.",
+    icon: "🚀",
+    accent: "from-emerald-500/80 to-teal-500/80",
+  },
+];
+
+const workflow = [
+  {
+    step: "01",
+    title: "Drop in a product",
+    description: "Upload a photo or pull from your catalog. Our background removal and lighting engine handle the rest.",
+  },
+  {
+    step: "02",
+    title: "Choose your moment",
+    description: "Select from curated scenes, AI try-on, or instantly brief a new concept in natural language.",
+  },
+  {
+    step: "03",
+    title: "Publish everywhere",
+    description: "Approve, resize, and publish across ads, PDPs, emails, and social without leaving the studio.",
+  },
+];
+
+const testimonials = [
+  {
+    quote:
+      "We shipped our summer collection with 70% fewer reshoots. The campaign paid for the platform in the first week.",
+    name: "Alexa Moore",
+    role: "VP Marketing, Northwind",
+    avatar: "/models/m02.webp",
+  },
+  {
+    quote:
+      "Try-on finally looks believable. Our customers spend longer on page and we cut our returns by double digits.",
+    name: "Priya Patel",
+    role: "Head of E-commerce, Lumen",
+    avatar: "/models/m05.webp",
+  },
+];
+
+const faqs = [
+  {
+    question: "Can I keep my brand safe?",
+    answer:
+      "Absolutely. Upload fonts, colors, and usage rules once. Every render respects your guardrails, and approvals are logged for compliance.",
+  },
+  {
+    question: "What platforms do you integrate with?",
+    answer:
+      "We connect with Shopify, WooCommerce, Klaviyo, Meta Ads, Google Ads, TikTok, and can export to any custom DAM via API.",
+  },
+  {
+    question: "How does billing work?",
+    answer:
+      "Start free with 30 renders. Upgrade to scale with unlimited seats, collaborative workspaces, and enterprise support.",
+  },
+];
+
+const logos = [
+  "Acme", "Northwind", "Lumina", "Vertex", "Harbor", "Nova",
+];
+
+const gallery = [
+  { title: "Lifestyle Scenes", description: "Curated, on-trend backgrounds tailored to your brand voice." },
+  { title: "AI Model Try-On", description: "See every fit on inclusive body types with one upload." },
+  { title: "Campaign Composer", description: "Launch on-brand ads and emails in the same workspace." },
+];
 
 export default function HeroSection() {
+  const renderLogos = useMemo(
+    () =>
+      logos.map((logo) => (
+        <motion.li
+          key={logo}
+          variants={fadeUp}
+          className="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-zinc-300 shadow-sm shadow-black/5"
+        >
+          {logo}
+        </motion.li>
+      )),
+    []
+  );
+
   return (
-    <main className="relative w-full overflow-hidden bg-[#0a0a0f] font-sans text-white">
-      <BackgroundCanvas />
-      <HeroContent />
-      <LogoOrbit />
-      <MetricsSection />
-      <FeatureShowcase />
-      <InteractiveDemo />
-      <ProcessTimeline />
-      <SocialProof />
-      <FinalCTA />
-      <FloatingCTA />
+    <main className="relative w-full overflow-hidden bg-[#06050d] text-white">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(124,58,237,0.4),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(6,182,212,0.35),transparent_60%)]" />
+        <div className="absolute inset-0 opacity-30" style={{
+          backgroundImage:
+            "linear-gradient(rgba(148,163,184,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.1)_1px,transparent_1px)",
+          backgroundSize: "60px 60px",
+        }} />
+      </div>
+
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-24 px-6 pb-32 pt-24 md:px-10 lg:pt-32">
+        <HeroHeader />
+        <SocialProof logos={renderLogos} />
+        <Stats />
+        <FeatureGrid />
+        <Workflow />
+        <Gallery />
+        <Testimonials />
+        <FAQ />
+        <CTA />
+      </div>
     </main>
   );
 }
 
-/* ============================= Background Canvas ============================= */
-
-function BackgroundCanvas() {
-  const canvasRef = useRef(null);
-  const prefersReducedMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (prefersReducedMotion) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let wCss = window.innerWidth;
-    let hCss = window.innerHeight;
-
-    const setSize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      wCss = window.innerWidth;
-      hCss = window.innerHeight;
-      canvas.width = Math.floor(wCss * dpr);
-      canvas.height = Math.floor(hCss * dpr);
-      canvas.style.width = `${wCss}px`;
-      canvas.style.height = `${hCss}px`;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw/clear in CSS px
-    };
-    setSize();
-
-    const rand = (a, b) => a + Math.random() * (b - a);
-    const PARTICLE_COUNT = 90;
-    const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
-      x: rand(0, wCss),
-      y: rand(0, hCss),
-      vx: rand(-0.35, 0.35),
-      vy: rand(-0.35, 0.35),
-      size: rand(0.6, 2.4),
-      opacity: rand(0.25, 0.65),
-    }));
-
-    let rafId = 0;
-    let running = true;
-
-    const draw = () => {
-      if (!running) return;
-      ctx.clearRect(0, 0, wCss, hCss);
-
-      for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-
-        if (p.x < 0 || p.x > wCss) p.vx *= -1;
-        if (p.y < 0 || p.y > hCss) p.vy *= -1;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(139, 92, 246, ${p.opacity})`;
-        ctx.fill();
-      }
-
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const p1 = particles[i];
-          const p2 = particles[j];
-          const dx = p1.x - p2.x;
-          const dy = p1.y - p2.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < 120) {
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(139,92,246,${(1 - dist / 120) * 0.18})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
-      }
-
-      rafId = requestAnimationFrame(draw);
-    };
-
-    rafId = requestAnimationFrame(draw);
-
-    // Throttled resize
-    let resizeTimer;
-    const onResize = () => {
-      if (resizeTimer) window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(() => {
-        setSize();
-      }, 150);
-    };
-    window.addEventListener("resize", onResize, { passive: true });
-
-    // Pause when tab hidden
-    const onVisibility = () => {
-      const wasRunning = running;
-      running = !document.hidden;
-      if (running && !wasRunning) rafId = requestAnimationFrame(draw);
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", onResize);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [prefersReducedMotion]);
-
-  // Inject gradient keyframes SSR-safely
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.textContent = `
-      @keyframes gradient { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-      .animate-gradient { background-size:200% 200%; animation:gradient 3s ease infinite; }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      if (style.parentNode) style.parentNode.removeChild(style);
-    };
-  }, []);
-
+function HeroHeader() {
   return (
-    <>
-      <canvas ref={canvasRef} className="absolute inset-0 opacity-40" aria-hidden="true" />
-      <div className="absolute inset-0 bg-gradient-to-br from-violet-950/30 via-fuchsia-950/20 to-indigo-950/30" aria-hidden="true" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-transparent to-transparent" aria-hidden="true" />
-      <AnimatedGrid />
-      <GlowOrbs />
-    </>
-  );
-}
-
-const AnimatedGrid = memo(function AnimatedGrid() {
-  return (
-    <div className="absolute inset-0 opacity-20" aria-hidden="true">
-      <div
-        className="h-full w-full"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, rgba(139, 92, 246, 0.08) 1px, transparent 1px),linear-gradient(to bottom, rgba(139, 92, 246, 0.08) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-    </div>
-  );
-});
-
-function GlowOrbs() {
-  const prefersReducedMotion = useReducedMotion();
-  return (
-    <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      <motion.div
-        animate={prefersReducedMotion ? {} : { x: [0, 100, 0], y: [0, -50, 0], scale: [1, 1.2, 1] }}
-        transition={prefersReducedMotion ? {} : { duration: 20, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -left-48 top-0 h-96 w-96 rounded-full bg-violet-600/30 blur-[100px]"
-      />
-      <motion.div
-        animate={prefersReducedMotion ? {} : { x: [0, -80, 0], y: [0, 100, 0], scale: [1, 1.3, 1] }}
-        transition={prefersReducedMotion ? {} : { duration: 25, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -right-48 top-1/3 h-96 w-96 rounded-full bg-fuchsia-600/25 blur-[120px]"
-      />
-      <motion.div
-        animate={prefersReducedMotion ? {} : { x: [0, 60, 0], y: [0, -80, 0], scale: [1.2, 1, 1.2] }}
-        transition={prefersReducedMotion ? {} : { duration: 22, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-indigo-600/20 blur-[100px]"
-      />
-    </div>
-  );
-}
-
-/* ================================ Hero Content ================================ */
-
-function HeroContent() {
-  const { scrollYProgress } = useScroll();
-  const y = useTransform(scrollYProgress, [0, 1], [0, -100]);
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
-
-  return (
-    <motion.section style={{ y, opacity }} className="relative z-10 px-6 pt-28 pb-24 md:px-12 lg:px-20 lg:pt-36">
-      <div className="mx-auto max-w-7xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-8 flex items-center gap-3"
+    <div className="grid gap-16 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+      <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}>
+        <motion.div variants={fadeUp} className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-violet-200">
+          <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
+          Launch faster with the Adaptive Content Engine
+        </motion.div>
+        <motion.h1
+          variants={fadeUp}
+          custom={0.1}
+          className="text-4xl font-black tracking-tight md:text-6xl lg:text-7xl"
         >
-          <Badge text="AI-Powered Studio" icon="✨" />
-          <motion.span initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="text-sm text-violet-300">
-            Trusted by 2,400+ brands
-          </motion.span>
-        </motion.div>
-
-        <div className="grid items-center gap-16 lg:grid-cols-2">
-          <div>
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-              className="text-5xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight"
-            >
-              Transform products into
-              <span className="block mt-2 bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent animate-gradient">
-                unforgettable visuals
-              </span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="mt-6 text-lg md:text-xl text-zinc-300 leading-relaxed max-w-xl"
-            >
-              Studio-quality photos, AI try-on, and marketing magic—delivered in seconds.
-              <span className="text-violet-300 font-medium"> No photographer required.</span>
-            </motion.p>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.3 }} className="mt-8 flex flex-wrap gap-3">
-              <FeaturePill text="No credit card" />
-              <FeaturePill text="3 free renders" />
-              <FeaturePill text="60-second setup" />
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.4 }} className="mt-10 flex flex-col sm:flex-row gap-4">
-              <MagneticButton href="#demo" primary>
-                Start creating free
-                <ArrowIcon />
-              </MagneticButton>
-              <MagneticButton href="#how">See how it works</MagneticButton>
-            </motion.div>
-
-            <EmailCapture />
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, rotateY: -15 }}
-            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-            transition={{ duration: 1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="relative"
+          The new standard for product storytelling
+        </motion.h1>
+        <motion.p
+          variants={fadeUp}
+          custom={0.2}
+          className="mt-6 max-w-xl text-lg leading-relaxed text-zinc-300 md:text-xl"
+        >
+          Generate high-converting visuals, AI try-on experiences, and launch-ready campaigns from a single collaborative studio.
+        </motion.p>
+        <motion.div
+          variants={fadeUp}
+          custom={0.3}
+          className="mt-10 flex flex-col gap-3 sm:flex-row"
+        >
+          <a
+            href="/signup"
+            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 px-8 py-4 text-base font-semibold text-white shadow-lg shadow-violet-500/30 transition hover:opacity-95"
           >
-            <TiltCard>
-              <CompareSlider />
-            </TiltCard>
-          </motion.div>
+            Start creating free
+          </a>
+          <a
+            href="#demo"
+            className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold text-white backdrop-blur transition hover:bg-white/10"
+          >
+            Explore the interactive demo
+          </a>
+        </motion.div>
+        <motion.div variants={fadeUp} custom={0.4} className="mt-8 flex items-center gap-4 text-sm text-zinc-400">
+          <div className="flex -space-x-3">
+            {[1, 2, 3, 4].map((index) => (
+              <span
+                key={index}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-xs font-semibold text-white"
+              >
+                {index}
+              </span>
+            ))}
+          </div>
+          <p>
+            Join 2,400+ teams accelerating launches with adaptive product storytelling.
+          </p>
+        </motion.div>
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, rotateX: -15 }}
+        whileInView={{ opacity: 1, scale: 1, rotateX: 0 }}
+        viewport={{ once: true, margin: "-120px" }}
+        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+        className="relative"
+      >
+        <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-1 shadow-2xl shadow-black/40">
+          <div className="relative rounded-[28px] bg-[#0b0a18]/95 p-8">
+            <div className="flex items-center justify-between text-sm text-zinc-400">
+              <span className="font-semibold text-violet-200">Live campaign</span>
+              <span>Syncing…</span>
+            </div>
+            <div className="mt-6 space-y-6">
+              {gallery.map((item) => (
+                <motion.div
+                  key={item.title}
+                  initial={{ opacity: 0, x: 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5 }}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                >
+                  <div className="flex items-center justify-between text-sm text-zinc-400">
+                    <span>{item.title}</span>
+                    <span className="text-xs text-emerald-300">Synced</span>
+                  </div>
+                  <p className="mt-3 text-base font-medium text-white">{item.description}</p>
+                </motion.div>
+              ))}
+            </div>
+            <div className="mt-8 rounded-2xl bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 p-5 text-sm text-zinc-300">
+              <p className="font-semibold text-white">Adaptive insights</p>
+              <p className="mt-2 leading-relaxed">
+                AI recommends new creative concepts based on channel performance. Approve with a tap to launch.
+              </p>
+            </div>
+          </div>
         </div>
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.3 }}
+          className="absolute -bottom-10 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-[#0b0a18]/90 px-5 py-3 text-sm text-zinc-300 shadow-xl"
+        >
+          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          Automations active · 12 destinations synced
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+}
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1, duration: 1 }} className="mt-16 flex justify-center">
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>↓</motion.div>
-            Scroll to explore
+function SocialProof({ logos }) {
+  return (
+    <motion.section
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-80px" }}
+      variants={staggered}
+      className="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 backdrop-blur"
+    >
+      <motion.p variants={fadeUp} className="text-center text-xs uppercase tracking-[0.3em] text-zinc-400">
+        powering launches for
+      </motion.p>
+      <motion.ul
+        variants={staggered}
+        className="mt-6 flex flex-wrap items-center justify-center gap-4"
+      >
+        {logos}
+      </motion.ul>
+    </motion.section>
+  );
+}
+
+function Stats() {
+  return (
+    <motion.section
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-60px" }}
+      variants={staggered}
+      className="grid gap-6 rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/0 to-white/0 p-8 md:grid-cols-3"
+    >
+      {stats.map((item, index) => (
+        <motion.div key={item.label} variants={fadeUp} custom={index * 0.1} className="rounded-2xl border border-white/5 bg-[#0d0c1d]/80 p-6 shadow-inner shadow-black/40">
+          <p className="text-sm uppercase tracking-widest text-zinc-400">{item.label}</p>
+          <p className="mt-4 text-3xl font-semibold text-white md:text-4xl">{item.value}</p>
+        </motion.div>
+      ))}
+    </motion.section>
+  );
+}
+
+function FeatureGrid() {
+  return (
+    <motion.section
+      id="features"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-80px" }}
+      variants={staggered}
+      className="grid gap-6 lg:grid-cols-3"
+    >
+      {features.map((feature) => (
+        <motion.div
+          key={feature.title}
+          variants={fadeUp}
+          className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0b0a18]/90 p-8 shadow-lg shadow-black/30"
+        >
+          <div className={`absolute -right-20 -top-20 h-52 w-52 rounded-full bg-gradient-to-br ${feature.accent} blur-3xl opacity-60`} aria-hidden />
+          <div className="relative z-10">
+            <span className="text-3xl" role="img" aria-hidden>
+              {feature.icon}
+            </span>
+            <h3 className="mt-5 text-2xl font-semibold">{feature.title}</h3>
+            <p className="mt-3 text-base leading-relaxed text-zinc-300">{feature.description}</p>
+            <a
+              href="#"
+              className="mt-8 inline-flex items-center text-sm font-semibold text-violet-200"
+            >
+              Learn more →
+            </a>
           </div>
         </motion.div>
+      ))}
+    </motion.section>
+  );
+}
+
+function Workflow() {
+  return (
+    <motion.section
+      id="workflow"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-100px" }}
+      variants={fadeUp}
+      className="rounded-[40px] border border-white/10 bg-gradient-to-br from-violet-600/10 via-transparent to-sky-500/10 p-10"
+    >
+      <div className="flex flex-col gap-12 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-lg">
+          <p className="text-sm uppercase tracking-[0.2em] text-violet-200">workflow</p>
+          <h2 className="mt-4 text-3xl font-semibold md:text-4xl">
+            Brief. Approve. Publish. In one canvas.
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-zinc-300">
+            Collaborate with merchandisers, creatives, and growth teams inside a shared timeline. Every change is versioned with instant approvals.
+          </p>
+        </div>
+        <div className="grid flex-1 gap-6 md:grid-cols-3">
+          {workflow.map((item) => (
+            <div key={item.step} className="rounded-3xl border border-white/10 bg-[#080717]/80 p-6">
+              <p className="text-sm font-semibold text-violet-300">{item.step}</p>
+              <h3 className="mt-4 text-xl font-semibold text-white">{item.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-zinc-300">{item.description}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </motion.section>
   );
 }
 
-/* ================================ Components ================================ */
-
-const Badge = memo(function Badge({ text, icon }) {
+function Gallery() {
   return (
-    <motion.div whileHover={{ scale: 1.05 }} className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-950/50 px-4 py-2 text-sm font-medium backdrop-blur-xl">
-      <span aria-hidden>{icon}</span>
-      <span className="bg-gradient-to-r from-violet-200 to-fuchsia-200 bg-clip-text text-transparent">{text}</span>
-    </motion.div>
-  );
-});
-
-const FeaturePill = memo(function FeaturePill({ text }) {
-  return (
-    <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300 backdrop-blur-sm">
-      <span className="mr-2 text-green-400" aria-hidden>✓</span>
-      {text}
-    </div>
-  );
-});
-
-function MagneticButton({ href, children, primary = false }) {
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const buttonRef = useRef(null);
-
-  const handleMouseMove = (e) => {
-    const el = buttonRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const x = (e.clientX - rect.left - rect.width / 2) / 8;
-    const y = (e.clientY - rect.top - rect.height / 2) / 8;
-    setPosition({ x, y });
-  };
-  const handleMouseLeave = () => setPosition({ x: 0, y: 0 });
-
-  const base = "group relative inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60";
-  const variant = primary
-    ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/50 hover:shadow-xl hover:shadow-violet-500/60"
-    : "border-2 border-white/20 bg-white/5 text-white hover:bg-white/10 backdrop-blur-sm";
-
-  return (
-    <motion.a
-      ref={buttonRef}
-      href={href}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
-      className={`${base} ${variant}`}
+    <motion.section
+      id="demo"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-80px" }}
+      variants={fadeUp}
+      className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]"
     >
-      {children}
-    </motion.a>
-  );
-}
-
-const ArrowIcon = memo(function ArrowIcon() {
-  return (
-    <motion.svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="transition-transform group-hover:translate-x-1" aria-hidden>
-      <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </motion.svg>
-  );
-});
-
-function EmailCapture() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState("idle"); // idle | loading | success | error
-  const fieldId = useId();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setStatus("error");
-      return;
-    }
-    setStatus("loading");
-    try {
-      // TODO: call your API here
-      await new Promise((r) => setTimeout(r, 700));
-      setStatus("success");
-      setTimeout(() => {
-        if (typeof window !== "undefined") {
-          window.location.href = `/dashboard?email=${encodeURIComponent(email)}`;
-        }
-      }, 700);
-    } catch {
-      setStatus("error");
-    }
-  };
-
-  return (
-    <motion.form
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, delay: 0.5 }}
-      onSubmit={handleSubmit}
-      className="mt-8 flex flex-col sm:flex-row gap-3 max-w-md"
-      noValidate
-      aria-describedby={`${fieldId}-desc`}
-    >
-      <div className="relative flex-1">
-        <label htmlFor={fieldId} className="sr-only">
-          Email address
-        </label>
-        <input
-          id={fieldId}
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="your@email.com"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-zinc-500 outline-none backdrop-blur-sm transition focus:border-violet-500/50 focus:bg-white/10"
-          disabled={status === "loading" || status === "success"}
-          autoComplete="email"
-          aria-invalid={status === "error"}
-        />
-        <p id={`${fieldId}-desc`} className="sr-only">
-          Enter your email to get early access.
+      <div className="rounded-[36px] border border-white/10 bg-[#080717]/90 p-8">
+        <p className="text-sm uppercase tracking-[0.2em] text-violet-200">interactive demo</p>
+        <h2 className="mt-4 text-3xl font-semibold md:text-4xl">
+          Preview every channel before you publish
+        </h2>
+        <p className="mt-4 text-base leading-relaxed text-zinc-300">
+          View creative across PDPs, ads, email blocks, and social in a single adaptive preview. Adjust copy, aspect ratio, and overlays instantly.
         </p>
-      </div>
-      <motion.button
-        type="submit"
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        disabled={status === "loading" || status === "success"}
-        className="rounded-xl bg-white/10 px-6 py-3 font-semibold text-white transition hover:bg-white/20 disabled:opacity-50 backdrop-blur-sm"
-        aria-live="polite"
-      >
-        {status === "loading" ? "Sending…" : status === "success" ? "Sent! ✓" : "Get Early Access"}
-      </motion.button>
-      {status === "error" && <p className="text-sm text-red-400">Please enter a valid email</p>}
-    </motion.form>
-  );
-}
-
-function TiltCard({ children }) {
-  const ref = useRef(null);
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-
-  const onMove = (e) => {
-    const el = ref.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-    setRotateY((x - cx) / 20);
-    setRotateX((cy - y) / 20);
-  };
-  const onLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-  };
-
-  return (
-    <motion.div
-      ref={ref}
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
-      style={{ transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`, transition: "transform 0.1s ease-out" }}
-      className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-xl"
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/* ============================== Compare Slider ============================== */
-
-function CompareSlider() {
-  const [position, setPosition] = useState(50); // percent
-  const trackRef = useRef(null);
-  const prefersReducedMotion = useReducedMotion();
-  const clampPct = (v) => Math.max(0, Math.min(100, v));
-
-  const updateFromClientX = (clientX) => {
-    const el = trackRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const pct = ((clientX - rect.left) / rect.width) * 100;
-    setPosition(clampPct(pct));
-  };
-
-  const onPointerDown = (e) => {
-    const el = trackRef.current;
-    if (!el) return;
-    el.setPointerCapture && el.setPointerCapture(e.pointerId);
-    updateFromClientX(e.clientX);
-  };
-
-  const onPointerMove = (e) => {
-    const el = trackRef.current;
-    if (!el) return;
-    if (!(e.buttons & 1)) return; // only while primary button down
-    updateFromClientX(e.clientX);
-  };
-
-  const onPointerUpOrCancel = (e) => {
-    const el = trackRef.current;
-    if (el && el.releasePointerCapture) el.releasePointerCapture(e.pointerId);
-  };
-
-  const onKeyDown = (e) => {
-    if (e.key === "ArrowLeft") setPosition((p) => clampPct(p - 2));
-    if (e.key === "ArrowRight") setPosition((p) => clampPct(p + 2));
-    if (e.key === "Home") setPosition(0);
-    if (e.key === "End") setPosition(100);
-  };
-
-  return (
-    <div className="relative overflow-hidden rounded-2xl" aria-label="Before and after comparison">
-      <div
-        ref={trackRef}
-        className="relative aspect-[4/5] w-full cursor-ew-resize select-none touch-none"
-        role="slider"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(position)}
-        tabIndex={0}
-        onKeyDown={onKeyDown}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUpOrCancel}
-        onPointerCancel={onPointerUpOrCancel}
-      >
-        {/* After layer */}
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-900 to-fuchsia-900" aria-hidden="true">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-6xl mb-4" aria-hidden="true">✨</div>
-              <div className="text-white font-bold text-lg">Enhanced</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Before clipped */}
-        <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900" aria-hidden="true">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-6xl mb-4 opacity-50" aria-hidden="true">📷</div>
-                <div className="text-zinc-400 font-bold text-lg">Original</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Handle */}
-        <div className="absolute top-0 bottom-0 w-1 bg-white/90 shadow-lg" style={{ left: `${position}%` }} aria-hidden="true">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white p-3 shadow-xl">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M8 4l-4 8 4 8M16 4l4 8-4 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Labels */}
-        <div className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm" aria-hidden="true">
-          Before
-        </div>
-        <div className="absolute right-4 top-4 rounded-full bg-violet-600 px-3 py-1 text-xs font-bold text-white" aria-hidden="true">
-          After
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {gallery.map((item) => (
+            <motion.div
+              key={item.title}
+              whileHover={{ scale: 1.02 }}
+              className="rounded-2xl border border-white/10 bg-white/5 p-5"
+            >
+              <h3 className="text-lg font-semibold text-white">{item.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-300">{item.description}</p>
+            </motion.div>
+          ))}
         </div>
       </div>
-      {prefersReducedMotion && (
-        <p className="mt-2 text-center text-xs text-zinc-500">
-          Tip: animations are minimized to respect your settings.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/* =============================== Logo Orbit =============================== */
-
-function LogoOrbit() {
-  const logos = ["Shopify", "WooCommerce", "Etsy", "Amazon", "eBay", "BigCommerce"];
-  return (
-    <section className="relative z-10 py-20 px-6 md:px-12" aria-label="Integrations">
-      <div className="mx-auto max-w-7xl text-center">
-        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="mb-12 text-sm uppercase tracking-widest text-zinc-500">
-          Seamlessly integrates with
-        </motion.p>
-        <div className="relative h-20 overflow-hidden">
-          <motion.div animate={{ x: [0, -1000] }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="flex gap-16 absolute">
-            {[...logos, ...logos, ...logos].map((logo, i) => (
-              <div key={i} className="flex items-center justify-center min-w-[150px]">
-                <span className="text-2xl font-bold text-zinc-600 hover:text-white transition">{logo}</span>
+      <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-gradient-to-br from-white/5 via-transparent to-transparent p-1">
+        <div className="rounded-[32px] bg-[#0b0a18]/95 p-8 shadow-2xl shadow-black/50">
+          <div className="flex items-center justify-between text-sm text-zinc-400">
+            <span>Performance lift</span>
+            <span>Last 30 days</span>
+          </div>
+          <div className="mt-8 grid gap-4">
+            {[18, 24, 31].map((value, index) => (
+              <div key={index} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <div className="flex items-center justify-between text-sm text-zinc-400">
+                  <span>{["PDP", "Paid Social", "Email" ][index]}</span>
+                  <span className="text-emerald-300">+{value}%</span>
+                </div>
+                <div className="mt-4 h-2 rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500" style={{ width: `${value}%` }} />
+                </div>
               </div>
             ))}
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================== Metrics Section ============================== */
-
-function MetricsSection() {
-  const metrics = [
-    { value: 43, suffix: "%", label: "Higher conversions", color: "from-green-400 to-emerald-600" },
-    { value: 94, suffix: "%", label: "Time saved", color: "from-violet-400 to-purple-600" },
-    { value: 12, suffix: "s", label: "Avg render time", color: "from-blue-400 to-cyan-600" },
-    { value: 99.9, suffix: "%", label: "Uptime SLA", color: "from-fuchsia-400 to-pink-600" },
-  ];
-
-  return (
-    <section className="relative z-10 px-6 py-24 md:px-12" aria-label="Key metrics">
-      <div className="mx-auto max-w-7xl">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {metrics.map((m, i) => (
-            <MetricCard key={i} {...m} delay={i * 0.08} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function MetricCard({ value, suffix, label, color, delay }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          const duration = 1600;
-          const start = performance.now();
-          const tick = (now) => {
-            const progress = Math.min((now - start) / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            setCount(eased * value);
-            if (progress < 1) requestAnimationFrame(tick);
-          };
-          requestAnimationFrame(tick);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.5 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [value]);
-
-  const decimals = suffix === "s" || (suffix === "%" && value > 90) ? 1 : 0;
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6, delay }}
-      whileHover={{ scale: 1.05, y: -5 }}
-      className="group relative rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-6 backdrop-blur-sm transition-all hover:border-white/20 hover:shadow-2xl hover:shadow-violet-500/20"
-    >
-      <div className={`text-4xl md:text-5xl font-black bg-gradient-to-r ${color} bg-clip-text text-transparent`}>
-        {count.toFixed(decimals)}{suffix}
-      </div>
-      <div className="mt-2 text-sm text-zinc-400 group-hover:text-zinc-300 transition">{label}</div>
-      <div className={`pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r ${color} opacity-0 blur-xl transition-opacity group-hover:opacity-10`} />
-    </motion.div>
-  );
-}
-
-/* ============================ Feature Showcase ============================ */
-
-function FeatureShowcase() {
-  const features = [
-    { title: "AI Image Enhancement", description: "Transform amateur shots into studio-quality masterpieces with one click. Advanced AI removes backgrounds, adjusts lighting, and perfects every pixel.", icon: "🎨", gradient: "from-violet-500 to-purple-600" },
-    { title: "Virtual Try-On", description: "Let customers see products on real models instantly. Boost confidence, reduce returns, and watch conversions skyrocket.", icon: "👕", gradient: "from-fuchsia-500 to-pink-600" },
-    { title: "Smart Copy Generation", description: "AI-powered descriptions that sell. Get compelling, SEO-optimized product copy in seconds—no copywriter needed.", icon: "✍️", gradient: "from-blue-500 to-cyan-600" },
-  ];
-  return (
-    <section id="features" className="relative z-10 px-6 py-32 md:px-12">
-      <div className="mx-auto max-w-7xl">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-16 text-center">
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black">
-            Built for <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">conversion</span>
-          </h2>
-          <p className="mt-4 text-xl text-zinc-400 max-w-2xl mx-auto">Every feature designed to turn browsers into buyers</p>
-        </motion.div>
-        <div className="grid gap-8 md:grid-cols-3">
-          {features.map((f, i) => (
-            <FeatureCard key={i} {...f} delay={i * 0.1} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FeatureCard({ title, description, icon, gradient, delay }) {
-  return (
-    <motion.article
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6, delay }}
-      whileHover={{ y: -8 }}
-      className="group relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-8 backdrop-blur-sm transition-all hover:border-white/20 hover:shadow-2xl"
-    >
-      <div className={`mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-r ${gradient} text-3xl shadow-lg`} aria-hidden>
-        {icon}
-      </div>
-      <h3 className="mb-3 text-2xl font-bold">{title}</h3>
-      <p className="text-zinc-400 leading-relaxed group-hover:text-zinc-300 transition">{description}</p>
-      <div className={`pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-r ${gradient} opacity-0 blur-2xl transition-opacity group-hover:opacity-5`} />
-    </motion.article>
-  );
-}
-
-/* ============================ Interactive Demo ============================ */
-
-function InteractiveDemo() {
-  return (
-    <section id="demo" className="relative z-10 px-6 py-32 md:px-12 bg-gradient-to-b from-transparent via-violet-950/20 to-transparent" aria-label="Interactive demo">
-      <div className="mx-auto max-w-7xl">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-black mb-4">See the magic</h2>
-          <p className="text-xl text-zinc-400">Drag to compare before and after</p>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="mx-auto max-w-3xl">
-          <TiltCard>
-            <CompareSlider />
-          </TiltCard>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================ Process Timeline ============================ */
-
-function ProcessTimeline() {
-  const steps = [
-    { title: "Upload", description: "Drop your product photo—any format, any quality", icon: "📤" },
-    { title: "Enhance", description: "AI works its magic in seconds", icon: "✨" },
-    { title: "Export", description: "Download or publish directly to your store", icon: "🚀" },
-  ];
-
-  return (
-    <section id="how" className="relative z-10 px-6 py-32 md:px-12" aria-label="How it works">
-      <div className="mx-auto max-w-7xl">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-20 text-center">
-          <h2 className="text-4xl md:text-5xl font-black mb-4">Three steps to perfect</h2>
-          <p className="text-xl text-zinc-400">From upload to sale in under a minute</p>
-        </motion.div>
-        <div className="relative">
-          <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent hidden md:block" aria-hidden />
-          <div className="grid gap-12 md:grid-cols-3">
-            {steps.map((s, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: i * 0.15 }} className="relative text-center">
-                <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="relative z-10 mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-4xl shadow-2xl shadow-violet-500/50">
-                  <span aria-hidden>{s.icon}</span>
-                </motion.div>
-                <h3 className="mb-3 text-2xl font-bold">{s.title}</h3>
-                <p className="text-zinc-400">{s.description}</p>
-              </motion.div>
-            ))}
           </div>
-        </div>
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mt-16 text-center">
-          <MagneticButton href="#demo" primary>
-            Try it yourself <ArrowIcon />
-          </MagneticButton>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================== Social Proof ============================== */
-
-function SocialProof() {
-  const testimonials = [
-    '"Conversion rate jumped 47% in our first month."',
-    '"We ditched our $8K/month photo team."',
-    '"ROI positive in 72 hours. Unreal."',
-    '"My competitor asked what agency we hired. LOL."',
-    '"Product returns down 34% with try-on."',
-  ];
-
-  return (
-    <section className="relative z-10 py-24 overflow-hidden" aria-label="Testimonials">
-      <div className="relative">
-        <motion.div animate={{ x: [-1000, 0] }} transition={{ duration: 40, repeat: Infinity, ease: "linear" }} className="flex gap-8">
-          {[...testimonials, ...testimonials, ...testimonials].map((t, i) => (
-            <blockquote key={i} className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/5 px-8 py-6 backdrop-blur-sm min-w-[320px] md:min-w-[400px]">
-              <p className="text-lg text-zinc-300">{t}</p>
-            </blockquote>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-/* =============================== Final CTA =============================== */
-
-function FinalCTA() {
-  return (
-    <section className="relative z-10 px-6 py-32 md:px-12" aria-label="Call to action">
-      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mx-auto max-w-4xl text-center">
-        <div className="relative rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-violet-900/40 to-fuchsia-900/40 p-12 md:p-16 backdrop-blur-xl overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-violet-600/10 via-transparent to-fuchsia-600/10" aria-hidden />
-          <div className="relative">
-            <h2 className="text-4xl md:text-5xl font-black mb-6">Your competitors aren't waiting</h2>
-            <p className="text-xl text-zinc-300 mb-10 max-w-2xl mx-auto">
-              Join 2,400+ brands creating product visuals that convert. Start free—no credit card, no commitment, no BS.
+          <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-zinc-300">
+            <p className="font-semibold text-white">Autopilot</p>
+            <p className="mt-2 leading-relaxed">
+              Let AI adjust offers, copy, and creative per channel. Approvals stay in your control with shared team notes.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <MagneticButton href="#demo" primary>
-                Start creating free <ArrowIcon />
-              </MagneticButton>
-              <MagneticButton href="#features">Explore features</MagneticButton>
-            </div>
-            <ul className="mt-10 flex flex-wrap justify-center gap-6 text-sm text-zinc-400">
-              <li>✓ 3 free renders</li>
-              <li>✓ No credit card</li>
-              <li>✓ Cancel anytime</li>
-              <li>✓ Setup in 60s</li>
-            </ul>
           </div>
         </div>
-      </motion.div>
-    </section>
+      </div>
+    </motion.section>
   );
 }
 
-/* ============================ Floating CTA ============================ */
-
-function FloatingCTA() {
-  const [isVisible, setIsVisible] = useState(false);
-  const prefersReducedMotion = useReducedMotion();
-
-  useEffect(() => {
-    const onScroll = () => setIsVisible(window.scrollY > 800);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  if (prefersReducedMotion) return null;
-
+function Testimonials() {
   return (
-    <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 100 }} className="fixed bottom-6 right-6 z-50 md:hidden">
-      <motion.a href="#demo" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-4 font-bold text-white shadow-2xl shadow-violet-500/50">
-        Start free <ArrowIcon />
-      </motion.a>
-    </motion.div>
+    <motion.section
+      id="stories"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-80px" }}
+      variants={staggered}
+      className="grid gap-6 md:grid-cols-2"
+    >
+      {testimonials.map((testimonial) => (
+        <motion.article
+          key={testimonial.name}
+          variants={fadeUp}
+          className="flex h-full flex-col gap-6 rounded-[32px] border border-white/10 bg-[#080717]/85 p-8 shadow-xl"
+        >
+          <p className="text-lg leading-relaxed text-zinc-200">“{testimonial.quote}”</p>
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 overflow-hidden rounded-full border border-white/10 bg-white/10">
+              <img
+                src={testimonial.avatar}
+                alt={testimonial.name}
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div>
+              <p className="text-base font-semibold text-white">{testimonial.name}</p>
+              <p className="text-sm text-zinc-400">{testimonial.role}</p>
+            </div>
+          </div>
+        </motion.article>
+      ))}
+    </motion.section>
+  );
+}
+
+function FAQ() {
+  return (
+    <motion.section
+      id="how"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-120px" }}
+      variants={fadeUp}
+      className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]"
+    >
+      <div>
+        <p className="text-sm uppercase tracking-[0.2em] text-violet-200">FAQ</p>
+        <h2 className="mt-4 text-3xl font-semibold md:text-4xl">Everything you need to launch with confidence</h2>
+        <p className="mt-4 text-base leading-relaxed text-zinc-300">
+          Transparent pricing, enterprise-ready security, and 24/7 creative support built for teams that ship fast.
+        </p>
+      </div>
+      <div className="space-y-6">
+        {faqs.map((faq) => (
+          <details
+            key={faq.question}
+            className="group rounded-3xl border border-white/10 bg-[#080717]/85 p-6"
+            open={faq.question === faqs[0].question}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between text-lg font-semibold text-white">
+              {faq.question}
+              <span className="text-xl transition group-open:rotate-45">+</span>
+            </summary>
+            <p className="mt-4 text-base leading-relaxed text-zinc-300">{faq.answer}</p>
+          </details>
+        ))}
+      </div>
+    </motion.section>
+  );
+}
+
+function CTA() {
+  return (
+    <motion.section
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-140px" }}
+      variants={fadeUp}
+      className="overflow-hidden rounded-[40px] border border-white/10 bg-gradient-to-br from-violet-600/20 via-fuchsia-500/10 to-sky-500/10 p-12 text-center"
+    >
+      <motion.h2 variants={fadeUp} className="text-3xl font-semibold md:text-4xl">
+        Ready to design the future of your product storytelling?
+      </motion.h2>
+      <motion.p variants={fadeUp} custom={0.1} className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-zinc-200">
+        Get full access to the Adaptive Content Engine for 14 days. Import your catalog, collaborate with your team, and launch your next campaign in record time.
+      </motion.p>
+      <motion.div variants={fadeUp} custom={0.2} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <a
+          href="/signup"
+          className="inline-flex items-center justify-center rounded-2xl bg-white px-8 py-4 text-base font-semibold text-[#06050d] shadow-xl shadow-black/10 transition hover:bg-zinc-100"
+        >
+          Create your workspace
+        </a>
+        <a
+          href="/pricing"
+          className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-8 py-4 text-base font-semibold text-white backdrop-blur transition hover:bg-white/20"
+        >
+          Compare plans
+        </a>
+      </motion.div>
+      <motion.p variants={fadeUp} custom={0.3} className="mt-6 text-sm text-zinc-300">
+        No credit card required · Cancel anytime · SOC 2 Type II compliant
+      </motion.p>
+    </motion.section>
   );
 }
