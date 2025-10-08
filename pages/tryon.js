@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useReducer, useRef, useState } from 'react';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Layout from '@/components/Layout';
 import Toast from '@/components/Toast';
 import Spinner from '@/components/Spinner';
@@ -145,7 +145,7 @@ function reducer(state, action){
 
 /* ---------------- Page ---------------- */
 export default function TryOnPage(){
-  const [supabase] = useState(()=>createBrowserSupabaseClient());
+  const [supabase] = useState(() => createPagesBrowserClient());
   const [dragActive, setDragActive] = useState(false);
   const [state, dispatch] = useReducer(reducer, initialState);
 
