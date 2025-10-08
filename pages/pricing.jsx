@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, ShieldCheck, Zap, BadgeCheck, ArrowRight,
   HelpCircle, ChevronDown, Check, X, Star,
-  Users, Database, Film, Gauge, Globe
+  Users, Database, Film, Gauge, Globe,
+  Sparkles, LineChart, Crown
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Layout from '@/components/Layout';
@@ -160,6 +161,33 @@ const ADDONS = [
   { key: 'priority', name: 'Priority Booster',    desc: 'Skip queues more often',  priceUSD: 15,  icon: <Gauge className="h-4 w-4" /> },
 ];
 
+const HERO_HIGHLIGHTS = [
+  {
+    key: 'quality',
+    icon: Sparkles,
+    title: 'Studio-grade quality',
+    desc: 'Photorealistic lighting, textures, and garments rendered in seconds.',
+  },
+  {
+    key: 'conversion',
+    icon: LineChart,
+    title: 'Boosted conversions',
+    desc: 'Teams report 23% higher add-to-cart rates after rolling out premium visuals.',
+  },
+  {
+    key: 'control',
+    icon: Crown,
+    title: 'Creative control',
+    desc: 'Dial in poses, lighting presets, and brand kits without leaving the browser.',
+  },
+];
+
+const HERO_STATS = [
+  { key: 'teams', value: '4.8★', label: 'Average rating across 1,200+ creative teams' },
+  { key: 'speed', value: '6×', label: 'Faster approvals versus manual retouching' },
+  { key: 'roi', value: '20%', label: 'Savings with annual billing on Pro & above' },
+];
+
 /* =========================
    FAQ
 ========================= */
@@ -224,6 +252,9 @@ export default function PricingPage() {
     });
   }, [billing, currency]);
 
+  const proPlan = useMemo(() => plans.find((p) => p?.key === 'pro'), [plans]);
+  const businessPlan = useMemo(() => plans.find((p) => p?.key === 'business'), [plans]);
+
   // Estimator calc
   const estimator = useMemo(() => {
     const plan = BASE_PLANS.find((p) => p.key === selectedPlan);
@@ -247,49 +278,105 @@ export default function PricingPage() {
     <Layout title="Pricing">
       <main className={`min-h-screen ${bgClass}`}>
         {/* Hero */}
-        <section className="relative overflow-hidden">
+        <section className="relative overflow-hidden pb-16 pt-24">
           <div className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-[120px]" />
-            <div className="absolute -bottom-24 -right-24 h-[22rem] w-[22rem] rounded-full bg-indigo-500/20 blur-[140px]" />
+            <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-fuchsia-500/25 blur-[140px]" />
+            <div className="absolute -bottom-32 -right-24 h-[26rem] w-[26rem] rounded-full bg-indigo-500/25 blur-[160px]" />
             <div
-              className="absolute inset-0 opacity-[0.06]"
+              className="absolute inset-0 opacity-[0.05]"
               style={{
                 backgroundImage:
-                  'linear-gradient(to right, rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.5) 1px, transparent 1px)',
-                backgroundSize: '44px 44px',
+                  'radial-gradient(circle at top left, rgba(236,72,153,.2), transparent 45%), radial-gradient(circle at bottom right, rgba(37,99,235,.2), transparent 35%)',
               }}
             />
           </div>
 
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 pt-24 pb-10 text-center">
-            <motion.h1
-              className="text-4xl md:text-5xl font-extrabold tracking-tight"
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              Pricing that scales with your brand
-            </motion.h1>
-            <p className="mx-auto mt-4 max-w-2xl text-base sm:text-lg text-zinc-600 dark:text-zinc-300">
-              Start free. Upgrade when you’re ready. Cancel anytime. Zero hassle.
-            </p>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="grid gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,420px)] lg:items-center">
+              <motion.div
+                initial={{ opacity: 0, y: 28 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="text-left"
+              >
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white/90">
+                  AI visuals loved by top ecommerce teams
+                </div>
+                <motion.h1
+                  className="mt-4 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1, duration: 0.6 }}
+                >
+                  Pricing engineered to beat the brief—and the competition
+                </motion.h1>
+                <motion.p
+                  className="mt-4 max-w-2xl text-base text-zinc-600 dark:text-zinc-300 sm:text-lg"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.6 }}
+                >
+                  Launch hyper-real product imagery, AI try-ons, and campaign-ready edits in one workflow. Start free, then scale with plans built for modern merchandisers and agencies.
+                </motion.p>
 
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs">
-              <Badge icon={<ShieldCheck className="h-4 w-4" />} text="7-day money-back guarantee" />
-              <Badge icon={<Zap className="h-4 w-4" />} text="Fast priority queues (Pro+)" />
-              <Badge icon={<BadgeCheck className="h-4 w-4" />} text="Secure & GDPR-aware" />
-            </div>
+                <div className="mt-6 flex flex-wrap items-center gap-3 text-xs">
+                  <Badge icon={<ShieldCheck className="h-4 w-4" />} text="7-day money-back guarantee" />
+                  <Badge icon={<Zap className="h-4 w-4" />} text="Priority rendering on Pro+" />
+                  <Badge icon={<BadgeCheck className="h-4 w-4" />} text="SOC2-ready infrastructure" />
+                </div>
 
-            {/* Toggles */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <BillingToggle billing={billing} onChange={setBilling} savings={savingsLabel} />
-              <CurrencyToggle currency={currency} onChange={setCurrency} />
-            </div>
+                <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                  {HERO_HIGHLIGHTS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div
+                        key={item.key}
+                        className="rounded-2xl border border-white/15 bg-white/60 p-4 shadow-sm backdrop-blur dark:bg-white/5"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-fuchsia-500 text-white shadow-lg">
+                            <Icon className="h-5 w-5" />
+                          </span>
+                          <div>
+                            <div className="text-sm font-semibold">{item.title}</div>
+                            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{item.desc}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            {/* Reviews + Verified logos */}
-            <div className="mt-8 space-y-6">
-              <ReviewsStrip />
-              <VerifiedBrands />
+                <div className="mt-8 flex flex-wrap items-center gap-3">
+                  <BillingToggle billing={billing} onChange={setBilling} savings={savingsLabel} />
+                  <CurrencyToggle currency={currency} onChange={setCurrency} />
+                </div>
+
+                <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                  {HERO_STATS.map((stat) => (
+                    <div
+                      key={stat.key}
+                      className="rounded-2xl border border-white/15 bg-white/50 p-4 text-left backdrop-blur dark:bg-white/5"
+                    >
+                      <div className="text-2xl font-bold text-zinc-900 dark:text-white">{stat.value}</div>
+                      <p className="mt-1 text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <ReviewsStrip />
+                  <VerifiedBrands />
+                </div>
+              </motion.div>
+
+              <HeroPlanSpotlight
+                plan={proPlan}
+                secondaryPlan={businessPlan}
+                billing={billing}
+                currency={currency}
+                onChoosePlan={() => setSelectedPlan('pro')}
+              />
             </div>
           </div>
         </section>
@@ -300,12 +387,33 @@ export default function PricingPage() {
             {plans
               .filter(p => ['free','starter','pro','business'].includes(p.key))
               .map((plan, idx) => (
-                <PlanCard key={plan.key} plan={plan} billing={billing} currency={currency} delay={idx * 0.06} />
+                <PlanCard
+                  key={plan.key}
+                  plan={plan}
+                  billing={billing}
+                  currency={currency}
+                  delay={idx * 0.06}
+                  onSelectPlan={setSelectedPlan}
+                />
               ))}
             {/* Agency */}
-            <PlanCard key="agency" plan={plans.find(p=>p.key==='agency')} billing={billing} currency={currency} delay={0.3} />
+            <PlanCard
+              key="agency"
+              plan={plans.find(p=>p.key==='agency')}
+              billing={billing}
+              currency={currency}
+              delay={0.3}
+              onSelectPlan={setSelectedPlan}
+            />
             {/* Enterprise */}
-            <PlanCard key="enterprise" plan={plans.find(p=>p.key==='enterprise')} billing={billing} currency={currency} delay={0.36} />
+            <PlanCard
+              key="enterprise"
+              plan={plans.find(p=>p.key==='enterprise')}
+              billing={billing}
+              currency={currency}
+              delay={0.36}
+              onSelectPlan={setSelectedPlan}
+            />
           </div>
           <MobileStickyCta />
         </section>
@@ -639,7 +747,7 @@ function CurrencyToggle({ currency, onChange }) {
 
 function ReviewsStrip() {
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/40 px-4 py-3 text-sm backdrop-blur dark:bg-white/5">
+    <div className="flex w-full max-w-md flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/40 px-4 py-3 text-sm backdrop-blur dark:bg-white/5">
       <div className="flex items-center gap-1">
         {Array.from({ length: 5 }).map((_, i) => (
           <Star
@@ -666,9 +774,9 @@ function VerifiedBrands() {
     { name: 'Zara' }, { name: 'ASOS' }, { name: 'Farfetch' }, { name: 'Shopify Plus' }, { name: 'Noon' },
   ];
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-2 text-xs font-semibold text-white/80 text-center">Verified by brands</div>
-      <div className="grid grid-cols-3 place-items-center gap-3 sm:grid-cols-5">
+    <div className="flex w-full max-w-xl flex-col gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-xs text-white/80 backdrop-blur dark:bg-white/5">
+      <div className="font-semibold uppercase tracking-wide text-[11px] text-white/80">Verified by brands</div>
+      <div className="grid grid-cols-3 place-items-center gap-2 sm:grid-cols-5">
         {brands.map((b) => (
           <BrandMark key={b.name} label={b.name} />
         ))}
@@ -679,8 +787,8 @@ function VerifiedBrands() {
 
 function BrandMark({ label }) {
   return (
-    <div className="group relative inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs text-white/80 transition hover:bg-white/15">
-      <svg width="18" height="18" viewBox="0 0 24 24" className="text-white/80">
+    <div className="group relative inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/30 px-3 py-2 text-xs text-zinc-700 transition hover:bg-white/50 dark:border-white/10 dark:bg-white/10 dark:text-white/80">
+      <svg width="18" height="18" viewBox="0 0 24 24" className="text-purple-600 dark:text-white/80">
         <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
       </svg>
       <span>{label}</span>
@@ -689,7 +797,105 @@ function BrandMark({ label }) {
   );
 }
 
-function PlanCard({ plan, billing, currency, delay = 0 }) {
+function HeroPlanSpotlight({ plan, secondaryPlan, billing, currency, onChoosePlan }) {
+  if (!plan) return null;
+
+  const monthlyPrice = plan.monthlyUSD == null ? null : formatMoney(plan.monthlyUSD, currency);
+  const yearlyPrice = plan.monthlyUSD == null ? null : formatMoney(Math.round((plan.monthlyUSD || 0) * 12 * 0.8), currency);
+
+  let primaryPrice = 'Custom pricing';
+  let secondaryLine = 'Let’s design a plan together.';
+
+  if (plan.monthlyUSD != null) {
+    if (billing === 'yearly') {
+      primaryPrice = `${yearlyPrice}/yr`;
+      secondaryLine = `${monthlyPrice}/mo equivalent • Save 20% annually`;
+    } else {
+      primaryPrice = `${monthlyPrice}/mo`;
+      secondaryLine = `${yearlyPrice}/yr when billed annually (save 20%)`;
+    }
+  }
+
+  const secondaryLabel = secondaryPlan?.monthlyUSD != null
+    ? `${formatMoney(secondaryPlan.monthlyUSD, currency)}/mo`
+    : 'Custom';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 32 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.15, duration: 0.6 }}
+      className="relative isolate flex flex-col gap-6 overflow-hidden rounded-[2rem] border border-white/15 bg-gradient-to-br from-white via-white/85 to-white/60 p-8 text-zinc-900 shadow-2xl backdrop-blur dark:from-white/10 dark:via-white/5 dark:to-white/5 dark:text-white"
+    >
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.25),transparent_55%),radial-gradient(circle_at_bottom,rgba(37,99,235,0.2),transparent_55%)]" />
+      <div className="pointer-events-none absolute -top-24 right-0 -z-10 h-48 w-48 rounded-full bg-white/40 blur-3xl dark:bg-white/10" />
+
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-4xl" aria-hidden>{plan.icon}</span>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-purple-600 dark:text-fuchsia-200">
+              Recommended
+            </div>
+            <h3 className="text-2xl font-bold">{plan.name} plan</h3>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300 max-w-[18rem]">{plan.tagline}</p>
+          </div>
+        </div>
+        {plan.highlight && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-purple-700 dark:text-fuchsia-200">
+            <Zap className="h-3.5 w-3.5" /> {plan.highlight}
+          </span>
+        )}
+      </div>
+
+      <div>
+        <div className="text-4xl font-black tracking-tight">{primaryPrice}</div>
+        <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{secondaryLine}</div>
+      </div>
+
+      <ul className="grid gap-3">
+        {plan.features.slice(0, 5).map((feature) => (
+          <li key={feature} className="flex items-start gap-3 text-sm">
+            <span className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-500">
+              <CheckCircle className="h-3.5 w-3.5" />
+            </span>
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="flex flex-col gap-3">
+        <Button onClick={onChoosePlan} className="w-full text-base">
+          Upgrade to {plan.name}
+        </Button>
+        <Link
+          href="/dashboard"
+          className="text-sm font-semibold text-purple-700 underline-offset-4 hover:underline dark:text-fuchsia-200"
+        >
+          Explore the workspace
+        </Link>
+        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Cancel anytime. No usage penalties. VAT handled automatically.</p>
+      </div>
+
+      {secondaryPlan && (
+        <div className="rounded-2xl border border-white/20 bg-white/50 p-4 text-sm backdrop-blur dark:bg-white/10">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold">Need more seats?</div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{secondaryPlan.name} • {secondaryPlan.tagline}</p>
+            </div>
+            <div className="text-right text-xs text-zinc-500 dark:text-zinc-300">
+              <div className="font-semibold text-zinc-900 dark:text-white">{secondaryLabel}</div>
+              <div>Priority+ queue</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+function PlanCard({ plan, billing, currency, delay = 0, onSelectPlan }) {
   if (!plan) return null;
   const { displayUSD, monthlyUSD } = plan;
   const priceLabel = displayUSD == null ? 'Custom' : `${formatMoney(displayUSD, currency)}${billing === 'yearly' && monthlyUSD != null ? ' /mo' : ''}`;
@@ -701,51 +907,59 @@ function PlanCard({ plan, billing, currency, delay = 0 }) {
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.5, delay }}
       className={[
-        'relative flex h-full flex-col justify-between rounded-3xl border p-8 text-center shadow-xl transition-all',
-        'border-white/10 bg-white/50 backdrop-blur dark:bg-white/5',
-        plan.popular ? 'ring-2 ring-fuchsia-500/40' : '',
+        'relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/15 bg-white/70 p-8 text-left shadow-xl transition-all backdrop-blur',
+        plan.popular
+          ? 'ring-2 ring-offset-2 ring-fuchsia-400/50 ring-offset-white dark:ring-offset-transparent'
+          : 'hover:-translate-y-1',
+        'dark:bg-white/5',
       ].join(' ')}
     >
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.18),transparent_60%),radial-gradient(circle_at_bottom,rgba(37,99,235,0.18),transparent_55%)]" />
       {plan.popular && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200">
+        <div className="absolute right-6 top-6">
+          <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/50 bg-white/70 px-3 py-1 text-xs font-bold text-amber-500 shadow-sm dark:bg-white/10 dark:text-amber-200">
             <Zap className="h-3.5 w-3.5" /> {plan.highlight || 'Popular'}
           </span>
         </div>
       )}
 
-      <div>
-        <div className="text-4xl mb-3">{plan.icon}</div>
-        <h3 className="text-2xl font-semibold">{plan.name}</h3>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{plan.tagline}</p>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-start gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-500 text-2xl text-white shadow-lg">
+            {plan.icon}
+          </span>
+          <div>
+            <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">{plan.name}</h3>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{plan.tagline}</p>
+          </div>
+        </div>
 
-        <div className="mt-5">
-          <div className="text-4xl font-extrabold tracking-tight">{priceLabel}</div>
+        <div>
+          <div className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white">{priceLabel}</div>
           <div className="text-xs text-zinc-500 dark:text-zinc-400">{plan.subLabel}</div>
         </div>
 
-        <ul className="mt-6 space-y-3 text-sm">
+        <ul className="grid gap-3 text-sm">
           {plan.features.map((f) => (
-            <li key={f} className="flex items-center justify-center gap-2">
-              <CheckCircle className="h-4 w-4 text-purple-500" />
+            <li key={f} className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/15 text-purple-600">
+                <CheckCircle className="h-3.5 w-3.5" />
+              </span>
               <span>{f}</span>
             </li>
           ))}
         </ul>
 
         {plan.note && (
-          <div className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">{plan.note}</div>
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400">{plan.note}</div>
         )}
       </div>
 
-      <div className="mt-8">
+      <div className="mt-6">
         <Button
-          className={[
-            'w-full rounded-xl px-4 py-2 text-base font-semibold shadow-md transition-transform',
-            plan.popular
-              ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-indigo-600 text-white'
-              : 'bg-white text-zinc-900 hover:scale-[1.02] dark:bg-white/10 dark:text-white',
-          ].join(' ')}
+          variant={plan.popular ? 'primary' : 'secondary'}
+          className="block w-full text-base"
+          onClick={() => onSelectPlan?.(plan.key)}
         >
           {plan.cta}
         </Button>
