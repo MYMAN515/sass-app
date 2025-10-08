@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Cookies from 'js-cookie';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const supabase = createBrowserSupabaseClient();
+  const supabase = createPagesBrowserClient();
   const [status, setStatus] = useState('Verifying…');
   const [error, setError] = useState('');
 

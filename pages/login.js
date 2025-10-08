@@ -3,14 +3,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AuthPage() {
   const router = useRouter();
 
   // ✅ أنشئ عميل سوبر بيس مرة واحدة
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const supabase = useMemo(() => createPagesBrowserClient(), []);
 
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');

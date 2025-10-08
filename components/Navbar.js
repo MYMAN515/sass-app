@@ -7,7 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoonIcon, SunIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/solid';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
 const LINKS = [
   { href: '/', label: 'Home' },
@@ -20,7 +20,7 @@ const LINKS = [
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const [supabase] = useState(() => createBrowserSupabaseClient());
+  const [supabase] = useState(() => createPagesBrowserClient());
 
   const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState(true);

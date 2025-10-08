@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useReducer, useRef, useState } from 'react';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Spinner from '@/components/Spinner';
 import Toast from '@/components/Toast';
 import Button from '@/components/Button';
@@ -192,7 +192,7 @@ function reducer(state, action) {
 }
 
 export default function EnhancePage() {
-  const [supabase] = useState(() => createBrowserSupabaseClient());
+  const [supabase] = useState(() => createPagesBrowserClient());
   const [dragActive, setDragActive] = useState(false);
   const [state, dispatch] = useReducer(reducer, initialState);
   const { userEmail, userId, userPlan, previewUrl, file, resultUrl, loading, showEnhanceModal, toast, options, progress } = state;

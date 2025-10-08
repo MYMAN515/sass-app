@@ -1,11 +1,11 @@
 // pages/admin/blog/index.js
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import Layout from '@/components/Layout';
 
 function formatDate(iso) {
@@ -18,9 +18,8 @@ function formatDate(iso) {
 
 export default function BlogAdmin() {
   const router = useRouter();
-  const supabase = useMemo(() => createPagesBrowserClient(), []);
-
-  const [session, setSession] = useState(null);
+  const supabase = useSupabaseClient();
+  const session = useSession();
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('pending'); // pending | draft | published | rejected | all
   const [q, setQ] = useState('');
@@ -31,28 +30,29 @@ export default function BlogAdmin() {
 
   // Auth + role
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!mounted) return;
-      if (!session?.user) {
-        router.replace(`/login?next=${encodeURIComponent('/admin/blog')}`);
-        return;
-      }
-      setSession(session);
+    if (session === null) {
+      router.replace(`/login?next=${encodeURIComponent('/admin/blog')}`);
+      return;
+    }
+    if (!session?.user) return;
 
+    let cancelled = false;
+    (async () => {
       const { data: roleRow } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', session.user.id)
         .maybeSingle();
 
-      setRole(roleRow?.role || '');
+      if (!cancelled) {
+        setRole(roleRow?.role || '');
+      }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => { mounted = false; sub.subscription.unsubscribe(); };
-  }, [supabase, router]);
+    return () => {
+      cancelled = true;
+    };
+  }, [session, supabase, router]);
 
   // Fetch posts
   useEffect(() => {
