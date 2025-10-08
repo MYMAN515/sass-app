@@ -929,25 +929,6 @@ const buildTryOnPrompt = (items = []) => {
     [setGroup, setSidebarOpen, switchTool]
   );
 
-  const allowedTools = (g) => (g === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((t) => t.id);
-
-  if (loading || user === undefined) {
-    return (
-      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-[#0b0b0f] to-[#140b22] text-zinc-300">
-        <div className="rounded-2xl bg-white/5 backdrop-blur px-4 py-3 border border-white/10 shadow text-sm">
-          Loading…
-        </div>
-      </main>
-    );
-  }
-  if (!user) return null;
-
-  const initials = (() => {
-    const n = user?.user_metadata?.name || user?.email || 'U';
-    const p = n.split(' ').filter(Boolean);
-    return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
-  })();
-
   const insights = useMemo(() => {
     const safeHistory = Array.isArray(history) ? history : [];
     const totalRuns = safeHistory.length;
@@ -1127,6 +1108,24 @@ const buildTryOnPrompt = (items = []) => {
     setShowEnhance,
   ]);
 
+  const allowedTools = (g) => (g === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((t) => t.id);
+
+  if (loading || user === undefined) {
+    return (
+      <main className="min-h-screen grid place-items-center bg-gradient-to-b from-[#0b0b0f] to-[#140b22] text-zinc-300">
+        <div className="rounded-2xl bg-white/5 backdrop-blur px-4 py-3 border border-white/10 shadow text-sm">
+          Loading…
+        </div>
+      </main>
+    );
+  }
+  if (!user) return null;
+
+  const initials = (() => {
+    const n = user?.user_metadata?.name || user?.email || 'U';
+    const p = n.split(' ').filter(Boolean);
+    return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
+  })();
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-zinc-50 relative overflow-hidden">
       {/* Background effects */}
