@@ -1,17 +1,13 @@
-import React, { useEffect, useId, useMemo, useRef, useState, memo } from "react";
-import {
-  motion,
-  useScroll,
-  useTransform,
-  useReducedMotion,
-} from "framer-motion";
+import React, { useEffect, useId, useRef, useState, memo } from "react";
+import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
 
 /**
- * Ultra Landing v2
+ * Ultra Landing v2 — JSX
+ * - DPR-correct canvas drawing & clearing
+ * - No TS types, pure JSX
  * - SSR-safe (no document/window at module scope)
  * - A11y: keyboard & screen reader support
- * - Performance: DPR-aware canvas, throttled resize, offscreen pauses
- * - Mobile-first & reduced-motion friendly
+ * - Performance: throttled resize, offscreen pause, reduced-motion friendly
  */
 
 export default function HeroSection() {
@@ -34,7 +30,7 @@ export default function HeroSection() {
 /* ============================= Background Canvas ============================= */
 
 function BackgroundCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef(null);
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -44,51 +40,53 @@ function BackgroundCanvas() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Handle DPR for crisp rendering
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let wCss = window.innerWidth;
+    let hCss = window.innerHeight;
+
     const setSize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const { innerWidth: w, innerHeight: h } = window;
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      wCss = window.innerWidth;
+      hCss = window.innerHeight;
+      canvas.width = Math.floor(wCss * dpr);
+      canvas.height = Math.floor(hCss * dpr);
+      canvas.style.width = `${wCss}px`;
+      canvas.style.height = `${hCss}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw/clear in CSS px
     };
     setSize();
 
+    const rand = (a, b) => a + Math.random() * (b - a);
     const PARTICLE_COUNT = 90;
-    const rand = (a: number, b: number) => a + Math.random() * (b - a);
-
     const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
-      x: rand(0, canvas.width / (window.devicePixelRatio || 1)),
-      y: rand(0, canvas.height / (window.devicePixelRatio || 1)),
+      x: rand(0, wCss),
+      y: rand(0, hCss),
       vx: rand(-0.35, 0.35),
       vy: rand(-0.35, 0.35),
       size: rand(0.6, 2.4),
       opacity: rand(0.25, 0.65),
     }));
 
-    let rafId: number | null = null;
+    let rafId = 0;
     let running = true;
 
     const draw = () => {
       if (!running) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, wCss, hCss);
 
-      particles.forEach((p) => {
+      for (const p of particles) {
         p.x += p.vx;
         p.y += p.vy;
 
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+        if (p.x < 0 || p.x > wCss) p.vx *= -1;
+        if (p.y < 0 || p.y > hCss) p.vy *= -1;
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(139, 92, 246, ${p.opacity})`;
         ctx.fill();
-      });
+      }
 
-      // connections
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const p1 = particles[i];
@@ -112,25 +110,26 @@ function BackgroundCanvas() {
 
     rafId = requestAnimationFrame(draw);
 
-    // Resize (throttled)
-    let resizeTimer: number | null = null;
+    // Throttled resize
+    let resizeTimer;
     const onResize = () => {
       if (resizeTimer) window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
         setSize();
       }, 150);
     };
-    window.addEventListener("resize", onResize);
+    window.addEventListener("resize", onResize, { passive: true });
 
     // Pause when tab hidden
     const onVisibility = () => {
+      const wasRunning = running;
       running = !document.hidden;
-      if (running && rafId === null) rafId = requestAnimationFrame(draw);
+      if (running && !wasRunning) rafId = requestAnimationFrame(draw);
     };
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
+      cancelAnimationFrame(rafId);
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibility);
     };
@@ -144,14 +143,16 @@ function BackgroundCanvas() {
       .animate-gradient { background-size:200% 200%; animation:gradient 3s ease infinite; }
     `;
     document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
+    return () => {
+      if (style.parentNode) style.parentNode.removeChild(style);
+    };
   }, []);
 
   return (
     <>
       <canvas ref={canvasRef} className="absolute inset-0 opacity-40" aria-hidden="true" />
-      <div className="absolute inset-0 bg-gradient-to-br from-violet-950/30 via-fuchsia-950/20 to-indigo-950/30" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-950/30 via-fuchsia-950/20 to-indigo-950/30" aria-hidden="true" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-transparent to-transparent" aria-hidden="true" />
       <AnimatedGrid />
       <GlowOrbs />
     </>
@@ -160,12 +161,12 @@ function BackgroundCanvas() {
 
 const AnimatedGrid = memo(function AnimatedGrid() {
   return (
-    <div className="absolute inset-0 opacity-20" aria-hidden>
+    <div className="absolute inset-0 opacity-20" aria-hidden="true">
       <div
         className="h-full w-full"
         style={{
           backgroundImage:
-            "linear-gradient(to right, rgba(139, 92, 246, 0.08) 1px, transparent 1px),\n             linear-gradient(to bottom, rgba(139, 92, 246, 0.08) 1px, transparent 1px)",
+            "linear-gradient(to right, rgba(139, 92, 246, 0.08) 1px, transparent 1px),linear-gradient(to bottom, rgba(139, 92, 246, 0.08) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }}
       />
@@ -175,16 +176,13 @@ const AnimatedGrid = memo(function AnimatedGrid() {
 
 function GlowOrbs() {
   const prefersReducedMotion = useReducedMotion();
-  const common = prefersReducedMotion
-    ? { animate: {}, transition: {} }
-    : {
-        animate: { x: [0, 100, 0], y: [0, -50, 0], scale: [1, 1.2, 1] },
-        transition: { duration: 20, repeat: Infinity, ease: "easeInOut" },
-      };
-
   return (
-    <div className="absolute inset-0 overflow-hidden" aria-hidden>
-      <motion.div {...common} className="absolute -left-48 top-0 h-96 w-96 rounded-full bg-violet-600/30 blur-[100px]" />
+    <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+      <motion.div
+        animate={prefersReducedMotion ? {} : { x: [0, 100, 0], y: [0, -50, 0], scale: [1, 1.2, 1] }}
+        transition={prefersReducedMotion ? {} : { duration: 20, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute -left-48 top-0 h-96 w-96 rounded-full bg-violet-600/30 blur-[100px]"
+      />
       <motion.div
         animate={prefersReducedMotion ? {} : { x: [0, -80, 0], y: [0, 100, 0], scale: [1, 1.3, 1] }}
         transition={prefersReducedMotion ? {} : { duration: 25, repeat: Infinity, ease: "easeInOut" }}
@@ -287,7 +285,7 @@ function HeroContent() {
 
 /* ================================ Components ================================ */
 
-const Badge = memo(function Badge({ text, icon }: { text: string; icon: string }) {
+const Badge = memo(function Badge({ text, icon }) {
   return (
     <motion.div whileHover={{ scale: 1.05 }} className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-950/50 px-4 py-2 text-sm font-medium backdrop-blur-xl">
       <span aria-hidden>{icon}</span>
@@ -296,7 +294,7 @@ const Badge = memo(function Badge({ text, icon }: { text: string; icon: string }
   );
 });
 
-const FeaturePill = memo(function FeaturePill({ text }: { text: string }) {
+const FeaturePill = memo(function FeaturePill({ text }) {
   return (
     <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300 backdrop-blur-sm">
       <span className="mr-2 text-green-400" aria-hidden>✓</span>
@@ -305,11 +303,11 @@ const FeaturePill = memo(function FeaturePill({ text }: { text: string }) {
   );
 });
 
-function MagneticButton({ href, children, primary = false }: { href: string; children: React.ReactNode; primary?: boolean }) {
+function MagneticButton({ href, children, primary = false }) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const buttonRef = useRef<HTMLAnchorElement | null>(null);
+  const buttonRef = useRef(null);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e) => {
     const el = buttonRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -350,10 +348,10 @@ const ArrowIcon = memo(function ArrowIcon() {
 
 function EmailCapture() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [status, setStatus] = useState("idle"); // idle | loading | success | error
   const fieldId = useId();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setStatus("error");
@@ -418,12 +416,12 @@ function EmailCapture() {
   );
 }
 
-function TiltCard({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement | null>(null);
+function TiltCard({ children }) {
+  const ref = useRef(null);
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
 
-  const onMove = (e: React.MouseEvent) => {
+  const onMove = (e) => {
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -452,34 +450,44 @@ function TiltCard({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ============================== Compare Slider ============================== */
+
 function CompareSlider() {
   const [position, setPosition] = useState(50); // percent
-  const trackRef = useRef<HTMLDivElement | null>(null);
+  const trackRef = useRef(null);
   const prefersReducedMotion = useReducedMotion();
+  const clampPct = (v) => Math.max(0, Math.min(100, v));
 
-  const clamp = (v: number) => Math.max(0, Math.min(100, v));
-
-  const updateFromClientX = (clientX: number) => {
+  const updateFromClientX = (clientX) => {
     const el = trackRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const pct = ((clientX - rect.left) / rect.width) * 100;
-    setPosition(clamp(pct));
+    setPosition(clampPct(pct));
   };
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    updateFromClientX(e.clientX);
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (e.buttons !== 1) return; // drag only while pressed
+  const onPointerDown = (e) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.setPointerCapture && el.setPointerCapture(e.pointerId);
     updateFromClientX(e.clientX);
   };
 
-  // keyboard support
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowLeft") setPosition((p) => clamp(p - 2));
-    if (e.key === "ArrowRight") setPosition((p) => clamp(p + 2));
+  const onPointerMove = (e) => {
+    const el = trackRef.current;
+    if (!el) return;
+    if (!(e.buttons & 1)) return; // only while primary button down
+    updateFromClientX(e.clientX);
+  };
+
+  const onPointerUpOrCancel = (e) => {
+    const el = trackRef.current;
+    if (el && el.releasePointerCapture) el.releasePointerCapture(e.pointerId);
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowLeft") setPosition((p) => clampPct(p - 2));
+    if (e.key === "ArrowRight") setPosition((p) => clampPct(p + 2));
     if (e.key === "Home") setPosition(0);
     if (e.key === "End") setPosition(100);
   };
@@ -488,7 +496,7 @@ function CompareSlider() {
     <div className="relative overflow-hidden rounded-2xl" aria-label="Before and after comparison">
       <div
         ref={trackRef}
-        className="relative aspect-[4/5] w-full cursor-ew-resize select-none"
+        className="relative aspect-[4/5] w-full cursor-ew-resize select-none touch-none"
         role="slider"
         aria-valuemin={0}
         aria-valuemax={100}
@@ -497,45 +505,52 @@ function CompareSlider() {
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
+        onPointerUp={onPointerUpOrCancel}
+        onPointerCancel={onPointerUpOrCancel}
       >
-        {/* After image */}
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-900 to-fuchsia-900">
+        {/* After layer */}
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-900 to-fuchsia-900" aria-hidden="true">
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <div className="text-6xl mb-4" aria-hidden>✨</div>
+              <div className="text-6xl mb-4" aria-hidden="true">✨</div>
               <div className="text-white font-bold text-lg">Enhanced</div>
             </div>
           </div>
         </div>
 
-        {/* Before image (clipped) */}
+        {/* Before clipped */}
         <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900">
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900" aria-hidden="true">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="text-6xl mb-4 opacity-50" aria-hidden>📷</div>
+                <div className="text-6xl mb-4 opacity-50" aria-hidden="true">📷</div>
                 <div className="text-zinc-400 font-bold text-lg">Original</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Slider handle */}
-        <div className="absolute top-0 bottom-0 w-1 bg-white/90 shadow-lg" style={{ left: `${position}%` }}>
+        {/* Handle */}
+        <div className="absolute top-0 bottom-0 w-1 bg-white/90 shadow-lg" style={{ left: `${position}%` }} aria-hidden="true">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white p-3 shadow-xl">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M8 4l-4 8 4 8M16 4l4 8-4 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
         </div>
 
         {/* Labels */}
-        <div className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">Before</div>
-        <div className="absolute right-4 top-4 rounded-full bg-violet-600 px-3 py-1 text-xs font-bold text-white">After</div>
+        <div className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm" aria-hidden="true">
+          Before
+        </div>
+        <div className="absolute right-4 top-4 rounded-full bg-violet-600 px-3 py-1 text-xs font-bold text-white" aria-hidden="true">
+          After
+        </div>
       </div>
-      {/* Reduced motion hint */}
       {prefersReducedMotion && (
-        <p className="mt-2 text-center text-xs text-zinc-500">Tip: animations are minimized to respect your settings.</p>
+        <p className="mt-2 text-center text-xs text-zinc-500">
+          Tip: animations are minimized to respect your settings.
+        </p>
       )}
     </div>
   );
@@ -588,9 +603,9 @@ function MetricsSection() {
   );
 }
 
-function MetricCard({ value, suffix, label, color, delay }: { value: number; suffix: string; label: string; color: string; delay: number }) {
+function MetricCard({ value, suffix, label, color, delay }) {
   const [count, setCount] = useState(0);
-  const ref = useRef<HTMLDivElement | null>(null);
+  const ref = useRef(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -598,13 +613,12 @@ function MetricCard({ value, suffix, label, color, delay }: { value: number; suf
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          const target = value;
           const duration = 1600;
           const start = performance.now();
-          const tick = (now: number) => {
+          const tick = (now) => {
             const progress = Math.min((now - start) / duration, 1);
             const eased = 1 - Math.pow(1 - progress, 3);
-            setCount(eased * target);
+            setCount(eased * value);
             if (progress < 1) requestAnimationFrame(tick);
           };
           requestAnimationFrame(tick);
@@ -665,7 +679,7 @@ function FeatureShowcase() {
   );
 }
 
-function FeatureCard({ title, description, icon, gradient, delay }: { title: string; description: string; icon: string; gradient: string; delay: number }) {
+function FeatureCard({ title, description, icon, gradient, delay }) {
   return (
     <motion.article
       initial={{ opacity: 0, y: 30 }}
