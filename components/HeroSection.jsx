@@ -1,640 +1,827 @@
-// components/HeroSection.jsx
-'use client';
-
-import Image from 'next/image';
-import Link from 'next/link';
-import { motion, useReducedMotion } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState, memo } from "react";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useReducedMotion,
+} from "framer-motion";
 
 /**
- * Landing Body (no Nav/No Footer) — Startup-serious with playful wit
- * Clear value prop • Early email capture • Rich animations • SVG aurora • Marquee • KPIs
+ * Ultra Landing v2
+ * - SSR-safe (no document/window at module scope)
+ * - A11y: keyboard & screen reader support
+ * - Performance: DPR-aware canvas, throttled resize, offscreen pauses
+ * - Mobile-first & reduced-motion friendly
  */
 
 export default function HeroSection() {
   return (
-    <section className="relative w-full overflow-hidden font-sans text-black dark:text-white">
-      <BackgroundFX />
-      <TopHero />
-      <LogoMarquee />
-      <ProofMetrics />
-      <ValueProps />
-      <HowItWorks />
-      <HumorBreak />
-      <TestimonialsTicker />
-      <BottomCTA />
-      <StickyMobileCTA />
+    <main className="relative w-full overflow-hidden bg-[#0a0a0f] font-sans text-white">
+      <BackgroundCanvas />
+      <HeroContent />
+      <LogoOrbit />
+      <MetricsSection />
+      <FeatureShowcase />
+      <InteractiveDemo />
+      <ProcessTimeline />
+      <SocialProof />
+      <FinalCTA />
+      <FloatingCTA />
+    </main>
+  );
+}
+
+/* ============================= Background Canvas ============================= */
+
+function BackgroundCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Handle DPR for crisp rendering
+    const setSize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const { innerWidth: w, innerHeight: h } = window;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    setSize();
+
+    const PARTICLE_COUNT = 90;
+    const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+    const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
+      x: rand(0, canvas.width / (window.devicePixelRatio || 1)),
+      y: rand(0, canvas.height / (window.devicePixelRatio || 1)),
+      vx: rand(-0.35, 0.35),
+      vy: rand(-0.35, 0.35),
+      size: rand(0.6, 2.4),
+      opacity: rand(0.25, 0.65),
+    }));
+
+    let rafId: number | null = null;
+    let running = true;
+
+    const draw = () => {
+      if (!running) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      particles.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(139, 92, 246, ${p.opacity})`;
+        ctx.fill();
+      });
+
+      // connections
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const p1 = particles[i];
+          const p2 = particles[j];
+          const dx = p1.x - p2.x;
+          const dy = p1.y - p2.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 120) {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(139,92,246,${(1 - dist / 120) * 0.18})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
+      }
+
+      rafId = requestAnimationFrame(draw);
+    };
+
+    rafId = requestAnimationFrame(draw);
+
+    // Resize (throttled)
+    let resizeTimer: number | null = null;
+    const onResize = () => {
+      if (resizeTimer) window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        setSize();
+      }, 150);
+    };
+    window.addEventListener("resize", onResize);
+
+    // Pause when tab hidden
+    const onVisibility = () => {
+      running = !document.hidden;
+      if (running && rafId === null) rafId = requestAnimationFrame(draw);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [prefersReducedMotion]);
+
+  // Inject gradient keyframes SSR-safely
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes gradient { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+      .animate-gradient { background-size:200% 200%; animation:gradient 3s ease infinite; }
+    `;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
+
+  return (
+    <>
+      <canvas ref={canvasRef} className="absolute inset-0 opacity-40" aria-hidden="true" />
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-950/30 via-fuchsia-950/20 to-indigo-950/30" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-transparent to-transparent" />
+      <AnimatedGrid />
+      <GlowOrbs />
+    </>
+  );
+}
+
+const AnimatedGrid = memo(function AnimatedGrid() {
+  return (
+    <div className="absolute inset-0 opacity-20" aria-hidden>
+      <div
+        className="h-full w-full"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(139, 92, 246, 0.08) 1px, transparent 1px),\n             linear-gradient(to bottom, rgba(139, 92, 246, 0.08) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+    </div>
+  );
+});
+
+function GlowOrbs() {
+  const prefersReducedMotion = useReducedMotion();
+  const common = prefersReducedMotion
+    ? { animate: {}, transition: {} }
+    : {
+        animate: { x: [0, 100, 0], y: [0, -50, 0], scale: [1, 1.2, 1] },
+        transition: { duration: 20, repeat: Infinity, ease: "easeInOut" },
+      };
+
+  return (
+    <div className="absolute inset-0 overflow-hidden" aria-hidden>
+      <motion.div {...common} className="absolute -left-48 top-0 h-96 w-96 rounded-full bg-violet-600/30 blur-[100px]" />
+      <motion.div
+        animate={prefersReducedMotion ? {} : { x: [0, -80, 0], y: [0, 100, 0], scale: [1, 1.3, 1] }}
+        transition={prefersReducedMotion ? {} : { duration: 25, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute -right-48 top-1/3 h-96 w-96 rounded-full bg-fuchsia-600/25 blur-[120px]"
+      />
+      <motion.div
+        animate={prefersReducedMotion ? {} : { x: [0, 60, 0], y: [0, -80, 0], scale: [1.2, 1, 1.2] }}
+        transition={prefersReducedMotion ? {} : { duration: 22, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-indigo-600/20 blur-[100px]"
+      />
+    </div>
+  );
+}
+
+/* ================================ Hero Content ================================ */
+
+function HeroContent() {
+  const { scrollYProgress } = useScroll();
+  const y = useTransform(scrollYProgress, [0, 1], [0, -100]);
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+
+  return (
+    <motion.section style={{ y, opacity }} className="relative z-10 px-6 pt-28 pb-24 md:px-12 lg:px-20 lg:pt-36">
+      <div className="mx-auto max-w-7xl">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-8 flex items-center gap-3"
+        >
+          <Badge text="AI-Powered Studio" icon="✨" />
+          <motion.span initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="text-sm text-violet-300">
+            Trusted by 2,400+ brands
+          </motion.span>
+        </motion.div>
+
+        <div className="grid items-center gap-16 lg:grid-cols-2">
+          <div>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+              className="text-5xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight"
+            >
+              Transform products into
+              <span className="block mt-2 bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent animate-gradient">
+                unforgettable visuals
+              </span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mt-6 text-lg md:text-xl text-zinc-300 leading-relaxed max-w-xl"
+            >
+              Studio-quality photos, AI try-on, and marketing magic—delivered in seconds.
+              <span className="text-violet-300 font-medium"> No photographer required.</span>
+            </motion.p>
+
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.3 }} className="mt-8 flex flex-wrap gap-3">
+              <FeaturePill text="No credit card" />
+              <FeaturePill text="3 free renders" />
+              <FeaturePill text="60-second setup" />
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.4 }} className="mt-10 flex flex-col sm:flex-row gap-4">
+              <MagneticButton href="#demo" primary>
+                Start creating free
+                <ArrowIcon />
+              </MagneticButton>
+              <MagneticButton href="#how">See how it works</MagneticButton>
+            </motion.div>
+
+            <EmailCapture />
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, rotateY: -15 }}
+            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+            transition={{ duration: 1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="relative"
+          >
+            <TiltCard>
+              <CompareSlider />
+            </TiltCard>
+          </motion.div>
+        </div>
+
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1, duration: 1 }} className="mt-16 flex justify-center">
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>↓</motion.div>
+            Scroll to explore
+          </div>
+        </motion.div>
+      </div>
+    </motion.section>
+  );
+}
+
+/* ================================ Components ================================ */
+
+const Badge = memo(function Badge({ text, icon }: { text: string; icon: string }) {
+  return (
+    <motion.div whileHover={{ scale: 1.05 }} className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-950/50 px-4 py-2 text-sm font-medium backdrop-blur-xl">
+      <span aria-hidden>{icon}</span>
+      <span className="bg-gradient-to-r from-violet-200 to-fuchsia-200 bg-clip-text text-transparent">{text}</span>
+    </motion.div>
+  );
+});
+
+const FeaturePill = memo(function FeaturePill({ text }: { text: string }) {
+  return (
+    <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300 backdrop-blur-sm">
+      <span className="mr-2 text-green-400" aria-hidden>✓</span>
+      {text}
+    </div>
+  );
+});
+
+function MagneticButton({ href, children, primary = false }: { href: string; children: React.ReactNode; primary?: boolean }) {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const buttonRef = useRef<HTMLAnchorElement | null>(null);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = (e.clientX - rect.left - rect.width / 2) / 8;
+    const y = (e.clientY - rect.top - rect.height / 2) / 8;
+    setPosition({ x, y });
+  };
+  const handleMouseLeave = () => setPosition({ x: 0, y: 0 });
+
+  const base = "group relative inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60";
+  const variant = primary
+    ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/50 hover:shadow-xl hover:shadow-violet-500/60"
+    : "border-2 border-white/20 bg-white/5 text-white hover:bg-white/10 backdrop-blur-sm";
+
+  return (
+    <motion.a
+      ref={buttonRef}
+      href={href}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
+      className={`${base} ${variant}`}
+    >
+      {children}
+    </motion.a>
+  );
+}
+
+const ArrowIcon = memo(function ArrowIcon() {
+  return (
+    <motion.svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="transition-transform group-hover:translate-x-1" aria-hidden>
+      <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </motion.svg>
+  );
+});
+
+function EmailCapture() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const fieldId = useId();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus("error");
+      return;
+    }
+    setStatus("loading");
+    try {
+      // TODO: call your API here
+      await new Promise((r) => setTimeout(r, 700));
+      setStatus("success");
+      setTimeout(() => {
+        if (typeof window !== "undefined") {
+          window.location.href = `/dashboard?email=${encodeURIComponent(email)}`;
+        }
+      }, 700);
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  return (
+    <motion.form
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, delay: 0.5 }}
+      onSubmit={handleSubmit}
+      className="mt-8 flex flex-col sm:flex-row gap-3 max-w-md"
+      noValidate
+      aria-describedby={`${fieldId}-desc`}
+    >
+      <div className="relative flex-1">
+        <label htmlFor={fieldId} className="sr-only">
+          Email address
+        </label>
+        <input
+          id={fieldId}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="your@email.com"
+          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-zinc-500 outline-none backdrop-blur-sm transition focus:border-violet-500/50 focus:bg-white/10"
+          disabled={status === "loading" || status === "success"}
+          autoComplete="email"
+          aria-invalid={status === "error"}
+        />
+        <p id={`${fieldId}-desc`} className="sr-only">
+          Enter your email to get early access.
+        </p>
+      </div>
+      <motion.button
+        type="submit"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        disabled={status === "loading" || status === "success"}
+        className="rounded-xl bg-white/10 px-6 py-3 font-semibold text-white transition hover:bg-white/20 disabled:opacity-50 backdrop-blur-sm"
+        aria-live="polite"
+      >
+        {status === "loading" ? "Sending…" : status === "success" ? "Sent! ✓" : "Get Early Access"}
+      </motion.button>
+      {status === "error" && <p className="text-sm text-red-400">Please enter a valid email</p>}
+    </motion.form>
+  );
+}
+
+function TiltCard({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [rotateX, setRotateX] = useState(0);
+  const [rotateY, setRotateY] = useState(0);
+
+  const onMove = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    setRotateY((x - cx) / 20);
+    setRotateX((cy - y) / 20);
+  };
+  const onLeave = () => {
+    setRotateX(0);
+    setRotateY(0);
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{ transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`, transition: "transform 0.1s ease-out" }}
+      className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-xl"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function CompareSlider() {
+  const [position, setPosition] = useState(50); // percent
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+
+  const updateFromClientX = (clientX: number) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pct = ((clientX - rect.left) / rect.width) * 100;
+    setPosition(clamp(pct));
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    updateFromClientX(e.clientX);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (e.buttons !== 1) return; // drag only while pressed
+    updateFromClientX(e.clientX);
+  };
+
+  // keyboard support
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowLeft") setPosition((p) => clamp(p - 2));
+    if (e.key === "ArrowRight") setPosition((p) => clamp(p + 2));
+    if (e.key === "Home") setPosition(0);
+    if (e.key === "End") setPosition(100);
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl" aria-label="Before and after comparison">
+      <div
+        ref={trackRef}
+        className="relative aspect-[4/5] w-full cursor-ew-resize select-none"
+        role="slider"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(position)}
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+      >
+        {/* After image */}
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-900 to-fuchsia-900">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-6xl mb-4" aria-hidden>✨</div>
+              <div className="text-white font-bold text-lg">Enhanced</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Before image (clipped) */}
+        <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-6xl mb-4 opacity-50" aria-hidden>📷</div>
+                <div className="text-zinc-400 font-bold text-lg">Original</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Slider handle */}
+        <div className="absolute top-0 bottom-0 w-1 bg-white/90 shadow-lg" style={{ left: `${position}%` }}>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white p-3 shadow-xl">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M8 4l-4 8 4 8M16 4l4 8-4 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Labels */}
+        <div className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">Before</div>
+        <div className="absolute right-4 top-4 rounded-full bg-violet-600 px-3 py-1 text-xs font-bold text-white">After</div>
+      </div>
+      {/* Reduced motion hint */}
+      {prefersReducedMotion && (
+        <p className="mt-2 text-center text-xs text-zinc-500">Tip: animations are minimized to respect your settings.</p>
+      )}
+    </div>
+  );
+}
+
+/* =============================== Logo Orbit =============================== */
+
+function LogoOrbit() {
+  const logos = ["Shopify", "WooCommerce", "Etsy", "Amazon", "eBay", "BigCommerce"];
+  return (
+    <section className="relative z-10 py-20 px-6 md:px-12" aria-label="Integrations">
+      <div className="mx-auto max-w-7xl text-center">
+        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="mb-12 text-sm uppercase tracking-widest text-zinc-500">
+          Seamlessly integrates with
+        </motion.p>
+        <div className="relative h-20 overflow-hidden">
+          <motion.div animate={{ x: [0, -1000] }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="flex gap-16 absolute">
+            {[...logos, ...logos, ...logos].map((logo, i) => (
+              <div key={i} className="flex items-center justify-center min-w-[150px]">
+                <span className="text-2xl font-bold text-zinc-600 hover:text-white transition">{logo}</span>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
     </section>
   );
 }
 
-/* ------------------------------ Top Section -------------------------------- */
+/* ============================== Metrics Section ============================== */
 
-function TopHero() {
-  return (
-    <div className="relative z-10 px-6 md:px-12 lg:px-20 pt-24 pb-16 lg:pt-28 lg:pb-24">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="mx-auto max-w-6xl"
-      >
-        {/* Badge + micro subtext */}
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/10 px-3 py-1 text-[11px] font-medium backdrop-blur-md">
-            STARTUP SERIOUS • TASTEFULLY FUN
-          </span>
-          <span className="text-[11px] text-zinc-600 dark:text-zinc-300">Clarity • Speed • Conversion-first</span>
-        </div>
-
-        <div className="grid items-center gap-10 lg:grid-cols-2">
-          {/* Left copy */}
-          <div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.05] tracking-tight">
-              Turn <span className="bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-rose-500 bg-clip-text text-transparent">product photos</span> into sales—<span className="whitespace-nowrap">no studio needed.</span>
-            </h1>
-
-            <p className="mt-4 max-w-xl text-lg md:text-xl text-zinc-700 dark:text-zinc-300">
-              Upload a photo → get on-brand, studio-grade shots and AI try-ons in seconds. It’s like hiring a photo team—minus the coffee drama.
-            </p>
-
-            {/* Micro commitments */}
-            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
-              <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">No credit card</span>
-              <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">Free starter credits</span>
-              <span className="rounded-full bg-white/80 px-3 py-1 dark:bg-white/10">Cancel anytime</span>
-            </div>
-
-            {/* CTAs + Email capture */}
-            <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center">
-              <MagneticCTA href="/dashboard" ariaLabel="Get started for free">
-                Get started free
-              </MagneticCTA>
-              <a
-                href="#demo"
-                className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/60 px-5 py-3 text-base font-semibold text-zinc-900 backdrop-blur-md transition hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white"
-              >
-                Watch 30s demo
-              </a>
-            </div>
-
-            <EarlyEmailCapture />
-            <TrustBar />
-          </div>
-
-          {/* Right: Interactive Compare */}
-          <motion.div
-            id="demo"
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="relative isolate mx-auto w-full max-w-xl overflow-hidden rounded-2xl border border-black/10 bg-white/70 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-white/5"
-            aria-label="Before and after preview"
-          >
-            <CompareSlider
-              before={{ src: '/demo-before.jpg', alt: 'Original product photo before enhancement' }}
-              after={{ src: '/demo-after.jpg', alt: 'Enhanced product photo after AI processing' }}
-              defaultPercent={62}
-              showLabels
-            />
-            <CornerBadge />
-          </motion.div>
-        </div>
-
-        {/* Scroll hint */}
-        <div className="pointer-events-none mt-10 flex items-center justify-center text-xs text-zinc-500 dark:text-zinc-400">
-          <span className="animate-bounce">Scroll to see the magic ↓</span>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-/* -------------------------------- Background -------------------------------- */
-
-function BackgroundFX() {
-  return (
-    <div className="absolute inset-0 -z-20">
-      {/* Light */}
-      <div className="h-full w-full bg-[radial-gradient(75%_100%_at_50%_0%,#eef2ff_0%,#ffffff_35%,#fff5f7_100%)] dark:hidden" />
-      {/* Dark */}
-      <div className="hidden h-full w-full dark:block bg-[radial-gradient(120%_80%_at_60%_-10%,#3b1e82_0%,#0f0320_55%,#080312_100%)]" />
-      {/* Grid */}
-      <div className="pointer-events-none absolute inset-0 hidden dark:block opacity-25 [background-image:linear-gradient(to_right,rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,.06)_1px,transparent_1px)] [background-size:24px_24px]" />
-      {/* Noise */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04] mix-blend-soft-light"
-        style={{
-          backgroundImage:
-            'url("data:image/svg+xml;utf8,\
-<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'1200\' height=\'600\'><filter id=\'n\'>\
-<feTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\'/></filter>\
-<rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' opacity=\'0.4\'/></svg>")',
-        }}
-      />
-      <AuroraBlobs />
-      <FloatingShapes />
-    </div>
-  );
-}
-
-function AuroraBlobs() {
-  const prefersReducedMotion = useReducedMotion();
-  return (
-    <div className="absolute inset-0 -z-10 overflow-hidden">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 0.6, scale: 1 }}
-        transition={{ duration: 1.2 }}
-        className="absolute -top-24 left-[-10%] h-[40rem] w-[40rem] rounded-full blur-3xl"
-        style={{
-          background: 'conic-gradient(from 90deg, rgba(99,102,241,.35), rgba(236,72,153,.35), rgba(244,63,94,.35))',
-          filter: 'blur(80px)',
-        }}
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 0.55, scale: 1 }}
-        transition={{ duration: 1.2, delay: 0.1 }}
-        className="absolute -bottom-24 right-[-10%] h-[36rem] w-[36rem] rounded-full blur-3xl"
-        style={{
-          background: 'conic-gradient(from 200deg, rgba(34,197,94,.35), rgba(59,130,246,.35), rgba(236,72,153,.35))',
-          filter: 'blur(90px)',
-        }}
-      />
-      {!prefersReducedMotion && (
-        <motion.div
-          aria-hidden
-          initial={{ rotate: 0 }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 55, repeat: Infinity, ease: 'linear' }}
-          className="absolute left-1/2 top-1/2 h-[28rem] w-[28rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 dark:border-white/5"
-        />
-      )}
-    </div>
-  );
-}
-
-function FloatingShapes() {
-  const items = [
-    { cx: 40, cy: 30, r: 14, opacity: 0.5 },
-    { cx: 85, cy: 65, r: 10, opacity: 0.35 },
-    { cx: 15, cy: 75, r: 8, opacity: 0.4 },
+function MetricsSection() {
+  const metrics = [
+    { value: 43, suffix: "%", label: "Higher conversions", color: "from-green-400 to-emerald-600" },
+    { value: 94, suffix: "%", label: "Time saved", color: "from-violet-400 to-purple-600" },
+    { value: 12, suffix: "s", label: "Avg render time", color: "from-blue-400 to-cyan-600" },
+    { value: 99.9, suffix: "%", label: "Uptime SLA", color: "from-fuchsia-400 to-pink-600" },
   ];
-  return (
-    <svg className="pointer-events-none absolute inset-0 -z-10 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-      {items.map((b, i) => (
-        <motion.circle
-          key={i}
-          cx={b.cx}
-          cy={b.cy}
-          r={b.r}
-          fill="url(#grad)"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: b.opacity, scale: 1 }}
-          transition={{ duration: 1, delay: i * 0.2 }}
-        />
-      ))}
-      <defs>
-        <radialGradient id="grad">
-          <stop offset="0%" stopColor="#f0abfc" />
-          <stop offset="100%" stopColor="transparent" />
-        </radialGradient>
-      </defs>
-    </svg>
-  );
-}
-
-/* ---------------------------------- CTAs ------------------------------------ */
-
-function MagneticCTA({ href, children, ariaLabel }) {
-  const [xy, setXy] = useState({ x: 0, y: 0 });
-  const onMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setXy({ x: (e.clientX - rect.left - rect.width / 2) / 6, y: (e.clientY - rect.top - rect.height / 2) / 6 });
-  };
-  const onLeave = () => setXy({ x: 0, y: 0 });
 
   return (
-    <Link
-      href={href}
-      aria-label={ariaLabel}
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
-      className="group inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:from-fuchsia-600 hover:to-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400"
-      style={{ transform: `translate3d(${xy.x}px, ${xy.y}px, 0)` }}
-    >
-      {children}
-      <svg className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-        <path d="M13 5l7 7-7 7M5 12h14" />
-      </svg>
-    </Link>
-  );
-}
-
-function EarlyEmailCapture() {
-  const [email, setEmail] = useState('');
-  const [state, setState] = useState('idle'); // idle | loading | success | error
-  const [msg, setMsg] = useState('');
-
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    if (!/.+@.+\..+/.test(email)) {
-      setState('error');
-      setMsg('Please enter a valid email.');
-      return;
-    }
-    setState('loading');
-    setMsg('');
-    setTimeout(() => {
-      setState('success');
-      setMsg('Invite reserved! Redirecting…');
-      window.location.href = `/dashboard?email=${encodeURIComponent(email)}&source=hero-email`;
-    }, 600);
-  };
-
-  return (
-    <form onSubmit={onSubmit} className="mt-5 flex w-full max-w-xl gap-2" aria-live="polite">
-      <div className="relative grow">
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your work email"
-          className="w-full rounded-xl border border-black/10 bg-white/70 px-4 py-3 text-sm outline-none backdrop-blur placeholder:text-zinc-500 focus:ring-2 focus:ring-fuchsia-400 dark:border-white/15 dark:bg-white/10"
-          aria-label="Work email"
-        />
-        {/* FIX: renamed SVGMail -> MailIcon to avoid duplicate identifier */}
-        <MailIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-70" />
-      </div>
-      <button
-        type="submit"
-        disabled={state === 'loading'}
-        className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-zinc-100"
-      >
-        {state === 'loading' ? 'Reserving…' : 'Get beta invite'}
-      </button>
-      {msg && <div className={`ml-2 self-center text-xs ${state === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>{msg}</div>}
-    </form>
-  );
-}
-
-/* ------------- FIXED: unique name to avoid redeclare collisions ------------- */
-function MailIcon(props) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" {...props} aria-hidden>
-      <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function CornerBadge() {
-  return (
-    <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
-      <SparkleIcon /> AI Enhanced
-    </div>
-  );
-}
-function SparkleIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 2l1.6 4.4L18 8l-4.4 1.6L12 14l-1.6-4.4L6 8l4.4-1.6L12 2z" stroke="currentColor" strokeWidth="1.2" fill="currentColor" opacity="0.9" />
-    </svg>
-  );
-}
-
-/* --------------------------------- Trust Bar -------------------------------- */
-
-function TrustBar() {
-  return (
-    <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
-      <span className="font-medium">Trusted by 1,200+ stores</span>
-      <span className="inline-block h-1 w-1 rounded-full bg-zinc-400" />
-      <span>GDPR-friendly</span>
-      <span className="inline-block h-1 w-1 rounded-full bg-zinc-400" />
-      <span>Secure uploads</span>
-    </div>
-  );
-}
-
-/* ----------------------------- Compare Slider ------------------------------- */
-
-function CompareSlider({ before, after, defaultPercent = 60, showLabels = true }) {
-  const trackRef = useRef(null);
-  const [pos, setPos] = useState(defaultPercent);
-  const clamp = (v) => Math.max(0, Math.min(100, v));
-
-  const moveToClientX = (clientX) => {
-    if (!trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const x = clamp(((clientX - rect.left) / rect.width) * 100);
-    setPos(x);
-  };
-
-  const onPointerDown = (e) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    moveToClientX(e.clientX);
-  };
-
-  const onPointerMove = (e) => {
-    if (!(e.buttons & 1)) return;
-    moveToClientX(e.clientX);
-  };
-
-  return (
-    <div ref={trackRef} className="relative w-full overflow-hidden">
-      {/* After (base) */}
-      <Image src={after.src} alt={after.alt} width={900} height={1200} priority className="h-auto w-full select-none object-cover" />
-      {/* Before overlay clipped */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ width: `${pos}%` }}>
-        <Image src={before.src} alt={before.alt} width={900} height={1200} className="h-full w-full object-cover" priority={false} />
-      </div>
-
-      {/* Labels */}
-      {showLabels && (
-        <>
-          <div className="pointer-events-none absolute left-3 top-3 select-none rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-zinc-800 shadow-sm dark:bg-black/60 dark:text-white">
-            Before
-          </div>
-          <div className="pointer-events-none absolute right-3 top-3 select-none rounded-full bg-rose-500/90 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
-            After
-          </div>
-        </>
-      )}
-
-      {/* Handle/rail */}
-      <div
-        role="slider"
-        aria-label="Compare before and after"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(pos)}
-        tabIndex={0}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowLeft') setPos((p) => clamp(p - 5));
-          if (e.key === 'ArrowRight') setPos((p) => clamp(p + 5));
-        }}
-        className="absolute top-0 cursor-ew-resize"
-        style={{ left: `calc(${pos}% - 1px)`, height: '100%' }}
-      >
-        <div className="h-full w-0.5 bg-white/90 mix-blend-difference shadow-[0_0_0_1px_rgba(0,0,0,.2)]" />
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-2 py-1 text-xs text-white">Drag</div>
-      </div>
-
-      {/* Range fallback */}
-      <div className="absolute inset-x-0 bottom-0 z-10 m-0 flex items-center gap-2 bg-gradient-to-t from-black/15 to-transparent px-4 pb-4 pt-10">
-        <input
-          aria-label="Compare before and after"
-          className="h-1 w-full cursor-ew-resize appearance-none rounded-full bg-zinc-300 outline-none accent-fuchsia-600 dark:bg-zinc-700"
-          type="range"
-          min={0}
-          max={100}
-          value={pos}
-          onChange={(e) => setPos(Number(e.target.value))}
-        />
-      </div>
-    </div>
-  );
-}
-
-/* ----------------------------- Logos Marquee -------------------------------- */
-
-function LogoMarquee() {
-  const logos = ['brand-1.svg', 'brand-2.svg', 'brand-3.svg', 'brand-4.svg', 'brand-5.svg'];
-  return (
-    <div className="relative z-10 mx-auto mt-6 w-full max-w-7xl overflow-hidden px-6 py-6 md:px-12">
-      <div className="mb-3 text-center text-[11px] uppercase tracking-widest text-zinc-500">POWERING TEAMS AT</div>
-      <div className="[mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-        <div className="animate-marquee flex min-w-full items-center gap-10 opacity-70 hover:[animation-play-state:paused]">
-          {logos.concat(logos).map((src, i) => (
-            <div key={i} className="relative h-8 w-28 opacity-80">
-              <Image src={`/${src}`} alt="brand logo" fill className="object-contain" />
-            </div>
+    <section className="relative z-10 px-6 py-24 md:px-12" aria-label="Key metrics">
+      <div className="mx-auto max-w-7xl">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          {metrics.map((m, i) => (
+            <MetricCard key={i} {...m} delay={i * 0.08} />
           ))}
         </div>
       </div>
-      <style jsx>{`
-        .animate-marquee { animation: marquee 26s linear infinite; }
-        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-      `}</style>
-    </div>
+    </section>
   );
 }
 
-/* ------------------------------- Proof Metrics ------------------------------ */
+function MetricCard({ value, suffix, label, color, delay }: { value: number; suffix: string; label: string; color: string; delay: number }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLDivElement | null>(null);
 
-function ProofMetrics() {
-  const metrics = [
-    { label: 'Higher conversion', to: 32, suffix: '%' },
-    { label: 'Time saved per shoot', to: 90, suffix: '%' },
-    { label: 'Avg render', to: 15, suffix: 's', reverse: true },
-    { label: 'Uptime', to: 99.9, suffix: '%' },
-  ];
-  return (
-    <div id="proof" className="relative z-10 mx-auto mt-4 max-w-7xl px-6 md:px-12">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {metrics.map((m, i) => (
-          <KPI key={i} label={m.label} to={m.to} suffix={m.suffix} reverse={m.reverse} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function KPI({ label, to, suffix = '', reverse = false }) {
-  const ref = useRef(null);
-  const [val, setVal] = useState(reverse ? to : 0);
   useEffect(() => {
-    let frame;
     const el = ref.current;
     if (!el) return;
-    let start = null;
-    const duration = 1000;
-    const startVal = reverse ? to : 0;
-    const endVal = reverse ? (to <= 15 ? to : 0) : to; // gag for honesty on "15s"
-    const step = (t) => {
-      if (!start) start = t;
-      const p = Math.min((t - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(Number((startVal + (endVal - startVal) * eased).toFixed(1)));
-      if (p < 1) frame = requestAnimationFrame(step);
-    };
     const io = new IntersectionObserver(
-      (ents) => ents.forEach((e) => e.isIntersecting && requestAnimationFrame(step)),
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          const target = value;
+          const duration = 1600;
+          const start = performance.now();
+          const tick = (now: number) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setCount(eased * target);
+            if (progress < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+          io.disconnect();
+        }
+      },
       { threshold: 0.5 }
     );
     io.observe(el);
-    return () => { cancelAnimationFrame(frame); io.disconnect(); };
-  }, [to, reverse]);
+    return () => io.disconnect();
+  }, [value]);
+
+  const decimals = suffix === "s" || (suffix === "%" && value > 90) ? 1 : 0;
 
   return (
-    <div ref={ref} className="rounded-xl border border-black/10 bg-white p-4 text-center dark:border-white/10 dark:bg-zinc-800">
-      <div className="text-2xl font-extrabold">{val}{suffix}</div>
-      <div className="text-xs text-zinc-600 dark:text-zinc-300">{label}</div>
-    </div>
-  );
-}
-
-/* --------------------------------- Features -------------------------------- */
-
-function ValueProps() {
-  return (
-    <div id="features" className="relative z-10 bg-white px-6 py-16 text-zinc-900 dark:bg-zinc-900 dark:text-white md:px-12 lg:px-20">
-      <motion.h2
-        initial={{ opacity: 0, y: 8 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.4 }}
-        transition={{ duration: 0.5 }}
-        className="mx-auto mb-10 text-center text-3xl font-bold md:text-4xl"
-      >
-        Designed to convert — and delight
-      </motion.h2>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        {[
-          { title: 'Image Enhancement', icon: '📷', desc: 'Studio quality at your fingertips.' },
-          { title: 'AI Try-On', icon: '🧍‍♂️', desc: 'Preview products on real models.' },
-          { title: 'Smart Descriptions', icon: '💡', desc: 'Auto-generate marketing copy.' },
-        ].map(({ title, icon, desc }) => (
-          <motion.div
-            key={title}
-            whileHover={{ y: -4 }}
-            className="rounded-2xl border border-black/10 bg-gradient-to-br from-white to-zinc-50 p-6 shadow-md transition dark:border-white/10 dark:from-zinc-800 dark:to-zinc-800"
-          >
-            <div className="mb-3 text-3xl" aria-hidden>{icon}</div>
-            <h3 className="text-lg font-semibold">{title}</h3>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{desc}</p>
-          </motion.div>
-        ))}
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.6, delay }}
+      whileHover={{ scale: 1.05, y: -5 }}
+      className="group relative rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-6 backdrop-blur-sm transition-all hover:border-white/20 hover:shadow-2xl hover:shadow-violet-500/20"
+    >
+      <div className={`text-4xl md:text-5xl font-black bg-gradient-to-r ${color} bg-clip-text text-transparent`}>
+        {count.toFixed(decimals)}{suffix}
       </div>
-    </div>
+      <div className="mt-2 text-sm text-zinc-400 group-hover:text-zinc-300 transition">{label}</div>
+      <div className={`pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r ${color} opacity-0 blur-xl transition-opacity group-hover:opacity-10`} />
+    </motion.div>
   );
 }
 
-/* ------------------------------- How It Works ------------------------------- */
+/* ============================ Feature Showcase ============================ */
 
-function HowItWorks() {
+function FeatureShowcase() {
+  const features = [
+    { title: "AI Image Enhancement", description: "Transform amateur shots into studio-quality masterpieces with one click. Advanced AI removes backgrounds, adjusts lighting, and perfects every pixel.", icon: "🎨", gradient: "from-violet-500 to-purple-600" },
+    { title: "Virtual Try-On", description: "Let customers see products on real models instantly. Boost confidence, reduce returns, and watch conversions skyrocket.", icon: "👕", gradient: "from-fuchsia-500 to-pink-600" },
+    { title: "Smart Copy Generation", description: "AI-powered descriptions that sell. Get compelling, SEO-optimized product copy in seconds—no copywriter needed.", icon: "✍️", gradient: "from-blue-500 to-cyan-600" },
+  ];
+  return (
+    <section id="features" className="relative z-10 px-6 py-32 md:px-12">
+      <div className="mx-auto max-w-7xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-16 text-center">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black">
+            Built for <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">conversion</span>
+          </h2>
+          <p className="mt-4 text-xl text-zinc-400 max-w-2xl mx-auto">Every feature designed to turn browsers into buyers</p>
+        </motion.div>
+        <div className="grid gap-8 md:grid-cols-3">
+          {features.map((f, i) => (
+            <FeatureCard key={i} {...f} delay={i * 0.1} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeatureCard({ title, description, icon, gradient, delay }: { title: string; description: string; icon: string; gradient: string; delay: number }) {
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.6, delay }}
+      whileHover={{ y: -8 }}
+      className="group relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-8 backdrop-blur-sm transition-all hover:border-white/20 hover:shadow-2xl"
+    >
+      <div className={`mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-r ${gradient} text-3xl shadow-lg`} aria-hidden>
+        {icon}
+      </div>
+      <h3 className="mb-3 text-2xl font-bold">{title}</h3>
+      <p className="text-zinc-400 leading-relaxed group-hover:text-zinc-300 transition">{description}</p>
+      <div className={`pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-r ${gradient} opacity-0 blur-2xl transition-opacity group-hover:opacity-5`} />
+    </motion.article>
+  );
+}
+
+/* ============================ Interactive Demo ============================ */
+
+function InteractiveDemo() {
+  return (
+    <section id="demo" className="relative z-10 px-6 py-32 md:px-12 bg-gradient-to-b from-transparent via-violet-950/20 to-transparent" aria-label="Interactive demo">
+      <div className="mx-auto max-w-7xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+          <h2 className="text-4xl md:text-5xl font-black mb-4">See the magic</h2>
+          <p className="text-xl text-zinc-400">Drag to compare before and after</p>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="mx-auto max-w-3xl">
+          <TiltCard>
+            <CompareSlider />
+          </TiltCard>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ============================ Process Timeline ============================ */
+
+function ProcessTimeline() {
   const steps = [
-    { title: 'Upload', desc: 'Add your product photo', icon: '📤' },
-    { title: 'Enhance', desc: 'AI-powered quality', icon: '⚙️' },
-    { title: 'Publish', desc: 'Export to your store', icon: '🚀' },
+    { title: "Upload", description: "Drop your product photo—any format, any quality", icon: "📤" },
+    { title: "Enhance", description: "AI works its magic in seconds", icon: "✨" },
+    { title: "Export", description: "Download or publish directly to your store", icon: "🚀" },
   ];
+
   return (
-    <div id="how" className="relative z-10 bg-gradient-to-b from-[#0f0320] to-black px-6 py-20 text-white md:px-12 lg:px-20">
-      <h2 className="mb-12 text-center text-3xl font-bold md:text-4xl">How it works</h2>
-      <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
-        {steps.map((step, idx) => (
-          <div key={idx} className="relative rounded-xl border border-white/10 bg-white/5 px-6 py-8 text-center shadow-xl">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-fuchsia-600 text-2xl">{step.icon}</div>
-            <h3 className="text-xl font-semibold">{step.title}</h3>
-            <p className="mt-1 text-sm text-zinc-300">{step.desc}</p>
-            {idx < steps.length - 1 && (
-              <svg className="pointer-events-none absolute right-[-18px] top-1/2 hidden -translate-y-1/2 md:block" width="36" height="2" viewBox="0 0 36 2" fill="none" aria-hidden>
-                <path d="M0 1h36" stroke="white" strokeOpacity="0.25" strokeDasharray="4 3" />
-              </svg>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-10 text-center">
-        <Link href="/dashboard" className="inline-flex items-center justify-center rounded-xl bg-white/90 px-5 py-3 font-semibold text-zinc-900 hover:bg-white">
-          Start creating →
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------- Fun Section ------------------------------- */
-
-function HumorBreak() {
-  return (
-    <div className="relative z-10 mx-auto max-w-5xl px-6 py-14 text-center md:px-12">
-      <p className="text-lg text-zinc-700 dark:text-zinc-300">
-        Pixel philosophy: <span className="font-semibold">beauty persuades</span>, speed convinces, and clarity closes. Also—yes—your coffee mug is now a fashion model.
-      </p>
-    </div>
-  );
-}
-
-/* ------------------------------ Testimonials Ticker ------------------------- */
-
-function TestimonialsTicker() {
-  const data = [
-    '“CTR up 27% in 14 days.” — UrbanWear',
-    '“Returns dropped 18% after try-on.” — SneakLab',
-    '“Catalog refresh in a weekend.” — BloomBox',
-    '“Consistent brand images = team peace.” — M.J.',
-  ];
-  return (
-    <div className="relative z-10 mx-auto mb-2 mt-2 max-w-7xl overflow-hidden px-6 py-6 md:px-12">
-      <div className="rounded-2xl border border-black/10 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-white/5">
-        <div className="relative [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
-          <div className="animate-marquee2 flex min-w-full items-center gap-10">
-            {data.concat(data).map((t, i) => (
-              <div key={i} className="whitespace-nowrap text-sm text-zinc-700 dark:text-zinc-300">
-                {t}
-              </div>
+    <section id="how" className="relative z-10 px-6 py-32 md:px-12" aria-label="How it works">
+      <div className="mx-auto max-w-7xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-20 text-center">
+          <h2 className="text-4xl md:text-5xl font-black mb-4">Three steps to perfect</h2>
+          <p className="text-xl text-zinc-400">From upload to sale in under a minute</p>
+        </motion.div>
+        <div className="relative">
+          <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent hidden md:block" aria-hidden />
+          <div className="grid gap-12 md:grid-cols-3">
+            {steps.map((s, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: i * 0.15 }} className="relative text-center">
+                <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="relative z-10 mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-4xl shadow-2xl shadow-violet-500/50">
+                  <span aria-hidden>{s.icon}</span>
+                </motion.div>
+                <h3 className="mb-3 text-2xl font-bold">{s.title}</h3>
+                <p className="text-zinc-400">{s.description}</p>
+              </motion.div>
             ))}
           </div>
         </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mt-16 text-center">
+          <MagneticButton href="#demo" primary>
+            Try it yourself <ArrowIcon />
+          </MagneticButton>
+        </motion.div>
       </div>
-      <style jsx>{`
-        .animate-marquee2 { animation: marquee2 30s linear infinite; }
-        @keyframes marquee2 { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-      `}</style>
-    </div>
+    </section>
   );
 }
 
-/* --------------------------------- Bottom CTA ------------------------------- */
+/* ============================== Social Proof ============================== */
 
-function BottomCTA() {
+function SocialProof() {
+  const testimonials = [
+    '"Conversion rate jumped 47% in our first month."',
+    '"We ditched our $8K/month photo team."',
+    '"ROI positive in 72 hours. Unreal."',
+    '"My competitor asked what agency we hired. LOL."',
+    '"Product returns down 34% with try-on."',
+  ];
+
   return (
-    <div className="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-10 text-center md:px-12">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.3 }}
-        transition={{ duration: 0.5 }}
-        className="rounded-3xl border border-black/10 bg-gradient-to-br from-white to-zinc-50 p-8 shadow-xl dark:border-white/10 dark:from-zinc-900 dark:to-zinc-900"
-      >
-        <h3 className="text-2xl font-extrabold">Your competitors are already here.</h3>
-        <p className="mt-2 text-zinc-600 dark:text-zinc-300">
-          Join the beta, spend less time retouching, and more time selling. Limited invites this month.
-        </p>
-        <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <MagneticCTA href="/dashboard">Claim your invite</MagneticCTA>
-          <Link
-            href="#features"
-            className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/60 px-5 py-3 text-sm font-semibold text-zinc-900 backdrop-blur transition hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white"
-          >
-            Explore features
-          </Link>
+    <section className="relative z-10 py-24 overflow-hidden" aria-label="Testimonials">
+      <div className="relative">
+        <motion.div animate={{ x: [-1000, 0] }} transition={{ duration: 40, repeat: Infinity, ease: "linear" }} className="flex gap-8">
+          {[...testimonials, ...testimonials, ...testimonials].map((t, i) => (
+            <blockquote key={i} className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/5 px-8 py-6 backdrop-blur-sm min-w-[320px] md:min-w-[400px]">
+              <p className="text-lg text-zinc-300">{t}</p>
+            </blockquote>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* =============================== Final CTA =============================== */
+
+function FinalCTA() {
+  return (
+    <section className="relative z-10 px-6 py-32 md:px-12" aria-label="Call to action">
+      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mx-auto max-w-4xl text-center">
+        <div className="relative rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-violet-900/40 to-fuchsia-900/40 p-12 md:p-16 backdrop-blur-xl overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-violet-600/10 via-transparent to-fuchsia-600/10" aria-hidden />
+          <div className="relative">
+            <h2 className="text-4xl md:text-5xl font-black mb-6">Your competitors aren't waiting</h2>
+            <p className="text-xl text-zinc-300 mb-10 max-w-2xl mx-auto">
+              Join 2,400+ brands creating product visuals that convert. Start free—no credit card, no commitment, no BS.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <MagneticButton href="#demo" primary>
+                Start creating free <ArrowIcon />
+              </MagneticButton>
+              <MagneticButton href="#features">Explore features</MagneticButton>
+            </div>
+            <ul className="mt-10 flex flex-wrap justify-center gap-6 text-sm text-zinc-400">
+              <li>✓ 3 free renders</li>
+              <li>✓ No credit card</li>
+              <li>✓ Cancel anytime</li>
+              <li>✓ Setup in 60s</li>
+            </ul>
+          </div>
         </div>
       </motion.div>
-    </div>
+    </section>
   );
 }
 
-/* ------------------------------ Sticky Mobile CTA --------------------------- */
+/* ============================ Floating CTA ============================ */
 
-function StickyMobileCTA() {
+function FloatingCTA() {
+  const [isVisible, setIsVisible] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    const onScroll = () => setIsVisible(window.scrollY > 800);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  if (prefersReducedMotion) return null;
+
   return (
-    <div className="md:hidden">
-      <Link
-        href="/dashboard"
-        className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-indigo-700/20 transition hover:bg-fuchsia-600"
-        aria-label="Try it now"
-      >
-        Try now <span aria-hidden>→</span>
-      </Link>
-    </div>
+    <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 100 }} className="fixed bottom-6 right-6 z-50 md:hidden">
+      <motion.a href="#demo" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-4 font-bold text-white shadow-2xl shadow-violet-500/50">
+        Start free <ArrowIcon />
+      </motion.a>
+    </motion.div>
   );
 }
