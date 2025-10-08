@@ -317,6 +317,7 @@ export default function Dashboard() {
   const [group, setGroup] = useState('product');
   const [tool, setTool] = useState('enhance');
   const [plan, setPlan] = useState('Free');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // outputs
   const [resultUrls, setResultUrls] = useState([]); // array
@@ -905,7 +906,11 @@ const buildTryOnPrompt = (items = []) => {
   })();
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(60%_120%_at_50%_-10%,#2a1746_0%,#0b0b0f_55%)] text-zinc-50">
+    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-zinc-50 relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.15),transparent_50%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.1),transparent_50%)] pointer-events-none" />
+      
       {/* Global font polish */}
       <style jsx global>{`
         html,
@@ -913,21 +918,60 @@ const buildTryOnPrompt = (items = []) => {
           font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Inter,
             Roboto, Helvetica, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji;
         }
+        @keyframes gradient {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+          50% { box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
+        }
       `}</style>
 
-      <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-5 md:gap-7 px-3 md:px-6 py-5 md:py-8">
+      <div className="relative mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 md:gap-7 px-3 md:px-6 py-5 md:py-8">
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-xl bg-white/10 backdrop-blur border border-white/20 hover:bg-white/20 transition"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
         {/* Sidebar */}
-        <aside className="rounded-3xl border border-white/10 bg-white/5 shadow-2xl sticky top-4 self-start h-fit overflow-hidden">
-          <div className="px-4 py-4 flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-white/10 to-white/0">
-            <div className="grid place-items-center size-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow">
-              <SparkleIcon className="w-5 h-5" />
+        <aside className={`
+          rounded-3xl border border-white/20 bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-xl shadow-2xl 
+          sticky top-4 self-start h-fit overflow-hidden transition-all duration-300
+          ${sidebarOpen ? 'fixed inset-4 z-40 lg:relative lg:inset-auto' : 'hidden lg:block'}
+        `}>
+          <div className="px-5 py-5 flex items-center justify-between border-b border-white/20 bg-gradient-to-r from-violet-500/20 via-fuchsia-500/10 to-transparent">
+            <div className="flex items-center gap-3">
+              <div className="grid place-items-center size-11 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg" style={{ animation: 'glow 3s ease-in-out infinite' }}>
+                <SparkleIcon className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="font-bold tracking-tight text-lg">AI Studio</div>
+                <div className="text-xs text-zinc-300/80">Professional Creative Suite</div>
+              </div>
             </div>
-            <div className="font-semibold tracking-tight">AI Studio</div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          <div className="px-4 py-3">
-            <div className="text-[11px] font-semibold text-zinc-300/90 mb-1">Workspace</div>
-            <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur">
+          <div className="px-5 py-4">
+            <div className="text-xs font-bold text-violet-300/90 mb-2 uppercase tracking-wider">Workspace</div>
+            <div className="inline-flex w-full rounded-xl border border-white/20 bg-gradient-to-r from-white/10 to-white/5 p-1.5 backdrop-blur">
               {GROUPS.map((g) => {
                 const Active = group === g.id;
                 const Icon = g.icon;
@@ -937,67 +981,87 @@ const buildTryOnPrompt = (items = []) => {
                     onClick={() => {
                       const nextGroup = g.id;
                       setGroup(nextGroup);
-                      // لا تغيّر الأداة تلقائيًا إلا إذا لم تكن ضمن المجموعة الجديدة
                       if (!allowedTools(nextGroup).includes(tool)) {
                         setTool(nextGroup === 'product' ? 'enhance' : 'tryon');
                       }
+                      setSidebarOpen(false);
                     }}
                     className={[
-                      'inline-flex items-center gap-2 py-1.5 px-3 rounded-full text-sm transition focus:outline-none focus:ring-2 focus:ring-violet-400/70',
+                      'flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-400/70',
                       Active
-                        ? 'bg-white/90 text-zinc-900 shadow'
-                        : 'text-zinc-200 hover:bg-white/10',
+                        ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-lg scale-105'
+                        : 'text-zinc-200 hover:bg-white/10 hover:text-white',
                     ].join(' ')}
                   >
-                    <Icon className="size-4" /> {g.label}
+                    <Icon className="size-5" /> {g.label}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="px-4 pb-4">
-            <div className="text-[11px] font-semibold text-zinc-300/90 mb-1">Tools</div>
-            <div className="space-y-1">
+          <div className="px-5 pb-5">
+            <div className="text-xs font-bold text-violet-300/90 mb-2 uppercase tracking-wider">Tools</div>
+            <div className="space-y-2">
               {(group === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((t) => {
                 const Active = tool === t.id;
                 const Icon = t.icon;
                 return (
-                  <button
+                  <motion.button
                     key={t.id}
-                    onClick={() => switchTool(t.id)}
+                    onClick={() => {
+                      switchTool(t.id);
+                      setSidebarOpen(false);
+                    }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     className={[
-                      'w-full group flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-violet-400/70',
+                      'w-full group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-400/70',
                       Active
-                        ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 border border-violet-400/30'
-                        : 'hover:bg-white/5 border border-white/5',
+                        ? 'bg-gradient-to-r from-violet-500/30 to-fuchsia-500/30 border border-violet-400/50 shadow-lg'
+                        : 'hover:bg-white/10 border border-white/10 hover:border-white/20',
                     ].join(' ')}
                   >
-                    <Icon
-                      className={[
-                        'size-4',
-                        Active
-                          ? 'text-violet-300'
-                          : 'text-zinc-300 group-hover:text-zinc-100',
-                      ].join(' ')}
-                    />
-                    <span className="truncate">{t.label}</span>
-                  </button>
+                    <div className={[
+                      'p-2 rounded-lg transition-all',
+                      Active
+                        ? 'bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-md'
+                        : 'bg-white/10 text-zinc-300 group-hover:bg-white/20 group-hover:text-white',
+                    ].join(' ')}>
+                      <Icon className="size-5" />
+                    </div>
+                    <span className={[
+                      'truncate transition-colors',
+                      Active ? 'text-white font-semibold' : 'text-zinc-200 group-hover:text-white'
+                    ].join(' ')}>{t.label}</span>
+                    {Active && (
+                      <motion.div
+                        layoutId="active-tool"
+                        className="ml-auto w-2 h-2 rounded-full bg-white shadow-lg"
+                        initial={false}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                      />
+                    )}
+                  </motion.button>
                 );
               })}
             </div>
           </div>
 
-          <div className="px-4 py-4 border-t border-white/10 bg-white/[.02]">
+          <div className="px-5 py-5 border-t border-white/20 bg-gradient-to-r from-violet-500/10 to-transparent">
             <div className="flex items-center gap-3">
-              <div className="grid place-items-center size-10 rounded-full bg-white/10 text-white font-bold">
+              <div className="grid place-items-center size-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white font-bold shadow-lg text-sm">
                 {initials}
               </div>
-              <div className="text-sm">
-                <div className="font-medium leading-tight">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold leading-tight truncate text-white">
                   {user.user_metadata?.name || user.email}
                 </div>
-                <div className="text-[11px] text-zinc-300/80">Plan: {plan}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-500/30 to-fuchsia-500/30 border border-violet-400/30 text-violet-200 font-medium">
+                    {plan}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1008,45 +1072,53 @@ const buildTryOnPrompt = (items = []) => {
           {/* Header / Presets / Try-On Models */}
           <motion.div
             layout
-            className="rounded-3xl border border-white/10 bg-white/[.06] backdrop-blur p-4 sm:p-5 md:p-6 shadow-xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl border border-white/20 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl p-5 sm:p-6 md:p-8 shadow-2xl relative overflow-hidden"
           >
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-                  {group === 'product'
-                    ? 'Premium Presets'
-                    : tool === 'tryon'
-                    ? 'AI Studio — Try-On'
-                    : 'Model Swap'}
-                </h1>
-                <p className="text-zinc-300/90 text-xs sm:text-sm">
-                  {group === 'product' ? (
-                    <>
-                      Pick a preset or open <span className="font-semibold">Customize</span>.
-                    </>
-                  ) : tool === 'tryon' ? (
-                    <>Step 1: items → Step 2: model → Step 3: run.</>
-                  ) : (
-                    <>
-                      Upload/URL for two images then run{' '}
-                      <span className="font-semibold">Model Swap</span>.
-                    </>
-                  )}
-                </p>
-              </div>
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 via-transparent to-fuchsia-500/10 pointer-events-none" />
+            <div className="relative">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="space-y-2">
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-white via-violet-200 to-fuchsia-200 bg-clip-text text-transparent">
+                    {group === 'product'
+                      ? 'Premium Presets'
+                      : tool === 'tryon'
+                      ? 'AI Virtual Try-On'
+                      : 'Model Swap Studio'}
+                  </h1>
+                  <p className="text-zinc-300/90 text-sm sm:text-base max-w-2xl">
+                    {group === 'product' ? (
+                      <>
+                        Choose a professional preset or{' '}
+                        <span className="font-semibold text-violet-300">customize</span> your own enhancement settings.
+                      </>
+                    ) : tool === 'tryon' ? (
+                      <>Create stunning try-on images in three simple steps: add items, select model, and generate.</>
+                    ) : (
+                      <>
+                        Seamlessly swap models between images with advanced AI composition.
+                      </>
+                    )}
+                  </p>
+                </div>
 
-              {group === 'product' && (
-                <button
-                  onClick={() => {
-                    setTool('enhance');
-                    setPendingPreset(null);
-                    setShowEnhance(true);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-violet-400/70"
-                >
-                  ✨ Customize Enhance
-                </button>
-              )}
+                {group === 'product' && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setTool('enhance');
+                      setPendingPreset(null);
+                      setShowEnhance(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg hover:shadow-xl transition-all focus:outline-none focus:ring-2 focus:ring-violet-400/70"
+                  >
+                    <SparkleIcon className="w-4 h-4" />
+                    Customize Enhance
+                  </motion.button>
+                )}
+              </div>
             </div>
 
             {group === 'product' ? (
@@ -1341,55 +1413,79 @@ const buildTryOnPrompt = (items = []) => {
               )}
 
               {tool === 'enhance' && (
-                <div className="space-y-3">
-                  <div className="text-xs text-zinc-300/90">
-                    Open Enhance settings then run.
+                <div className="relative space-y-4">
+                  <div className="text-sm text-zinc-300/90">
+                    Configure your enhancement settings and run the AI processor.
                   </div>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setShowEnhance(true)}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-white text-zinc-900 px-3 py-2 text-sm font-semibold hover:bg-white/90"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-4 py-3 text-sm font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
                     disabled={busy}
                   >
-                    ✨ Open Enhance Settings
-                  </button>
+                    <SparkleIcon className="w-5 h-5" />
+                    Open Enhance Settings
+                  </motion.button>
                 </div>
               )}
 
               {tool === 'tryon' && (
-                <div className="space-y-3">
-                  <div className="text-xs text-zinc-300/90">
-                    Add items and pick a model, then Run.
+                <div className="relative space-y-4">
+                  <div className="text-sm text-zinc-300/90">
+                    Add clothing items and select a model to generate your virtual try-on.
                   </div>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: busy || !hasItems || !selectedModel ? 1 : 1.02 }}
+                    whileTap={{ scale: busy || !hasItems || !selectedModel ? 1 : 0.98 }}
                     onClick={runTryOn}
                     disabled={busy || !hasItems || !selectedModel}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-4 py-3 text-sm font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <PlayIcon className="w-4 h-4" /> Run Try-On (Combine)
-                  </button>
+                    <PlayIcon className="w-5 h-5" />
+                    {busy ? 'Processing...' : 'Run Virtual Try-On'}
+                  </motion.button>
                   {!hasItems && (
-                    <div className="text-[11px] text-amber-200/90">
-                      Add at least one clothing/accessory item.
-                    </div>
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-start gap-2 text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2"
+                    >
+                      <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Add at least one clothing or accessory item to begin.
+                    </motion.div>
                   )}
                   {hasItems && !selectedModel && (
-                    <div className="text-[11px] text-amber-200/90">
-                      Select a model to enable Run.
-                    </div>
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-start gap-2 text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2"
+                    >
+                      <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Select a model to enable the Run button.
+                    </motion.div>
                   )}
                 </div>
               )}
 
               {tool === 'modelSwap' && (
-                <div className="space-y-3">
-                  <label className="text-xs text-zinc-300/90">Prompt</label>
-                  <input
-                    value={swapPrompt}
-                    onChange={(e) => setSwapPrompt(e.target.value)}
-                    placeholder="Describe the composite…"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
-                  />
-                  <button
+                <div className="relative space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-violet-300/90 uppercase tracking-wider">Composition Prompt</label>
+                    <input
+                      value={swapPrompt}
+                      onChange={(e) => setSwapPrompt(e.target.value)}
+                      placeholder="Describe how to blend the images..."
+                      className="mt-2 w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-400/70 transition"
+                    />
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={runModelSwap}
                     disabled={
                       busy ||
@@ -1398,17 +1494,18 @@ const buildTryOnPrompt = (items = []) => {
                       (swapA.mode === 'url' && !swapA.url) ||
                       (swapB.mode === 'url' && !swapB.url)
                     }
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-white text-zinc-900 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-4 py-3 text-sm font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <PlayIcon className="w-4 h-4" /> Run Model Swap
-                  </button>
+                    <PlayIcon className="w-5 h-5" />
+                    {busy ? 'Processing...' : 'Run Model Swap'}
+                  </motion.button>
                 </div>
               )}
 
               {tool === 'removeBg' && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="text-xs text-zinc-300/90">Preview frame</div>
+                <div className="relative space-y-4">
+                  <div className="space-y-3">
+                    <div className="text-xs font-semibold text-violet-300/90 uppercase tracking-wider">Preview Frame Settings</div>
                     <ModeTabs mode={bgMode} setMode={setBgMode} />
                     {bgMode === 'color' && (
                       <Field label="Color">
@@ -1455,41 +1552,73 @@ const buildTryOnPrompt = (items = []) => {
                           type="checkbox"
                           checked={shadow}
                           onChange={(e) => setShadow(e.target.checked)}
+                          className="w-4 h-4 rounded accent-violet-500"
                         />
-                        <span className="text-xs">Enable</span>
+                        <span className="text-xs">Enable drop shadow</span>
                       </div>
                     </Field>
                   </div>
 
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={runRemoveBg}
                     disabled={busy || !rbFile}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-white text-zinc-900 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-4 py-3 text-sm font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <ScissorsIcon className="w-4 h-4" /> Remove Background
-                  </button>
+                    <ScissorsIcon className="w-5 h-5" />
+                    {busy ? 'Processing...' : 'Remove Background'}
+                  </motion.button>
                 </div>
               )}
             </aside>
           </div>
 
           {/* History */}
-          <div className="rounded-3xl border border-white/10 bg-white/[.06] shadow-xl p-4 md:p-5">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">History</div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-3xl border border-white/20 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl p-5 md:p-6 relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-fuchsia-500/5 pointer-events-none" />
+            <div className="relative flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-violet-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-sm font-bold uppercase tracking-wider text-violet-300/90">
+                  Recent Generations
+                </div>
+                {history.length > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/30 text-violet-200">
+                    {history.length}
+                  </span>
+                )}
+              </div>
               {history.length > 0 && (
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setHistory([])}
-                  className="text-xs px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                  className="text-xs px-3 py-1.5 rounded-lg border border-white/20 bg-white/10 hover:bg-white/20 font-medium transition-all"
                 >
-                  Clear
-                </button>
+                  Clear All
+                </motion.button>
               )}
             </div>
             {history.length === 0 ? (
-              <div className="text-xs text-zinc-300/80 px-1 py-4">— No renders yet —</div>
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-violet-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-sm text-zinc-400">No generations yet</div>
+                <div className="text-xs text-zinc-500 mt-1">Your recent creations will appear here</div>
+              </div>
             ) : (
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              <div className="relative mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {history.map((h, i) => {
                   const thumb = h.outputs?.[0];
                   const tag =
@@ -1501,40 +1630,54 @@ const buildTryOnPrompt = (items = []) => {
                       ? 'Remove BG'
                       : 'Enhance';
                   return (
-                    <button
+                    <motion.button
                       key={i}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => {
                         setResultUrls(h.outputs);
                         setSelectedOutput(h.outputs?.[0] || '');
                       }}
-                      className="group rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 text-left"
+                      className="group rounded-xl overflow-hidden border border-white/20 hover:border-violet-400/50 bg-gradient-to-br from-white/10 to-white/5 hover:shadow-xl transition-all text-left"
                       title={tag}
                     >
-                      <div className="relative aspect-[4/3]">
+                      <div className="relative aspect-[4/3] overflow-hidden">
                         {thumb ? (
-                          <img
-                            src={thumb}
-                            alt={tag}
-                            className="absolute inset-0 w-full h-full object-cover"
-                          />
+                          <>
+                            <img
+                              src={thumb}
+                              alt={tag}
+                              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                          </>
                         ) : (
-                          <div className="absolute inset-0 grid place-items-center text-[11px] text-zinc-300/80">
+                          <div className="absolute inset-0 grid place-items-center text-xs text-zinc-400 bg-white/5">
+                            <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
                             No image
                           </div>
                         )}
                       </div>
-                      <div className="p-2">
-                        <div className="text-[11px] font-medium">{tag}</div>
-                        <div className="text-[10px] text-zinc-400">
+                      <div className="p-3">
+                        <div className="text-xs font-semibold text-white group-hover:text-violet-300 transition-colors truncate">{tag}</div>
+                        <div className="text-[10px] text-zinc-400 mt-1 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
                           {new Date(h.ts).toLocaleTimeString()}
                         </div>
                       </div>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
             )}
-          </div>
+          </motion.div>
         </section>
       </div>
 
@@ -1811,29 +1954,37 @@ function TryOnStepper({ step }) {
 
 function StepBadge({ phase }) {
   const map = {
-    idle: { label: 'Ready', color: 'bg-white/10 text-white border-white/20' },
+    idle: { 
+      label: 'Ready', 
+      color: 'bg-gradient-to-r from-white/10 to-white/5 text-white border-white/20',
+      icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+    },
     processing: {
       label: 'Processing',
-      color: 'bg-amber-200/20 text-amber-200 border-amber-200/30',
+      color: 'bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-amber-200 border-amber-400/30',
+      icon: <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
     },
     ready: {
-      label: 'Done',
-      color: 'bg-emerald-300/20 text-emerald-200 border-emerald-300/30',
+      label: 'Complete',
+      color: 'bg-gradient-to-r from-emerald-500/20 to-green-500/10 text-emerald-200 border-emerald-400/30',
+      icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     },
-    error: { label: 'Error', color: 'bg-rose-300/20 text-rose-200 border-rose-300/30' },
+    error: { 
+      label: 'Error', 
+      color: 'bg-gradient-to-r from-rose-500/20 to-red-500/10 text-rose-200 border-rose-400/30',
+      icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+    },
   };
   const it = map[phase] || map.idle;
   return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${it.color}`}
+    <motion.span
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold backdrop-blur ${it.color}`}
     >
-      <span
-        className={`inline-block size-2 rounded-full ${
-          phase === 'processing' ? 'bg-white animate-pulse' : 'bg-white'
-        }`}
-      />
+      {it.icon}
       {it.label}
-    </span>
+    </motion.span>
   );
 }
 
