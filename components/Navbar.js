@@ -40,18 +40,24 @@ export default function Navbar() {
 
   // Theme init
   useEffect(() => {
-    const stored = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (typeof window === 'undefined') return;
+    const doc = window.document?.documentElement;
+    if (!doc) return;
+    const stored = window.localStorage?.getItem('theme');
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
     const initialDark = stored ? stored === 'dark' : prefersDark;
     setDark(initialDark);
-    document.documentElement.classList.toggle('dark', initialDark);
+    doc.classList.toggle('dark', initialDark);
   }, []);
 
   const toggleTheme = () => {
+    if (typeof window === 'undefined') return;
+    const doc = window.document?.documentElement;
+    if (!doc) return;
     const next = !dark;
     setDark(next);
-    localStorage.setItem('theme', next ? 'dark' : 'light');
-    document.documentElement.classList.toggle('dark', next);
+    window.localStorage?.setItem('theme', next ? 'dark' : 'light');
+    doc.classList.toggle('dark', next);
   };
 
   // Scroll FX

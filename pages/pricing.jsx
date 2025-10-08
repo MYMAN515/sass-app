@@ -190,10 +190,13 @@ export default function PricingPage() {
   const [addonKeys, setAddonKeys] = useState({ storage: false, video: false, priority: false });
 
   useEffect(() => {
-    const observe = () => setIsDark(document.documentElement.classList.contains('dark'));
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (!root) return;
+    const observe = () => setIsDark(root.classList.contains('dark'));
     observe();
     const mo = new MutationObserver(observe);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    mo.observe(root, { attributes: true, attributeFilter: ['class'] });
     return () => mo.disconnect();
   }, []);
 
