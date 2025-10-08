@@ -1,13 +1,13 @@
 // pages/auth/callback.jsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export default function GoogleAuthCallback() {
-  const supabase = createBrowserSupabaseClient();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const router = useRouter();
   const [msg, setMsg] = useState('⏳ Verifying Google login…');
 
