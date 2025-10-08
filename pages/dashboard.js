@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { InsightsPanel, SuggestionPanel } from '../components/dashboard/SmartPanels';
 
 /**
  * Unified AI Studio Dashboard (pages/dashboard.js)
@@ -116,6 +117,18 @@ const pickUrls = (out) => {
   if (typeof out === 'string') return [out];
   const one = out.url || out.image || out.result;
   return one ? [one] : [];
+};
+
+const formatRelativeTime = (ts) => {
+  if (!ts) return '';
+  const delta = Date.now() - ts;
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (delta < minute) return 'just now';
+  if (delta < hour) return `${Math.max(1, Math.round(delta / minute))}m ago`;
+  if (delta < day) return `${Math.max(1, Math.round(delta / hour))}h ago`;
+  return `${Math.max(1, Math.round(delta / day))}d ago`;
 };
 
 /* -------------------------------------------------------
@@ -305,6 +318,23 @@ const PEOPLE_TOOLS = [
   { id: 'tryon', label: 'Try-On', icon: PersonIcon },
   { id: 'modelSwap', label: 'Model Swap', icon: SwapIcon },
 ];
+
+const TOOL_LABELS = {
+  enhance: 'Enhance',
+  tryon: 'Try-On',
+  swap: 'Model Swap',
+  modelSwap: 'Model Swap',
+  removeBg: 'Remove Background',
+};
+
+const TOOL_PARENT_GROUP = {
+  enhance: 'product',
+  removeBg: 'product',
+  tryon: 'people',
+  modelSwap: 'people',
+};
+
+const normalizeToolId = (id) => (id === 'swap' ? 'modelSwap' : id);
 
 export default function Dashboard() {
   const supabase = useSupabaseClient();
@@ -877,16 +907,29 @@ const buildTryOnPrompt = (items = []) => {
     setProgress(null);
   };
 
-  const switchTool = (nextId) => {
+  const switchTool = useCallback((nextId) => {
+    if (!nextId) return;
     setTool(nextId);
     setErr('');
     setPhase('idle');
     setResultUrls([]);
     setSelectedOutput('');
     if (nextId === 'tryon') setTryonStep('items');
-  };
+  }, []);
 
-  const allowedTools = (g) => (g === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map(t => t.id);
+  const goToTool = useCallback(
+    (nextId) => {
+      const normalized = normalizeToolId(nextId);
+      if (!normalized) return;
+      const parent = TOOL_PARENT_GROUP[normalized] || 'product';
+      setGroup(parent);
+      switchTool(normalized);
+      setSidebarOpen(false);
+    },
+    [setGroup, setSidebarOpen, switchTool]
+  );
+
+  const allowedTools = (g) => (g === 'product' ? PRODUCT_TOOLS : PEOPLE_TOOLS).map((t) => t.id);
 
   if (loading || user === undefined) {
     return (
@@ -904,6 +947,185 @@ const buildTryOnPrompt = (items = []) => {
     const p = n.split(' ').filter(Boolean);
     return ((p[0]?.[0] || n[0]) + (p[1]?.[0] || '')).toUpperCase();
   })();
+
+  const insights = useMemo(() => {
+    const safeHistory = Array.isArray(history) ? history : [];
+    const totalRuns = safeHistory.length;
+    const lastRun = safeHistory[0];
+    const activeToolLabel = TOOL_LABELS[tool] || TOOL_LABELS.enhance;
+    const mood = phase === 'error' ? 'error' : phase === 'processing' ? 'loading' : 'ready';
+    const statusValue =
+      mood === 'error' ? 'Needs attention' : mood === 'loading' ? 'Processing' : 'Ready';
+
+    const metrics = [
+      { id: 'plan', label: 'Plan', value: plan },
+      { id: 'active', label: 'Active Tool', value: activeToolLabel },
+      { id: 'runs', label: 'Completed Runs', value: totalRuns },
+      { id: 'status', label: 'Status', value: statusValue },
+    ];
+
+    if (lastRun?.ts) {
+      metrics.push({
+        id: 'last-output',
+        label: 'Last Output',
+        value: formatRelativeTime(lastRun.ts),
+        hint: TOOL_LABELS[lastRun.tool] || '—',
+      });
+    }
+
+    if (progress !== null) {
+      metrics.push({
+        id: 'progress',
+        label: 'Live Progress',
+        value: `${progress}%`,
+        hint: phase === 'processing' ? 'Rendering' : 'Stage',
+      });
+    }
+
+    return {
+      metrics,
+      mood,
+      statusLabel: statusValue,
+      lastRun,
+      totalRuns,
+    };
+  }, [history, plan, tool, phase, progress]);
+
+  const suggestions = useMemo(() => {
+    const list = [];
+    const trimmedUrl = enhUrl?.trim();
+    const safeHistory = Array.isArray(history) ? history : [];
+    const lastRun = safeHistory[0];
+
+    if (phase === 'error') {
+      const fallback = normalizeToolId(lastRun?.tool || tool);
+      list.push({
+        id: 'resolve-error',
+        title: 'Resolve the last error',
+        description: err || 'Review the inputs and try again with adjusted settings.',
+        tone: 'error',
+        actionLabel: 'Retry last tool',
+        onAction: () => goToTool(fallback),
+      });
+    }
+
+    if (phase === 'processing') {
+      list.push({
+        id: 'processing',
+        title: 'Processing in background',
+        description: 'Prepare your next task while the current job completes.',
+      });
+    }
+
+    if (tool === 'enhance') {
+      if (enhMode === 'upload' && !enhFile) {
+        list.push({
+          id: 'add-enhance-image',
+          title: 'Upload a product image',
+          description: 'Drop a product photo to unlock studio presets and enhancements.',
+        });
+      } else if (enhMode === 'url' && !trimmedUrl) {
+        list.push({
+          id: 'add-enhance-url',
+          title: 'Paste a public image URL',
+          description: 'Paste an accessible image link so we can enhance it for you.',
+        });
+      } else if (!pendingPreset && !busy) {
+        list.push({
+          id: 'tune-enhance',
+          title: 'Fine-tune enhance settings',
+          description: 'Open the custom enhancer to craft a branded look.',
+          actionLabel: 'Open customizer',
+          onAction: () => {
+            setPendingPreset(null);
+            setShowEnhance(true);
+          },
+        });
+      }
+    }
+
+    if (tool === 'tryon') {
+      if (!hasItems) {
+        list.push({
+          id: 'add-tryon-item',
+          title: 'Add a garment',
+          description: 'Upload or link at least one clothing item to begin the try-on.',
+        });
+      } else if (!selectedModel) {
+        list.push({
+          id: 'select-model',
+          title: 'Pick a model',
+          description: 'Select a base model to style with the uploaded garments.',
+        });
+      }
+    }
+
+    if (tool === 'modelSwap') {
+      const needsA = swapA.mode === 'upload' ? !swapA.file : !swapA.url;
+      const needsB = swapB.mode === 'upload' ? !swapB.file : !swapB.url;
+      if (needsA || needsB) {
+        list.push({
+          id: 'complete-modelswap',
+          title: 'Provide both source images',
+          description: 'Add Image A and Image B so the swap engine can blend them.',
+        });
+      }
+    }
+
+    if (tool === 'removeBg' && !rbFile) {
+      list.push({
+        id: 'upload-removebg',
+        title: 'Upload an item to isolate',
+        description: 'Drop a product image to remove the background instantly.',
+      });
+    }
+
+    if (phase !== 'processing' && lastRun) {
+      const normalized = normalizeToolId(lastRun.tool);
+      if (normalized && normalized !== tool) {
+        list.push({
+          id: 'reopen-last',
+          title: `Revisit ${TOOL_LABELS[lastRun.tool] || 'last tool'}`,
+          description: 'Jump back to your previous workflow with one click.',
+          actionLabel: 'Open tool',
+          onAction: () => goToTool(normalized),
+        });
+      }
+    }
+
+    if (phase !== 'processing') {
+      const alternate = tool === 'enhance' ? 'tryon' : tool === 'tryon' ? 'removeBg' : 'enhance';
+      if (alternate !== tool) {
+        list.push({
+          id: 'explore-alt',
+          title: `Explore ${TOOL_LABELS[alternate] || 'another tool'}`,
+          description: 'Discover more ways to optimise your catalog in the suite.',
+          actionLabel: `Open ${TOOL_LABELS[alternate]}`,
+          onAction: () => goToTool(alternate),
+        });
+      }
+    }
+
+    return list.slice(0, 4);
+  }, [
+    phase,
+    err,
+    history,
+    tool,
+    enhMode,
+    enhFile,
+    enhUrl,
+    pendingPreset,
+    busy,
+    hasItems,
+    selectedModel,
+    swapA,
+    swapB,
+    rbFile,
+    goToTool,
+    setPendingPreset,
+    setShowEnhance,
+  ]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-zinc-50 relative overflow-hidden">
@@ -1108,7 +1330,7 @@ const buildTryOnPrompt = (items = []) => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {
-                      setTool('enhance');
+                      goToTool('enhance');
                       setPendingPreset(null);
                       setShowEnhance(true);
                     }}
@@ -1118,6 +1340,10 @@ const buildTryOnPrompt = (items = []) => {
                     Customize Enhance
                   </motion.button>
                 )}
+              </div>
+              <div className="mt-6 grid gap-4 xl:grid-cols-[2fr_1fr]">
+                <InsightsPanel insights={insights} />
+                <SuggestionPanel suggestions={suggestions} />
               </div>
             </div>
 
@@ -1133,7 +1359,7 @@ const buildTryOnPrompt = (items = []) => {
                       preview={p.preview}
                       tag={p.tag}
                       onClick={() => {
-                        setTool('enhance');
+                        goToTool('enhance');
                         setPendingPreset(p.config);
                         setShowEnhance(true);
                       }}
@@ -1714,7 +1940,7 @@ const buildTryOnPrompt = (items = []) => {
 /* -------------------------------------------------------
    Reusable UI widgets
 ------------------------------------------------------- */
-function DropSimple({ label, file, local, onPick }) {
+const DropSimple = memo(function DropSimple({ label, file, local, onPick }) {
   const inputRef = useRef(null);
   return (
     <div
@@ -1747,9 +1973,9 @@ function DropSimple({ label, file, local, onPick }) {
       )}
     </div>
   );
-}
+});
 
-function InputSlot({ label, mode, setMode, file, setFile, url, setUrl, hint }) {
+const InputSlot = memo(function InputSlot({ label, mode, setMode, file, setFile, url, setUrl, hint }) {
   const inputRef = useRef(null);
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -1818,9 +2044,9 @@ function InputSlot({ label, mode, setMode, file, setFile, url, setUrl, hint }) {
       )}
     </div>
   );
-}
+});
 
-function PresetCard({ title, subtitle, onClick, preview, tag }) {
+const PresetCard = memo(function PresetCard({ title, subtitle, onClick, preview, tag }) {
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
   if (broken) return null;
@@ -1856,9 +2082,9 @@ function PresetCard({ title, subtitle, onClick, preview, tag }) {
       </div>
     </button>
   );
-}
+});
 
-function ModelCard({ model, active, onSelect }) {
+const ModelCard = memo(function ModelCard({ model, active, onSelect }) {
   return (
     <button
       onClick={onSelect}
@@ -1887,9 +2113,9 @@ function ModelCard({ model, active, onSelect }) {
       </div>
     </button>
   );
-}
+});
 
-function TryOnStepper({ step }) {
+const TryOnStepper = memo(function TryOnStepper({ step }) {
   const steps = [
     { id: 'items', label: 'Items' },
     { id: 'model', label: 'Model' },
@@ -1950,12 +2176,12 @@ function TryOnStepper({ step }) {
       </div>
     </div>
   );
-}
+});
 
-function StepBadge({ phase }) {
+const StepBadge = memo(function StepBadge({ phase }) {
   const map = {
-    idle: { 
-      label: 'Ready', 
+    idle: {
+      label: 'Ready',
       color: 'bg-gradient-to-r from-white/10 to-white/5 text-white border-white/20',
       icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
     },
@@ -1986,17 +2212,18 @@ function StepBadge({ phase }) {
       {it.label}
     </motion.span>
   );
-}
+});
 
-function Field({ label, children }) {
+const Field = memo(function Field({ label, children }) {
   return (
     <label className="flex items-center justify-between gap-3 text-xs">
       <span className="min-w-28 text-zinc-300/90">{label}</span>
       <div className="flex-1">{children}</div>
     </label>
   );
-}
-function Color({ value, onChange }) {
+});
+
+const Color = memo(function Color({ value, onChange }) {
   return (
     <div className="flex items-center gap-2">
       <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
@@ -2007,8 +2234,9 @@ function Color({ value, onChange }) {
       />
     </div>
   );
-}
-function Range({ value, onChange, min, max, step = 1 }) {
+});
+
+const Range = memo(function Range({ value, onChange, min, max, step = 1 }) {
   return (
     <div className="flex items-center gap-2">
       <input
@@ -2023,10 +2251,10 @@ function Range({ value, onChange, min, max, step = 1 }) {
       <span className="w-10 text-right">{typeof value === 'number' ? value : ''}</span>
     </div>
   );
-}
+});
 
 /* ---- Try-On item card ---- */
-function TryItemCard({ index, item, onMode, onFile, onUrl, onType, onRemove }) {
+const TryItemCard = memo(function TryItemCard({ index, item, onMode, onFile, onUrl, onType, onRemove }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
       <div className="flex items-center justify-between mb-2">
@@ -2069,7 +2297,7 @@ function TryItemCard({ index, item, onMode, onFile, onUrl, onType, onRemove }) {
       </div>
     </div>
   );
-}
+});
 
 function EnhanceCustomizer({ initial, onComplete }) {
   return (
@@ -2136,13 +2364,13 @@ function EnhanceCustomizer({ initial, onComplete }) {
   );
 }
 
-function Thumb({ src }) {
+const Thumb = memo(function Thumb({ src }) {
   return (
     <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 grid place-items-center p-2">
       <img src={src} alt="thumb" className="max-w-full max-h-[38vh] object-contain" />
     </div>
   );
-}
+});
 
 /* ----- Icons (SVG) ----- */
 function SparkleIcon(props) {
