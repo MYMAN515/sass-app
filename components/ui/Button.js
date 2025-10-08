@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 
-export default function Button({ children, variant = 'primary', ...props }) {
+export default function Button({ children, variant = 'primary', className = '', ...props }) {
   const base = 'px-5 py-2 rounded-full font-medium transition-all text-sm';
 
   const styles = {
@@ -13,7 +13,7 @@ export default function Button({ children, variant = 'primary', ...props }) {
     <motion.button
       whileTap={{ scale: 0.97 }}
       whileHover={{ scale: 1.03 }}
-      className={`${base} ${styles[variant]}`}
+      className={`${base} ${styles[variant]} ${className}`.trim()}
       {...props}
     >
       {children}
