@@ -2,6 +2,9 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import Replicate from 'replicate';
 
+import { createRateLimiter } from '@/lib/rateLimit';
+import { sanitizeEmail, sanitizeString, safeJsonResponse } from '@/lib/security';
+
 export const config = {
   api: { bodyParser: true },
 };
@@ -19,6 +22,7 @@ const ensureHttpList = (arr = []) =>
     .filter((u) => /^https?:\/\//i.test(u));
 
 const replicate = new Replicate({ auth: REPLICATE_TOKEN });
+const aiRateLimiter = createRateLimiter({ uniqueTokenPerInterval: 3, interval: 60_000 });
 
 // تشغيل الموديل (باستخدام predictions.create + wait)
 async function runNanoBananaOnce({ prompt, inputs }) {
@@ -49,6 +53,8 @@ async function runNanoBananaOnce({ prompt, inputs }) {
 
 export default async function handler(req, res) {
   try {
+    safeJsonResponse(res);
+
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Only POST allowed' });
     }
@@ -58,20 +64,33 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Missing Replicate token' });
     }
 
+    const ip =
+      (req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || '').trim() ||
+      'unknown';
+
+    const limiterResult = aiRateLimiter.check(ip);
+    if (!limiterResult.success) {
+      res.setHeader('Retry-After', String(limiterResult.retryAfter));
+      return res.status(429).json({ error: 'Too many requests. Please slow down and try again.' });
+    }
+
     const { imageUrl, imageUrls, prompt, user_email, num_images } = req.body || {};
 
     let inputs = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
     if (!inputs.length && typeof imageUrl === 'string') inputs = [imageUrl];
     inputs = ensureHttpList(inputs).slice(0, 6);
 
-    if (!inputs.length || !prompt || !user_email) {
+    const sanitizedPrompt = sanitizeString(prompt, { maxLength: 600 });
+    const sanitizedEmail = sanitizeEmail(user_email);
+
+    if (!inputs.length || !sanitizedPrompt || !sanitizedEmail) {
       return res.status(400).json({
         error: 'Missing required fields: imageUrls/imageUrl, prompt, user_email',
       });
     }
 
     console.log('📦 Payload to nano-banana:', {
-      prompt: prompt?.slice(0, 120),
+      prompt: sanitizedPrompt?.slice(0, 120),
       inputsCount: inputs.length,
       first: inputs[0],
     });
@@ -87,7 +106,7 @@ export default async function handler(req, res) {
     const { data: userData, error: userError } = await supabase
       .from('Data')
       .select('credits, plan')
-      .eq('email', user_email)
+      .eq('email', sanitizedEmail)
       .single();
 
     if (userError || !userData) {
@@ -117,9 +136,9 @@ export default async function handler(req, res) {
 
     for (let i = 0; i < outputsCount; i++) {
       try {
-        let urls = await runNanoBananaOnce({ prompt, inputs });
+        let urls = await runNanoBananaOnce({ prompt: sanitizedPrompt, inputs });
         if (!urls.length) {
-          urls = await runNanoBananaOnce({ prompt: harden(prompt), inputs });
+          urls = await runNanoBananaOnce({ prompt: harden(sanitizedPrompt), inputs });
         }
         if (urls.length) {
           variants.push(urls[0]);
@@ -143,7 +162,7 @@ export default async function handler(req, res) {
     // ✅ خصم كريدت لو Free
     if (userData.plan !== 'Pro') {
       try {
-        await supabase.rpc('decrement_credit', { user_email });
+        await supabase.rpc('decrement_credit', { user_email: sanitizedEmail });
       } catch (e) {
         console.warn('⚠️ Failed to decrement credit:', e?.message || e);
       }
@@ -158,8 +177,6 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('🔥 /api/ai fatal error:', err);
-    return res
-      .status(500)
-      .json({ error: err?.message || 'Internal error' });
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
