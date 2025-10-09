@@ -106,6 +106,7 @@ export default function Navbar() {
   useEffect(() => {
     let mounted = true;
     let channel;
+    const cleanups = [];
 
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -122,10 +123,8 @@ export default function Navbar() {
         name: session.user.user_metadata?.name || session.user.email,
       });
 
-      // جلب أولي
       await syncUserData(session.user.id, session.user.email);
 
-      // ✅ Realtime: استمع لتحديثات صف المستخدم في Data
       channel = supabase
         .channel('public:Data:credits')
         .on(
@@ -148,26 +147,26 @@ export default function Navbar() {
             if (newPlan) setPlan(newPlan);
           }
         )
-        .subscribe(status => {
-          // console.log('Realtime status', status);
-        });
+        .subscribe();
+      cleanups.push(() => {
+        if (channel) supabase.removeChannel(channel);
+      });
 
-      // Fallback: لو أي صفحة بثّت الحدث "credits:refresh" نعيد الجلب
       const onRefresh = () => syncUserData(session.user.id, session.user.email);
       window.addEventListener('credits:refresh', onRefresh);
-
-      // Cleanup
-      return () => {
-        mounted = false;
-        window.removeEventListener('credits:refresh', onRefresh);
-        if (channel) supabase.removeChannel(channel);
-      };
+      cleanups.push(() => window.removeEventListener('credits:refresh', onRefresh));
     })();
 
     return () => {
       mounted = false;
+      cleanups.forEach((fn) => fn());
     };
   }, [supabase, syncUserData]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    setMenuOpen(false);
+  }, [pathname, menuOpen]);
 
   const initials = useMemo(() => {
     const n = user?.name || user?.email || '';
@@ -178,8 +177,15 @@ export default function Navbar() {
   }, [user]);
 
   const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Failed to call logout API', err);
+    }
+
     await supabase.auth.signOut();
     Cookies.remove('user');
+    setMenuOpen(false);
     router.push('/login');
   };
 
