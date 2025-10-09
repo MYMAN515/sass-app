@@ -1,6 +1,5 @@
 // components/Navbar.jsx
 'use client';
-
 import Link from 'next/link';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
