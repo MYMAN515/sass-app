@@ -164,9 +164,8 @@ export default function Navbar() {
   }, [supabase, syncUserData]);
 
   useEffect(() => {
-    if (!menuOpen) return;
     setMenuOpen(false);
-  }, [pathname, menuOpen]);
+  }, [pathname]);
 
   const initials = useMemo(() => {
     const n = user?.name || user?.email || '';
@@ -199,273 +198,286 @@ export default function Navbar() {
   // لون تنبيهي لو الكريدت قليل
   const lowCredits = !loading && user && credits <= 3 && plan !== 'Pro';
 
+  const desktopNav = (
+    <div className="hidden md:flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-sm backdrop-blur">
+      {LINKS.map((link) => {
+        const active = isActive(link.href);
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            aria-current={active ? 'page' : undefined}
+            className="relative inline-flex items-center rounded-full px-3 py-1.5 font-medium text-white/80 transition hover:text-white"
+          >
+            {active && (
+              <motion.span
+                layoutId="navbar-active"
+                className="absolute inset-0 rounded-full bg-gradient-to-r from-fuchsia-500/60 to-purple-600/60"
+                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              />
+            )}
+            <span className="relative">{link.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+
+  const desktopActions = (
+    <div className="hidden md:flex items-center gap-3">
+      <button
+        onClick={toggleTheme}
+        className="inline-flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10 hover:text-white"
+        aria-label="Toggle theme"
+      >
+        {dark ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+      </button>
+
+      {loading ? (
+        <div className="h-10 w-48 rounded-full bg-white/10 animate-pulse" />
+      ) : user ? (
+        <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
+            <span className="inline-block size-2 rounded-full bg-emerald-400" />
+            Plan
+            <strong className="font-semibold text-white">{plan}</strong>
+          </div>
+
+          <Link
+            href={lowCredits ? '/pricing' : '/dashboard'}
+            className={[
+              'hidden lg:inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition',
+              lowCredits
+                ? 'border-rose-400/50 bg-rose-400/10 text-rose-100 hover:bg-rose-400/20'
+                : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white',
+            ].join(' ')}
+            title={lowCredits ? 'Recharge credits' : 'View credits'}
+          >
+            Credits
+            <motion.span
+              key={creditPulseRef.current}
+              initial={{ scale: 1.2 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+              className="font-semibold text-white"
+              aria-live="polite"
+            >
+              {credits}
+            </motion.span>
+            {lowCredits && <span className="hidden md:inline">Low</span>}
+          </Link>
+
+          <Link
+            href="/enhance"
+            className="hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:shadow-purple-500/40"
+          >
+            🚀 Launch Studio
+          </Link>
+
+          <div
+            title={user.email}
+            className="grid size-10 place-items-center rounded-full border border-white/15 bg-white/10 font-semibold text-white"
+          >
+            {initials}
+          </div>
+          <button
+            onClick={handleLogout}
+            className="text-xs font-medium text-white/70 underline-offset-2 hover:text-white hover:underline"
+          >
+            Logout
+          </button>
+        </div>
+      ) : (
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:shadow-purple-500/40"
+        >
+          Sign in
+        </Link>
+      )}
+    </div>
+  );
+
   return (
     <header
       className={[
-        'fixed top-0 z-50 w-full transition-all duration-300',
-        scrolled ? 'shadow-[0_10px_30px_-10px_rgba(0,0,0,.5)]' : '',
+        'fixed top-0 z-50 w-full transition-colors duration-500',
+        scrolled ? 'backdrop-blur-xl bg-[#0b061c]/80 shadow-[0_12px_45px_-20px_rgba(0,0,0,0.65)]' : 'bg-transparent',
       ].join(' ')}
       aria-label="Primary"
     >
-      <div
-        className={[
-          'mx-auto max-w-7xl px-4',
-          'rounded-b-3xl border-b border-white/10',
-          'backdrop-blur-xl',
-          'bg-white/5 dark:bg-zinc-900/50',
-        ].join(' ')}
-        style={{ boxShadow: scrolled ? 'inset 0 -1px 0 rgba(255,255,255,.06)' : 'none' }}
-      >
-        <nav className="h-16 flex items-center justify-between text-white">
-          {/* Logo */}
-          <Link href="/" className="group inline-flex items-center gap-2">
-            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg">
-              <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
-                <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
-              </svg>
-            </div>
-            <span className="font-semibold tracking-tight">
-              AI Studio
-              <span className="ml-2 inline-block align-middle h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            </span>
-          </Link>
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 text-white md:h-20">
+        <Link href="/" className="group inline-flex items-center gap-3 rounded-full bg-white/5 px-3 py-2 text-sm font-semibold tracking-tight text-white transition hover:bg-white/10">
+          <span className="relative flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-indigo-500 text-white shadow-lg shadow-fuchsia-500/40">
+            <span className="absolute inset-0 rounded-2xl bg-white/20 opacity-0 transition group-hover:opacity-100" />
+            <svg width="18" height="18" viewBox="0 0 24 24" className="relative text-white">
+              <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
+            </svg>
+          </span>
+          <span className="flex items-center gap-2">
+            AI Studio
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          </span>
+        </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-2">
-            {LINKS.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={[
-                  'relative px-3 py-2 rounded-full text-sm font-medium transition',
-                  'hover:bg-white/10',
-                  isActive(l.href) ? 'text-white' : 'text-white/80',
-                ].join(' ')}
-              >
-                <span className="relative">
-                  {l.label}
-                  {isActive(l.href) && (
-                    <span className="absolute -bottom-1 left-0 right-0 mx-auto h-[2px] w-6 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
-                  )}
-                </span>
-              </Link>
-            ))}
+        {desktopNav}
+        {desktopActions}
 
-            <button
-              onClick={toggleTheme}
-              className="ml-1 inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-9 transition"
-              aria-label="Toggle theme"
-              title="Toggle theme"
-            >
-              {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
-            </button>
-
-            {/* User/CTA */}
-            {loading ? (
-              <div className="ml-2 h-9 w-52 rounded-full bg-white/10 animate-pulse" />
-            ) : user ? (
-              <div className="ml-2 flex items-center gap-2">
-                <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
-                  <span className="inline-block size-2 rounded-full bg-emerald-400" />
-                  Plan: <strong className="font-semibold">{plan}</strong>
-                </span>
-
-                {/* Credits pill مع أنيميشن عند التغيير */}
-                <Link
-                  href={lowCredits ? '/pricing' : '#'}
-                  className={[
-                    'hidden lg:inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition',
-                    lowCredits
-                      ? 'border-rose-400/40 bg-rose-400/15 hover:bg-rose-400/25'
-                      : 'border-white/15 bg-white/10 hover:bg-white/15',
-                  ].join(' ')}
-                  title={lowCredits ? 'Recharge credits' : 'Credits'}
-                >
-                  Credits:{' '}
-                  <motion.strong
-                    key={creditPulseRef.current}
-                    initial={{ scale: 1.2, color: lowCredits ? '#fecaca' : '#fff' }}
-                    animate={{ scale: 1, color: '#fff' }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-                    className="font-semibold"
-                    aria-live="polite"
-                  >
-                    {credits}
-                  </motion.strong>
-                  {lowCredits && <span className="ml-1 hidden md:inline">— Low</span>}
-                </Link>
-
-                <Link
-                  href="/enhance"
-                  className="hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
-                >
-                  🚀 Launch Studio
-                </Link>
-
-                <div
-                  title={user.email}
-                  className="ml-1 grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold"
-                >
-                  {initials}
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="text-xs underline text-white/80 hover:text-white"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <div className="ml-2 flex items-center gap-2">
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
-                >
-                  Sign in
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile toggle */}
-          <button
-            className="md:hidden inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-10 transition"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Toggle menu"
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
-          </button>
-        </nav>
+        <button
+          className="inline-flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10 md:hidden"
+          onClick={() => setMenuOpen((value) => !value)}
+          aria-label="Toggle menu"
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+        </button>
       </div>
 
-      {/* Mobile Drawer */}
       <AnimatePresence>
         {menuOpen && (
           <>
             <motion.div
               className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               onClick={() => setMenuOpen(false)}
             />
             <motion.aside
-              className="fixed right-0 top-0 bottom-0 z-50 w-[84vw] max-w-sm bg-[#0f0a1f] text-white border-l border-white/10 shadow-2xl"
-              role="dialog" aria-modal="true"
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              className="fixed inset-y-0 right-0 z-50 flex w-[86vw] max-w-sm flex-col overflow-hidden border-l border-white/10 bg-[#0b061c] text-white shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 260, damping: 26 }}
             >
-              <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
-                <div className="inline-flex items-center gap-2">
-                  <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500">
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                <div className="inline-flex items-center gap-3">
+                  <div className="flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-indigo-500 text-white shadow-lg shadow-fuchsia-500/40">
                     <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
                       <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
                     </svg>
                   </div>
-                  <span className="font-semibold">AI Studio</span>
+                  <div className="text-sm font-semibold">AI Studio</div>
                 </div>
                 <button
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-10 transition"
-                  onClick={() => setMenuOpen(false)} aria-label="Close menu"
+                  className="inline-flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
+                  onClick={() => setMenuOpen(false)}
+                  aria-label="Close menu"
                 >
-                  <XMarkIcon className="w-6 h-6" />
+                  <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="px-4 py-4 space-y-1">
-                {LINKS.map((l) => (
-                  <Link
-                    key={l.href}
-                    href={l.href}
-                    onClick={() => setMenuOpen(false)}
-                    className={[
-                      'block rounded-xl px-3 py-3 text-sm font-medium transition',
-                      isActive(l.href) ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5',
-                    ].join(' ')}
-                  >
-                    {l.label}
-                  </Link>
-                ))}
+              <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6">
+                <nav className="space-y-2 text-sm">
+                  {LINKS.map((link) => {
+                    const active = isActive(link.href);
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={[
+                          'flex items-center justify-between rounded-2xl border px-4 py-3 font-medium transition',
+                          active
+                            ? 'border-fuchsia-500/50 bg-fuchsia-500/10 text-white'
+                            : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white',
+                        ].join(' ')}
+                      >
+                        <span>{link.label}</span>
+                        {active && <span className="text-xs uppercase tracking-wide text-fuchsia-200">Now</span>}
+                      </Link>
+                    );
+                  })}
+                </nav>
 
                 <button
                   onClick={toggleTheme}
-                  className="mt-2 inline-flex items-center gap-2 rounded-xl px-3 py-3 text-sm font-medium border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                  className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
                 >
-                  {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
-                  {dark ? 'Light Mode' : 'Dark Mode'}
+                  <span>{dark ? 'Switch to light mode' : 'Switch to dark mode'}</span>
+                  {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
                 </button>
 
-                <div className="pt-4">
-                  {loading ? (
-                    <div className="h-10 w-full rounded-xl bg-white/10 animate-pulse" />
-                  ) : user ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold">
-                          {initials}
-                        </div>
-                        <div className="text-sm font-medium truncate">{user.name || user.email}</div>
+                {loading ? (
+                  <div className="h-12 w-full rounded-2xl bg-white/10 animate-pulse" />
+                ) : user ? (
+                  <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
+                    <div className="flex items-center gap-3">
+                      <div className="grid size-11 place-items-center rounded-full border border-white/10 bg-white/10 text-base font-semibold text-white">
+                        {initials}
                       </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1">
-                          <span className="inline-block size-2 rounded-full bg-emerald-400" />
-                          Plan: <strong className="font-semibold">{plan}</strong>
-                        </span>
-                        <span className={[
-                          'inline-flex items-center gap-2 rounded-full px-2.5 py-1 border',
-                          lowCredits ? 'border-rose-400/40 bg-rose-400/15' : 'border-white/15 bg-white/10'
-                        ].join(' ')}>
-                          Credits:{' '}
-                          <motion.strong
-                            key={`m-${creditPulseRef.current}`}
-                            initial={{ scale: 1.15 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-                            className="font-semibold"
-                          >
-                            {credits}
-                          </motion.strong>
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 pt-2">
-                        <Link
-                          href="/enhance"
-                          onClick={() => setMenuOpen(false)}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
-                        >
-                          🚀 Launch Studio
-                        </Link>
-                        {lowCredits ? (
-                          <Link
-                            href="/pricing"
-                            onClick={() => setMenuOpen(false)}
-                            className="text-xs underline text-rose-300 hover:text-rose-200"
-                          >
-                            Recharge
-                          </Link>
-                        ) : (
-                          <button
-                            onClick={() => { setMenuOpen(false); handleLogout(); }}
-                            className="text-xs underline text-white/80 hover:text-white"
-                          >
-                            Logout
-                          </button>
-                        )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{user.name || user.email}</p>
+                        <p className="truncate text-xs text-white/60">{user.email}</p>
                       </div>
                     </div>
-                  ) : (
-                    <Link
-                      href="/login"
-                      onClick={() => setMenuOpen(false)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
-                    >
-                      Sign in
-                    </Link>
-                  )}
-                </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                        <span className="block text-white/50">Plan</span>
+                        <span className="text-sm font-semibold text-white">{plan}</span>
+                      </div>
+                      <div className={[
+                        'rounded-xl border px-3 py-2',
+                        lowCredits
+                          ? 'border-rose-400/50 bg-rose-400/10 text-rose-100'
+                          : 'border-white/10 bg-white/5 text-white',
+                      ].join(' ')}>
+                        <span className="block text-white/50">Credits</span>
+                        <motion.span
+                          key={`mobile-${creditPulseRef.current}`}
+                          initial={{ scale: 1.1 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+                          className="text-sm font-semibold"
+                        >
+                          {credits}
+                        </motion.span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+                      <Link
+                        href="/enhance"
+                        onClick={() => setMenuOpen(false)}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:shadow-purple-500/40"
+                      >
+                        🚀 Launch Studio
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="flex-1 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/70 transition hover:border-white/30 hover:text-white"
+                      >
+                        Logout
+                      </button>
+                      {lowCredits && (
+                        <Link
+                          href="/pricing"
+                          onClick={() => setMenuOpen(false)}
+                          className="w-full text-center text-xs font-semibold text-rose-200 underline"
+                        >
+                          Recharge credits
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    href="/login"
+                    onClick={() => setMenuOpen(false)}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:shadow-purple-500/40"
+                  >
+                    Sign in
+                  </Link>
+                )}
               </div>
 
-              <div className="mt-auto p-4 text-xs text-white/50 border-t border-white/10">
-                © {new Date().getFullYear()} AI Studio
+              <div className="border-t border-white/10 px-5 py-4 text-xs text-white/40">
+                © {new Date().getFullYear()} AI Studio. Crafted with ✨
               </div>
             </motion.aside>
           </>
