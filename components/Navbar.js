@@ -12,7 +12,6 @@ import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 const LINKS = [
   { href: '/', label: 'Home' },
   { href: '/pricing', label: 'Pricing' },
-  { href: '/dashboard', label: 'Dashboard' },
   { href: '/history', label: 'History' },
   { href: '/blog', label: 'Blog' },
 ];
@@ -305,7 +304,7 @@ export default function Navbar() {
                   </Link>
 
                   <Link
-                    href="/enhance"
+                    href="/dashboard"
                     className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
                   >
                     🚀 Launch Studio
