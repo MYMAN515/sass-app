@@ -18,6 +18,8 @@ export default function AuthPage() {
   const [name, setName] = useState('');
   const [confirm, setConfirm] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -158,161 +160,285 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-zinc-900 to-zinc-800 text-white px-4 py-10">
-      <div className="w-full max-w-md bg-zinc-900/70 border border-zinc-700 p-8 rounded-2xl shadow-2xl backdrop-blur">
-        <h2 className="text-3xl font-bold mb-6 text-center">
-          {isLogin ? 'Welcome Back' : 'Create Your Account'}
-        </h2>
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
+      <div className="pointer-events-none absolute inset-x-0 top-[-25rem] z-0 flex justify-center blur-3xl">
+        <div className="h-[36rem] w-[36rem] rounded-full bg-gradient-to-br from-purple-500 via-fuchsia-500 to-sky-500 opacity-30" />
+      </div>
 
-        <AnimatePresence>
-          {successMsg && (
-            <motion.p
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="text-emerald-400 text-sm mb-4 text-center"
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-16 sm:px-8 lg:px-12">
+        <div className="grid w-full gap-10 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_25px_70px_-25px_rgba(59,130,246,0.3)] backdrop-blur-xl lg:grid-cols-[1.15fr,1fr] lg:p-10">
+          <section className="hidden flex-col justify-between rounded-2xl bg-gradient-to-br from-slate-900/40 via-slate-900/20 to-slate-900/60 p-10 lg:flex">
+            <div>
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-200">
+                {isLogin ? 'Welcome back' : 'Join the community'}
+              </span>
+              <h2 className="mt-6 text-3xl font-semibold leading-tight text-white">
+                {isLogin ? 'Sign in to pick up where you left off.' : 'Create an account to unlock premium creative tools.'}
+              </h2>
+              <p className="mt-4 text-sm leading-relaxed text-slate-200/80">
+                Manage your projects, collaborate with your team, and explore AI-powered features tailored for designers and creators.
+              </p>
+            </div>
+
+            <ul className="mt-10 space-y-5 text-sm text-slate-100/90">
+              {["Seamless syncing across devices", 'Advanced AI image tooling', 'Priority support from experts'].map((item) => (
+                <li key={item} className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg">✓</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-12 text-xs text-slate-200/70">
+              Need an enterprise plan?{' '}
+              <a href="/pricing" className="font-semibold text-sky-300 hover:text-sky-200">
+                Contact our sales team
+              </a>
+            </div>
+          </section>
+
+          <section className="flex flex-col justify-center gap-6 rounded-2xl bg-slate-950/60 p-6 shadow-inner shadow-black/10 sm:p-8">
+            <div className="flex flex-col gap-4 text-center">
+              <div className="inline-flex self-center rounded-full border border-white/10 bg-white/5 p-1 text-xs font-medium">
+                <button
+                  type="button"
+                  className={`rounded-full px-4 py-2 transition ${
+                    isLogin
+                      ? 'bg-white text-slate-900 shadow'
+                      : 'text-slate-200 hover:text-white'
+                  }`}
+                  onClick={() => {
+                    setIsLogin(true);
+                    setError('');
+                    setSuccessMsg('');
+                  }}
+                >
+                  Log In
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-full px-4 py-2 transition ${
+                    !isLogin
+                      ? 'bg-white text-slate-900 shadow'
+                      : 'text-slate-200 hover:text-white'
+                  }`}
+                  onClick={() => {
+                    setIsLogin(false);
+                    setError('');
+                    setSuccessMsg('');
+                  }}
+                >
+                  Register
+                </button>
+              </div>
+
+              <div>
+                <h1 className="text-2xl font-semibold text-white sm:text-3xl">
+                  {isLogin ? 'Welcome back!' : 'Create your account'}
+                </h1>
+                <p className="mt-2 text-sm text-slate-300">
+                  {isLogin
+                    ? 'Enter your credentials to access your dashboard.'
+                    : 'Set up your profile to start creating stunning visuals.'}
+                </p>
+              </div>
+            </div>
+
+            <AnimatePresence>
+              {successMsg && (
+                <motion.p
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+                  role="status"
+                >
+                  {successMsg}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+                  role="alert"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {!isLogin && (
+                <label className="block text-left text-sm">
+                  <span className="mb-2 block text-slate-200">Full name</span>
+                  <input
+                    type="text"
+                    placeholder="Jane Doe"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder-slate-400 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/40"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </label>
+              )}
+
+              <label className="block text-left text-sm">
+                <span className="mb-2 block text-slate-200">Email address</span>
+                <input
+                  type="email"
+                  placeholder="you@example.com"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder-slate-400 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/40"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </label>
+
+              <label className="block text-left text-sm">
+                <span className="mb-2 block text-slate-200">Password</span>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-base text-white placeholder-slate-400 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/40"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete={isLogin ? 'current-password' : 'new-password'}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-xs font-medium text-slate-300 hover:text-white"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </label>
+
+              {!isLogin && (
+                <label className="block text-left text-sm">
+                  <span className="mb-2 block text-slate-200">Confirm password</span>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Repeat password"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-base text-white placeholder-slate-400 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/40"
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      required
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-xs font-medium text-slate-300 hover:text-white"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    >
+                      {showConfirmPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                </label>
+              )}
+
+              {!isLogin && (
+                <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-white/20 bg-transparent accent-sky-400"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                  />
+                  <span>
+                    I agree to the
+                    <a href="/privacy-terms" className="mx-1 font-semibold text-sky-300 hover:text-sky-200">
+                      Privacy & Terms
+                    </a>
+                    of service.
+                  </span>
+                </label>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-sky-500 to-fuchsia-500 px-4 py-3 text-base font-semibold text-white shadow-lg transition focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className="relative z-10">{loading ? 'Please wait…' : isLogin ? 'Log In' : 'Create account'}</span>
+                <span className="absolute inset-0 -translate-x-full bg-white/20 transition-transform duration-500 ease-out group-hover:translate-x-0" aria-hidden="true" />
+              </button>
+            </form>
+
+            {isLogin && (
+              <div className="text-right text-xs text-slate-400">
+                <button
+                  className="font-medium text-sky-300 hover:text-sky-200"
+                  onClick={async () => {
+                    if (!email) return setError('Enter your email above first.');
+                    try {
+                      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                        redirectTo:
+                          (typeof window !== 'undefined'
+                            ? `${window.location.origin}/auth/callback`
+                            : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`),
+                      });
+                      if (resetErr) throw resetErr;
+                      setSuccessMsg('Password reset email sent.');
+                    } catch (err) {
+                      setError(normalizeError(err));
+                    }
+                  }}
+                >
+                  Forgot your password?
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 text-xs text-slate-400">
+              <div className="h-px flex-1 bg-white/10" />
+              <span>Or continue with</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white text-slate-900 px-4 py-3 font-semibold shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {successMsg}
-            </motion.p>
-          )}
-        </AnimatePresence>
+              <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="h-5 w-5" />
+              Google
+            </motion.button>
 
-        <AnimatePresence>
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="text-red-400 text-sm mb-4 text-center"
-            >
-              {error}
-            </motion.p>
-          )}
-        </AnimatePresence>
+            {!isLogin && (
+              <div className="text-center text-xs text-slate-400">
+                Didn’t get the email?
+                <button className="ml-1 font-semibold text-sky-300 hover:text-sky-200" onClick={handleResend}>
+                  Resend verification
+                </button>
+              </div>
+            )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <input
-              type="text"
-              placeholder="Full Name"
-              className="w-full p-3 rounded-xl bg-zinc-800 border border-zinc-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full p-3 rounded-xl bg-zinc-800 border border-zinc-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full p-3 rounded-xl bg-zinc-800 border border-zinc-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete={isLogin ? 'current-password' : 'new-password'}
-          />
-          {!isLogin && (
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              className="w-full p-3 rounded-xl bg-zinc-800 border border-zinc-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              autoComplete="new-password"
-            />
-          )}
-          {!isLogin && (
-            <label className="flex items-center text-sm text-gray-300 select-none">
-              <input
-                type="checkbox"
-                className="mr-2 accent-purple-600"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-              />
-              I agree to the <a href="/terms" className="underline mx-1">Terms</a> & <a href="/privacy" className="underline">Privacy</a>
-            </label>
-          )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white p-3 rounded-xl mt-2 disabled:opacity-60"
-          >
-            {loading ? 'Please wait…' : isLogin ? 'Log In' : 'Register'}
-          </button>
-        </form>
-
-        {isLogin && (
-          <div className="text-right mt-2">
-            <button
-              className="text-xs text-zinc-300 hover:text-white underline"
-              onClick={async () => {
-                if (!email) return setError('Enter your email above first.');
-                try {
-                  const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                    redirectTo:
-                      (typeof window !== 'undefined'
-                        ? `${window.location.origin}/auth/callback`
-                        : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`),
-                  });
-                  if (resetErr) throw resetErr;
-                  setSuccessMsg('Password reset email sent.');
-                } catch (err) {
-                  setError(normalizeError(err));
-                }
-              }}
-            >
-              Forgot password?
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-center my-4">
-          <div className="flex-grow h-px bg-zinc-700" />
-          <span className="mx-3 text-gray-400 text-sm">OR</span>
-          <div className="flex-grow h-px bg-zinc-700" />
-        </div>
-
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          type="button"
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="w-full bg-white text-black font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition disabled:opacity-60"
-        >
-          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-          Continue with Google
-        </motion.button>
-
-        {!isLogin && (
-          <div className="text-center text-xs text-gray-400 mt-3">
-            Didn’t get the email?{' '}
-            <button className="text-purple-400 hover:underline" onClick={handleResend}>
-              Resend verification
-            </button>
-          </div>
-        )}
-
-        <div className="text-center text-sm text-gray-400 mt-6">
-          {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
-          <button
-            className="text-purple-400 hover:underline ml-1"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
-              setSuccessMsg('');
-            }}
-          >
-            {isLogin ? 'Register' : 'Log In'}
-          </button>
+            <div className="text-center text-sm text-slate-400">
+              {isLogin ? "Don't have an account?" : 'Already have an account?'}
+              <button
+                className="ml-2 font-semibold text-sky-300 hover:text-sky-200"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError('');
+                  setSuccessMsg('');
+                }}
+              >
+                {isLogin ? 'Create one' : 'Log in'}
+              </button>
+            </div>
+          </section>
         </div>
       </div>
     </div>
