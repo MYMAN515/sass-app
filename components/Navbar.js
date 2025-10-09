@@ -168,6 +168,17 @@ export default function Navbar() {
     setMenuOpen(false);
   }, [pathname, menuOpen]);
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const body = document.body;
+    if (!body || !menuOpen) return undefined;
+    const previous = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = previous;
+    };
+  }, [menuOpen]);
+
   const initials = useMemo(() => {
     const n = user?.name || user?.email || '';
     const parts = n.split(' ').filter(Boolean);
@@ -202,275 +213,313 @@ export default function Navbar() {
   return (
     <header
       className={[
-        'fixed top-0 z-50 w-full transition-all duration-300',
-        scrolled ? 'shadow-[0_10px_30px_-10px_rgba(0,0,0,.5)]' : '',
+        'fixed inset-x-0 top-0 z-50 w-full transition-all duration-500',
+        scrolled
+          ? 'border-b border-white/10 bg-zinc-950/70 backdrop-blur-xl shadow-[0_18px_45px_-20px_rgba(15,10,31,0.9)]'
+          : 'bg-transparent',
       ].join(' ')}
       aria-label="Primary"
     >
       <div
-        className={[
-          'mx-auto max-w-7xl px-4',
-          'rounded-b-3xl border-b border-white/10',
-          'backdrop-blur-xl',
-          'bg-white/5 dark:bg-zinc-900/50',
-        ].join(' ')}
-        style={{ boxShadow: scrolled ? 'inset 0 -1px 0 rgba(255,255,255,.06)' : 'none' }}
-      >
-        <nav className="h-16 flex items-center justify-between text-white">
-          {/* Logo */}
-          <Link href="/" className="group inline-flex items-center gap-2">
-            <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg">
-              <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"
+        aria-hidden
+      />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <nav className="relative flex h-20 items-center justify-between gap-4 text-white">
+          <Link href="/" className="group inline-flex items-center gap-3">
+            <span className="relative grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-indigo-500 shadow-lg shadow-fuchsia-500/25">
+              <span className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 transition group-hover:opacity-100" aria-hidden />
+              <svg width="20" height="20" viewBox="0 0 24 24" className="relative text-white">
                 <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
               </svg>
-            </div>
-            <span className="font-semibold tracking-tight">
-              AI Studio
-              <span className="ml-2 inline-block align-middle h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            </span>
+            <span className="flex flex-col leading-none">
+              <span className="text-sm font-semibold uppercase tracking-[0.28em] text-white/60">AI Studio</span>
+              <span className="text-lg font-semibold tracking-tight">Creative Suite</span>
             </span>
           </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-2">
-            {LINKS.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={[
-                  'relative px-3 py-2 rounded-full text-sm font-medium transition',
-                  'hover:bg-white/10',
-                  isActive(l.href) ? 'text-white' : 'text-white/80',
-                ].join(' ')}
-              >
-                <span className="relative">
-                  {l.label}
-                  {isActive(l.href) && (
-                    <span className="absolute -bottom-1 left-0 right-0 mx-auto h-[2px] w-6 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
-                  )}
-                </span>
-              </Link>
-            ))}
-
-            <button
-              onClick={toggleTheme}
-              className="ml-1 inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-9 transition"
-              aria-label="Toggle theme"
-              title="Toggle theme"
-            >
-              {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
-            </button>
-
-            {/* User/CTA */}
-            {loading ? (
-              <div className="ml-2 h-9 w-52 rounded-full bg-white/10 animate-pulse" />
-            ) : user ? (
-              <div className="ml-2 flex items-center gap-2">
-                <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
-                  <span className="inline-block size-2 rounded-full bg-emerald-400" />
-                  Plan: <strong className="font-semibold">{plan}</strong>
-                </span>
-
-                {/* Credits pill مع أنيميشن عند التغيير */}
-                <Link
-                  href={lowCredits ? '/pricing' : '#'}
-                  className={[
-                    'hidden lg:inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition',
-                    lowCredits
-                      ? 'border-rose-400/40 bg-rose-400/15 hover:bg-rose-400/25'
-                      : 'border-white/15 bg-white/10 hover:bg-white/15',
-                  ].join(' ')}
-                  title={lowCredits ? 'Recharge credits' : 'Credits'}
-                >
-                  Credits:{' '}
-                  <motion.strong
-                    key={creditPulseRef.current}
-                    initial={{ scale: 1.2, color: lowCredits ? '#fecaca' : '#fff' }}
-                    animate={{ scale: 1, color: '#fff' }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-                    className="font-semibold"
-                    aria-live="polite"
+          <div className="hidden lg:flex items-center gap-8">
+            <ul className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur">
+              {LINKS.map((l) => (
+                <li key={l.href}>
+                  <Link
+                    href={l.href}
+                    className={[
+                      'relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200',
+                      isActive(l.href)
+                        ? 'bg-white/90 text-zinc-900 shadow-lg shadow-black/10'
+                        : 'text-white/80 hover:text-white hover:bg-white/10',
+                    ].join(' ')}
                   >
-                    {credits}
-                  </motion.strong>
-                  {lowCredits && <span className="ml-1 hidden md:inline">— Low</span>}
-                </Link>
+                    {l.label}
+                    {isActive(l.href) && (
+                      <span className="absolute -bottom-[9px] left-1/2 size-2 -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
 
-                <Link
-                  href="/enhance"
-                  className="hidden lg:inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
-                >
-                  🚀 Launch Studio
-                </Link>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleTheme}
+                className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
+                aria-label="Toggle theme"
+                title="Toggle theme"
+              >
+                {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+              </button>
 
-                <div
-                  title={user.email}
-                  className="ml-1 grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold"
-                >
-                  {initials}
+              {loading ? (
+                <div className="h-11 w-48 rounded-full bg-white/10" />
+              ) : user ? (
+                <div className="flex items-center gap-3">
+                  <div className="hidden xl:flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium">
+                    <span className="inline-block size-2 rounded-full bg-emerald-400" />
+                    Plan <strong className="font-semibold">{plan}</strong>
+                  </div>
+
+                  <Link
+                    href={lowCredits ? '/pricing' : '#'}
+                    className={[
+                      'hidden xl:inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition',
+                      lowCredits
+                        ? 'border-rose-400/40 bg-rose-400/20 text-rose-50 hover:bg-rose-400/30'
+                        : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white',
+                    ].join(' ')}
+                    title={lowCredits ? 'Recharge credits' : 'Credits balance'}
+                  >
+                    Credits
+                    <motion.span
+                      key={creditPulseRef.current}
+                      initial={{ scale: 1.2 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                      className="text-sm"
+                      aria-live="polite"
+                    >
+                      {credits}
+                    </motion.span>
+                    {lowCredits && <span className="hidden md:inline">Low</span>}
+                  </Link>
+
+                  <Link
+                    href="/enhance"
+                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
+                  >
+                    🚀 Launch Studio
+                  </Link>
+
+                  <div
+                    title={user.email}
+                    className="grid size-10 place-items-center rounded-full border border-white/15 bg-white/10 font-semibold uppercase text-white"
+                  >
+                    {initials}
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="text-xs font-semibold text-white/70 transition hover:text-white"
+                  >
+                    Logout
+                  </button>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="text-xs underline text-white/80 hover:text-white"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <div className="ml-2 flex items-center gap-2">
+              ) : (
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
                 >
                   Sign in
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* Mobile toggle */}
-          <button
-            className="md:hidden inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-10 transition"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Toggle menu"
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
-          </button>
+          <div className="flex items-center gap-3 lg:hidden">
+            <button
+              onClick={toggleTheme}
+              className="inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
+              aria-label="Toggle theme"
+              title="Toggle theme"
+            >
+              {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+            </button>
+
+            <button
+              className="inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Toggle menu"
+              aria-expanded={menuOpen}
+            >
+              {menuOpen ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+            </button>
+          </div>
         </nav>
       </div>
 
-      {/* Mobile Drawer */}
       <AnimatePresence>
         {menuOpen && (
           <>
             <motion.div
-              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               onClick={() => setMenuOpen(false)}
             />
-            <motion.aside
-              className="fixed right-0 top-0 bottom-0 z-50 w-[84vw] max-w-sm bg-[#0f0a1f] text-white border-l border-white/10 shadow-2xl"
-              role="dialog" aria-modal="true"
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+            <motion.div
+              className="fixed inset-x-4 top-24 bottom-6 z-50 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#120b25] via-[#100a1f] to-[#090611] text-white shadow-[0_40px_90px_-30px_rgba(12,6,25,0.9)]"
+              role="dialog"
+              aria-modal="true"
+              initial={{ opacity: 0, y: 60 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 60 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 24 }}
             >
-              <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
-                <div className="inline-flex items-center gap-2">
-                  <div className="grid place-items-center size-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500">
-                    <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
-                      <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
-                    </svg>
+              <div className="relative flex h-full flex-col">
+                <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
+                  <div className="inline-flex items-center gap-3">
+                    <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-indigo-500">
+                      <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
+                        <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
+                      </svg>
+                    </span>
+                    <div className="leading-tight">
+                      <div className="text-xs font-semibold uppercase tracking-[0.28em] text-white/60">AI Studio</div>
+                      <div className="text-base font-semibold">Creative Suite</div>
+                    </div>
                   </div>
-                  <span className="font-semibold">AI Studio</span>
-                </div>
-                <button
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20 size-10 transition"
-                  onClick={() => setMenuOpen(false)} aria-label="Close menu"
-                >
-                  <XMarkIcon className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="px-4 py-4 space-y-1">
-                {LINKS.map((l) => (
-                  <Link
-                    key={l.href}
-                    href={l.href}
+                  <button
+                    className="inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
                     onClick={() => setMenuOpen(false)}
-                    className={[
-                      'block rounded-xl px-3 py-3 text-sm font-medium transition',
-                      isActive(l.href) ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5',
-                    ].join(' ')}
+                    aria-label="Close menu"
                   >
-                    {l.label}
-                  </Link>
-                ))}
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                </div>
 
-                <button
-                  onClick={toggleTheme}
-                  className="mt-2 inline-flex items-center gap-2 rounded-xl px-3 py-3 text-sm font-medium border border-white/15 bg-white/5 hover:bg-white/10 transition"
-                >
-                  {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
-                  {dark ? 'Light Mode' : 'Dark Mode'}
-                </button>
-
-                <div className="pt-4">
-                  {loading ? (
-                    <div className="h-10 w-full rounded-xl bg-white/10 animate-pulse" />
-                  ) : user ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="grid place-items-center size-9 rounded-full bg-white/10 border border-white/15 font-bold">
-                          {initials}
-                        </div>
-                        <div className="text-sm font-medium truncate">{user.name || user.email}</div>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1">
-                          <span className="inline-block size-2 rounded-full bg-emerald-400" />
-                          Plan: <strong className="font-semibold">{plan}</strong>
-                        </span>
-                        <span className={[
-                          'inline-flex items-center gap-2 rounded-full px-2.5 py-1 border',
-                          lowCredits ? 'border-rose-400/40 bg-rose-400/15' : 'border-white/15 bg-white/10'
-                        ].join(' ')}>
-                          Credits:{' '}
-                          <motion.strong
-                            key={`m-${creditPulseRef.current}`}
-                            initial={{ scale: 1.15 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-                            className="font-semibold"
-                          >
-                            {credits}
-                          </motion.strong>
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 pt-2">
+                <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
+                  <ul className="space-y-2">
+                    {LINKS.map((l) => (
+                      <li key={l.href}>
                         <Link
-                          href="/enhance"
+                          href={l.href}
                           onClick={() => setMenuOpen(false)}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
+                          className={[
+                            'flex items-center justify-between rounded-2xl border px-4 py-4 text-base font-medium transition',
+                            isActive(l.href)
+                              ? 'border-white/20 bg-white/10 text-white'
+                              : 'border-white/5 bg-white/5 text-white/80 hover:border-white/15 hover:bg-white/10 hover:text-white',
+                          ].join(' ')}
                         >
-                          🚀 Launch Studio
+                          <span>{l.label}</span>
+                          {isActive(l.href) && (
+                            <span className="size-2 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
+                          )}
                         </Link>
-                        {lowCredits ? (
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={toggleTheme}
+                    className="mt-6 flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+                  >
+                    <span>{dark ? 'Switch to Light mode' : 'Switch to Dark mode'}</span>
+                    {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+                  </button>
+
+                  <div className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                    {loading ? (
+                      <div className="h-12 w-full rounded-2xl bg-white/10" />
+                    ) : user ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/10 text-base font-semibold uppercase">
+                            {initials}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold">{user.name || user.email}</div>
+                            <div className="text-xs text-white/60">Signed in</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs font-medium">
+                            <div className="flex items-center justify-between text-white/70">
+                              <span>Current plan</span>
+                              <span className="inline-block size-2 rounded-full bg-emerald-400" />
+                            </div>
+                            <div className="pt-2 text-base font-semibold">{plan}</div>
+                          </div>
                           <Link
-                            href="/pricing"
+                            href={lowCredits ? '/pricing' : '#'}
                             onClick={() => setMenuOpen(false)}
-                            className="text-xs underline text-rose-300 hover:text-rose-200"
+                            className={[
+                              'rounded-2xl border p-3 text-xs font-medium transition',
+                              lowCredits
+                                ? 'border-rose-400/40 bg-rose-400/20 text-rose-50 hover:bg-rose-400/30'
+                                : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white',
+                            ].join(' ')}
                           >
-                            Recharge
+                            <div className="flex items-center justify-between text-white/70">
+                              <span>Credits</span>
+                              {lowCredits && (
+                                <span className="rounded-full bg-rose-400/80 px-2 py-0.5 text-[11px] font-semibold text-rose-50">
+                                  Low
+                                </span>
+                              )}
+                            </div>
+                            <motion.div
+                              key={`mobile-${creditPulseRef.current}`}
+                              initial={{ scale: 1.1 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+                              className="pt-2 text-2xl font-semibold"
+                            >
+                              {credits}
+                            </motion.div>
                           </Link>
-                        ) : (
+                        </div>
+                        <div className="flex flex-col gap-3 pt-1 sm:flex-row">
+                          <Link
+                            href="/enhance"
+                            onClick={() => setMenuOpen(false)}
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
+                          >
+                            🚀 Launch Studio
+                          </Link>
                           <button
-                            onClick={() => { setMenuOpen(false); handleLogout(); }}
-                            className="text-xs underline text-white/80 hover:text-white"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              handleLogout();
+                            }}
+                            className="inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
                           >
                             Logout
                           </button>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <Link
-                      href="/login"
-                      onClick={() => setMenuOpen(false)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-fuchsia-600 hover:to-purple-700 px-4 py-2 text-sm font-semibold shadow-lg transition"
-                    >
-                      Sign in
-                    </Link>
-                  )}
+                    ) : (
+                      <Link
+                        href="/login"
+                        onClick={() => setMenuOpen(false)}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
+                      >
+                        Sign in
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 px-5 py-4 text-xs text-white/50">
+                  © {new Date().getFullYear()} AI Studio. Crafted for visionaries.
                 </div>
               </div>
-
-              <div className="mt-auto p-4 text-xs text-white/50 border-t border-white/10">
-                © {new Date().getFullYear()} AI Studio
-              </div>
-            </motion.aside>
+            </motion.div>
           </>
         )}
       </AnimatePresence>
     </header>
   );
+
 }
