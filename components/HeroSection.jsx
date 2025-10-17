@@ -10,6 +10,49 @@ import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion
  * - Performance: throttled resize, offscreen pause, reduced-motion friendly
  */
 
+const LOGOS = Object.freeze(["Shopify", "WooCommerce", "Etsy", "Amazon", "eBay", "BigCommerce"]);
+const METRICS = Object.freeze([
+  { value: 43, suffix: "%", label: "Higher conversions", color: "from-green-400 to-emerald-600" },
+  { value: 94, suffix: "%", label: "Time saved", color: "from-violet-400 to-purple-600" },
+  { value: 12, suffix: "s", label: "Avg render time", color: "from-blue-400 to-cyan-600" },
+  { value: 99.9, suffix: "%", label: "Uptime SLA", color: "from-fuchsia-400 to-pink-600" },
+]);
+const FEATURE_LIST = Object.freeze([
+  {
+    title: "AI Image Enhancement",
+    description:
+      "Transform amateur shots into studio-quality masterpieces with one click. Advanced AI removes backgrounds, adjusts lighting, and perfects every pixel.",
+    icon: "🎨",
+    gradient: "from-violet-500 to-purple-600",
+  },
+  {
+    title: "Virtual Try-On",
+    description:
+      "Let customers see products on real models instantly. Boost confidence, reduce returns, and watch conversions skyrocket.",
+    icon: "👕",
+    gradient: "from-fuchsia-500 to-pink-600",
+  },
+  {
+    title: "Smart Copy Generation",
+    description:
+      "AI-powered descriptions that sell. Get compelling, SEO-optimized product copy in seconds—no copywriter needed.",
+    icon: "✍️",
+    gradient: "from-blue-500 to-cyan-600",
+  },
+]);
+const PROCESS_STEPS = Object.freeze([
+  { title: "Upload", description: "Drop your product photo—any format, any quality", icon: "📤" },
+  { title: "Enhance", description: "AI works its magic in seconds", icon: "✨" },
+  { title: "Export", description: "Download or publish directly to your store", icon: "🚀" },
+]);
+const TESTIMONIALS = Object.freeze([
+  '"Conversion rate jumped 47% in our first month."',
+  '"We ditched our $8K/month photo team."',
+  '"ROI positive in 72 hours. Unreal."',
+  '"My competitor asked what agency we hired. LOL."',
+  '"Product returns down 34% with try-on."',
+]);
+
 export default function HeroSection() {
   return (
     <main className="relative w-full overflow-hidden bg-[#0a0a0f] font-sans text-white">
@@ -558,8 +601,7 @@ function CompareSlider() {
 
 /* =============================== Logo Orbit =============================== */
 
-function LogoOrbit() {
-  const logos = ["Shopify", "WooCommerce", "Etsy", "Amazon", "eBay", "BigCommerce"];
+const LogoOrbit = memo(function LogoOrbit() {
   return (
     <section className="relative z-10 py-20 px-6 md:px-12" aria-label="Integrations">
       <div className="mx-auto max-w-7xl text-center">
@@ -568,7 +610,7 @@ function LogoOrbit() {
         </motion.p>
         <div className="relative h-20 overflow-hidden">
           <motion.div animate={{ x: [0, -1000] }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="flex gap-16 absolute">
-            {[...logos, ...logos, ...logos].map((logo, i) => (
+            {[...LOGOS, ...LOGOS, ...LOGOS].map((logo, i) => (
               <div key={i} className="flex items-center justify-center min-w-[150px]">
                 <span className="text-2xl font-bold text-zinc-600 hover:text-white transition">{logo}</span>
               </div>
@@ -578,30 +620,23 @@ function LogoOrbit() {
       </div>
     </section>
   );
-}
+});
 
 /* ============================== Metrics Section ============================== */
 
-function MetricsSection() {
-  const metrics = [
-    { value: 43, suffix: "%", label: "Higher conversions", color: "from-green-400 to-emerald-600" },
-    { value: 94, suffix: "%", label: "Time saved", color: "from-violet-400 to-purple-600" },
-    { value: 12, suffix: "s", label: "Avg render time", color: "from-blue-400 to-cyan-600" },
-    { value: 99.9, suffix: "%", label: "Uptime SLA", color: "from-fuchsia-400 to-pink-600" },
-  ];
-
+const MetricsSection = memo(function MetricsSection() {
   return (
     <section className="relative z-10 px-6 py-24 md:px-12" aria-label="Key metrics">
       <div className="mx-auto max-w-7xl">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {metrics.map((m, i) => (
-            <MetricCard key={i} {...m} delay={i * 0.08} />
+          {METRICS.map((metric, index) => (
+            <MetricCard key={metric.label} {...metric} delay={index * 0.08} />
           ))}
         </div>
       </div>
     </section>
   );
-}
+});
 
 function MetricCard({ value, suffix, label, color, delay }) {
   const [count, setCount] = useState(0);
@@ -654,12 +689,7 @@ function MetricCard({ value, suffix, label, color, delay }) {
 
 /* ============================ Feature Showcase ============================ */
 
-function FeatureShowcase() {
-  const features = [
-    { title: "AI Image Enhancement", description: "Transform amateur shots into studio-quality masterpieces with one click. Advanced AI removes backgrounds, adjusts lighting, and perfects every pixel.", icon: "🎨", gradient: "from-violet-500 to-purple-600" },
-    { title: "Virtual Try-On", description: "Let customers see products on real models instantly. Boost confidence, reduce returns, and watch conversions skyrocket.", icon: "👕", gradient: "from-fuchsia-500 to-pink-600" },
-    { title: "Smart Copy Generation", description: "AI-powered descriptions that sell. Get compelling, SEO-optimized product copy in seconds—no copywriter needed.", icon: "✍️", gradient: "from-blue-500 to-cyan-600" },
-  ];
+const FeatureShowcase = memo(function FeatureShowcase() {
   return (
     <section id="features" className="relative z-10 px-6 py-32 md:px-12">
       <div className="mx-auto max-w-7xl">
@@ -670,14 +700,14 @@ function FeatureShowcase() {
           <p className="mt-4 text-xl text-zinc-400 max-w-2xl mx-auto">Every feature designed to turn browsers into buyers</p>
         </motion.div>
         <div className="grid gap-8 md:grid-cols-3">
-          {features.map((f, i) => (
-            <FeatureCard key={i} {...f} delay={i * 0.1} />
+          {FEATURE_LIST.map((feature, index) => (
+            <FeatureCard key={feature.title} {...feature} delay={index * 0.1} />
           ))}
         </div>
       </div>
     </section>
   );
-}
+});
 
 function FeatureCard({ title, description, icon, gradient, delay }) {
   return (
@@ -721,13 +751,7 @@ function InteractiveDemo() {
 
 /* ============================ Process Timeline ============================ */
 
-function ProcessTimeline() {
-  const steps = [
-    { title: "Upload", description: "Drop your product photo—any format, any quality", icon: "📤" },
-    { title: "Enhance", description: "AI works its magic in seconds", icon: "✨" },
-    { title: "Export", description: "Download or publish directly to your store", icon: "🚀" },
-  ];
-
+const ProcessTimeline = memo(function ProcessTimeline() {
   return (
     <section id="how" className="relative z-10 px-6 py-32 md:px-12" aria-label="How it works">
       <div className="mx-auto max-w-7xl">
@@ -738,13 +762,13 @@ function ProcessTimeline() {
         <div className="relative">
           <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent hidden md:block" aria-hidden />
           <div className="grid gap-12 md:grid-cols-3">
-            {steps.map((s, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: i * 0.15 }} className="relative text-center">
+            {PROCESS_STEPS.map((step, index) => (
+              <motion.div key={step.title} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: index * 0.15 }} className="relative text-center">
                 <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="relative z-10 mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-4xl shadow-2xl shadow-violet-500/50">
-                  <span aria-hidden>{s.icon}</span>
+                  <span aria-hidden>{step.icon}</span>
                 </motion.div>
-                <h3 className="mb-3 text-2xl font-bold">{s.title}</h3>
-                <p className="text-zinc-400">{s.description}</p>
+                <h3 className="mb-3 text-2xl font-bold">{step.title}</h3>
+                <p className="text-zinc-400">{step.description}</p>
               </motion.div>
             ))}
           </div>
@@ -757,37 +781,29 @@ function ProcessTimeline() {
       </div>
     </section>
   );
-}
+});
 
 /* ============================== Social Proof ============================== */
 
-function SocialProof() {
-  const testimonials = [
-    '"Conversion rate jumped 47% in our first month."',
-    '"We ditched our $8K/month photo team."',
-    '"ROI positive in 72 hours. Unreal."',
-    '"My competitor asked what agency we hired. LOL."',
-    '"Product returns down 34% with try-on."',
-  ];
-
+const SocialProof = memo(function SocialProof() {
   return (
     <section className="relative z-10 py-24 overflow-hidden" aria-label="Testimonials">
       <div className="relative">
         <motion.div animate={{ x: [-1000, 0] }} transition={{ duration: 40, repeat: Infinity, ease: "linear" }} className="flex gap-8">
-          {[...testimonials, ...testimonials, ...testimonials].map((t, i) => (
-            <blockquote key={i} className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/5 px-8 py-6 backdrop-blur-sm min-w-[320px] md:min-w-[400px]">
-              <p className="text-lg text-zinc-300">{t}</p>
+          {[...TESTIMONIALS, ...TESTIMONIALS, ...TESTIMONIALS].map((quote, index) => (
+            <blockquote key={`${quote}-${index}`} className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/5 px-8 py-6 backdrop-blur-sm min-w-[320px] md:min-w-[400px]">
+              <p className="text-lg text-zinc-300">{quote}</p>
             </blockquote>
           ))}
         </motion.div>
       </div>
     </section>
   );
-}
+});
 
 /* =============================== Final CTA =============================== */
 
-function FinalCTA() {
+const FinalCTA = memo(function FinalCTA() {
   return (
     <section className="relative z-10 px-6 py-32 md:px-12" aria-label="Call to action">
       <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mx-auto max-w-4xl text-center">
@@ -815,7 +831,7 @@ function FinalCTA() {
       </motion.div>
     </section>
   );
-}
+});
 
 /* ============================ Floating CTA ============================ */
 
