@@ -176,6 +176,21 @@ export default function Navbar() {
     };
   }, [menuOpen]);
 
+  const headerSafePadding = useMemo(
+    () => ({
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
+    }),
+    []
+  );
+
+  const drawerSafeInsets = useMemo(
+    () => ({
+      top: 'calc(env(safe-area-inset-top, 0px) + 5.5rem)',
+      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)',
+    }),
+    []
+  );
+
   const initials = useMemo(() => {
     const n = user?.name || user?.email || '';
     const parts = n.split(' ').filter(Boolean);
@@ -214,16 +229,18 @@ export default function Navbar() {
         scrolled
           ? 'border-b border-white/10 bg-zinc-950/70 backdrop-blur-xl shadow-[0_18px_45px_-20px_rgba(15,10,31,0.9)]'
           : 'bg-transparent',
+        'pb-3 sm:pb-0',
       ].join(' ')}
       aria-label="Primary"
+      style={headerSafePadding}
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"
         aria-hidden
       />
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <nav className="relative flex h-20 items-center justify-between gap-4 text-white">
-          <Link href="/" className="group inline-flex items-center gap-3">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <nav className="relative flex w-full flex-wrap items-center justify-between gap-3 gap-y-4 text-white py-3 sm:flex-nowrap sm:gap-4 sm:gap-y-0 sm:py-0 sm:h-20">
+          <Link href="/" className="group inline-flex flex-shrink-0 items-center gap-3">
             <span className="relative grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-indigo-500 shadow-lg shadow-fuchsia-500/25">
               <span className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 transition group-hover:opacity-100" aria-hidden />
               <svg width="20" height="20" viewBox="0 0 24 24" className="relative text-white">
@@ -332,10 +349,10 @@ export default function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 lg:hidden">
+          <div className="flex flex-shrink-0 items-center gap-2 lg:hidden">
             <button
               onClick={toggleTheme}
-              className="inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
+              className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
               aria-label="Toggle theme"
               title="Toggle theme"
             >
@@ -343,7 +360,7 @@ export default function Navbar() {
             </button>
 
             <button
-              className="inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
+              className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Toggle menu"
               aria-expanded={menuOpen}
@@ -372,6 +389,7 @@ export default function Navbar() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 60 }}
               transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+              style={drawerSafeInsets}
             >
               <div className="relative flex h-full flex-col">
                 <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
@@ -479,7 +497,7 @@ export default function Navbar() {
                         </div>
                         <div className="flex flex-col gap-3 pt-1 sm:flex-row">
                           <Link
-                            href="/enhance"
+                            href="/dashboard"
                             onClick={() => setMenuOpen(false)}
                             className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
                           >
