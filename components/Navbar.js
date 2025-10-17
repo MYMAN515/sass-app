@@ -162,9 +162,8 @@ export default function Navbar() {
   }, [supabase, syncUserData]);
 
   useEffect(() => {
-    if (!menuOpen) return;
     setMenuOpen(false);
-  }, [pathname, menuOpen]);
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
