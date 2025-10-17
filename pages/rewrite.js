@@ -1,23 +1,64 @@
 // /pages/rewrite.js
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { isAbortError } from '@/lib/isAbortError';
 
 export default function RewritePage() {
   const [input, setInput] = useState('');
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const activeRequestId = useRef(0);
+  const controllerRef = useRef(null);
+
+  useEffect(() => () => {
+    controllerRef.current?.abort();
+  }, []);
 
   const handleRewrite = async () => {
+    const text = input.trim();
+    if (!text) return;
+
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
+    const requestId = activeRequestId.current + 1;
+    activeRequestId.current = requestId;
+
+    const isLatest = () => activeRequestId.current === requestId;
+
     setLoading(true);
     setOutput('');
-    const res = await fetch('/api/rewrite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: input }),
-    });
-    const data = await res.json();
-    setOutput(data.rewritten || 'No response returned.');
-    setLoading(false);
+    setError('');
+
+    try {
+      const res = await fetch('/api/rewrite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: controller.signal,
+      });
+
+      if (!isLatest() || controller.signal.aborted) return;
+
+      if (!res.ok) {
+        const message = await res.text().catch(() => 'Unable to rewrite the text right now.');
+        throw new Error(message || 'Unable to rewrite the text right now.');
+      }
+
+      const data = await res.json();
+      if (!isLatest() || controller.signal.aborted) return;
+
+      setOutput(data.rewritten || 'No response returned.');
+    } catch (err) {
+      if (!isLatest() || isAbortError(err)) return;
+      setError(err.message || 'Something went wrong while rewriting.');
+    } finally {
+      if (isLatest()) {
+        setLoading(false);
+      }
+    }
   };
 
   return (
@@ -53,17 +94,30 @@ export default function RewritePage() {
           {loading ? 'Enhancing...' : 'Rewrite with AI'}
         </motion.button>
 
-        <AnimatePresence>
-          {output && (
+        <AnimatePresence mode="wait">
+          {(error || output) && (
             <motion.div
+              key={error ? 'error' : 'result'}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.5 }}
-              className="mt-8 p-6 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+              className={`mt-8 p-6 rounded-xl border ${
+                error
+                  ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-200'
+                  : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              }`}
+              role="status"
+              aria-live="polite"
             >
-              <h2 className="text-lg font-semibold mb-2">🔁 AI Rewritten Text:</h2>
-              <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{output}</p>
+              {error ? (
+                <p>{error}</p>
+              ) : (
+                <>
+                  <h2 className="text-lg font-semibold mb-2">🔁 AI Rewritten Text:</h2>
+                  <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{output}</p>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
