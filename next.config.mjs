@@ -6,7 +6,7 @@ const ContentSecurityPolicy = `
   connect-src 'self' https: wss:;
   font-src 'self' https://fonts.gstatic.com;
   frame-src 'self' https://js.stripe.com;
-  media-src 'self';
+  media-src 'self' https://replicate.delivery;
   object-src 'none';
 `;
 
