@@ -240,6 +240,17 @@ const MODELS = [
   { id: 'm10', name: 'Ali — Casual Half', pose: 'half', url: '/models/m10.webp' },
 ];
 
+const VIDEO_RESOLUTION_COSTS = {
+  '480p': 1,
+  '720p': 3,
+  '1080p': 5,
+};
+
+const VIDEO_ASPECT_OPTIONS = ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', '9:21'];
+
+const DEFAULT_VIDEO_FPS = 24;
+const DEFAULT_VIDEO_DURATION = 5;
+
 /* -------------------------------------------------------
    Toast system
 ------------------------------------------------------- */
@@ -347,6 +358,7 @@ export default function Dashboard() {
   const [group, setGroup] = useState('product');
   const [tool, setTool] = useState('enhance');
   const [plan, setPlan] = useState('Free');
+  const [credits, setCredits] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // outputs
@@ -414,6 +426,17 @@ export default function Dashboard() {
   const [selectedModel, setSelectedModel] = useState(null);
   const [tryonStep, setTryonStep] = useState('items'); // items|model|run
 
+  const [videoResolution, setVideoResolution] = useState('1080p');
+  const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
+  const [videoCameraFixed, setVideoCameraFixed] = useState(false);
+  const [videoPrompt, setVideoPrompt] = useState('make it walk like a model ,realstic,4k');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoBusy, setVideoBusy] = useState(false);
+  const [videoError, setVideoError] = useState('');
+
+  const videoFps = DEFAULT_VIDEO_FPS;
+  const videoDuration = DEFAULT_VIDEO_DURATION;
+
   const hasItems = useMemo(
     () =>
       tryItems.some(
@@ -423,6 +446,25 @@ export default function Dashboard() {
       ),
     [tryItems]
   );
+
+  const currentTryOnImage = useMemo(
+    () => (tool === 'tryon' && resultUrls[0] ? resultUrls[0] : ''),
+    [tool, resultUrls]
+  );
+
+  useEffect(() => {
+    setVideoUrl('');
+    setVideoError('');
+    setVideoBusy(false);
+  }, [currentTryOnImage]);
+
+  const videoCost = VIDEO_RESOLUTION_COSTS[videoResolution] || VIDEO_RESOLUTION_COSTS['1080p'];
+  const creditsNumber =
+    typeof credits === 'number' && Number.isFinite(credits) ? Math.max(credits, 0) : null;
+  const insufficientCredits = creditsNumber !== null && creditsNumber < videoCost;
+  const proLocked = plan !== 'Pro';
+  const canShowVideoPanel = tool === 'tryon' && !!currentTryOnImage;
+  const makeVideoDisabled = proLocked || !currentTryOnImage || insufficientCredits || videoBusy;
 
   /* ---------- auth/init ---------- */
   useEffect(() => {
@@ -436,11 +478,14 @@ export default function Dashboard() {
       try {
         const { data } = await supabase
           .from('Data')
-          .select('plan')
+          .select('plan, credits')
           .eq('user_id', user.id)
           .single();
         if (!mounted) return;
         setPlan(data?.plan || 'Free');
+        setCredits(
+          typeof data?.credits === 'number' && Number.isFinite(data.credits) ? data.credits : null
+        );
       } catch {
         /* ignore */
       }
@@ -884,6 +929,94 @@ const buildTryOnPrompt = (items = []) => {
     }
   }, [rbFile, rbData, rbLocal, toasts]);
 
+  const handleMakeVideo = useCallback(async () => {
+    if (!currentTryOnImage || proLocked || videoBusy) return;
+    setVideoError('');
+    setVideoBusy(true);
+    setVideoUrl('');
+    const toast = toasts.push('Rendering video…', { progress: 12 });
+    let adv = 12;
+    const iv = setInterval(() => {
+      adv = Math.min(adv + 7, 88);
+      toast.update({ progress: adv });
+    }, 520);
+    try {
+      const payload = {
+        imageUrl: currentTryOnImage,
+        prompt: videoPrompt,
+        user_email: (user?.email || '').toLowerCase(),
+        resolution: videoResolution,
+        aspectRatio: videoAspectRatio,
+        cameraFixed: videoCameraFixed,
+        fps: videoFps,
+        duration: videoDuration,
+      };
+
+      const response = await fetch('/api/video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const text = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'API error');
+      }
+
+      const urlCandidate =
+        data.video ||
+        (Array.isArray(data.output) ? data.output[0] : data.output) ||
+        data.url ||
+        '';
+
+      if (!urlCandidate) {
+        throw new Error('No video returned');
+      }
+
+      setVideoUrl(urlCandidate);
+      if (typeof data.credits === 'number' && Number.isFinite(data.credits)) {
+        setCredits(Math.max(data.credits, 0));
+      } else {
+        setCredits((prev) => {
+          if (typeof prev === 'number' && Number.isFinite(prev)) {
+            return Math.max(prev - videoCost, 0);
+          }
+          return prev;
+        });
+      }
+      toast.update({ progress: 100, msg: 'Video ready ✓' });
+      setTimeout(() => toast.close(), 800);
+    } catch (e) {
+      const message = e?.message || 'Failed to create video';
+      setVideoError(message);
+      toast.update({ msg: `Video failed: ${message}`, type: 'error' });
+      setTimeout(() => toast.close(), 1400);
+    } finally {
+      clearInterval(iv);
+      setVideoBusy(false);
+    }
+  }, [
+    currentTryOnImage,
+    proLocked,
+    videoBusy,
+    toasts,
+    videoPrompt,
+    user,
+    videoResolution,
+    videoAspectRatio,
+    videoCameraFixed,
+    videoFps,
+    videoDuration,
+    videoCost,
+  ]);
+
   /* ---------- UI helpers ---------- */
   const resetAll = () => {
     setResultUrls([]);
@@ -905,6 +1038,13 @@ const buildTryOnPrompt = (items = []) => {
     setSelectedModel(null);
     setTryonStep('items');
     setProgress(null);
+    setVideoResolution('1080p');
+    setVideoAspectRatio('16:9');
+    setVideoCameraFixed(false);
+    setVideoPrompt('make it walk like a model ,realstic,4k');
+    setVideoUrl('');
+    setVideoBusy(false);
+    setVideoError('');
   };
 
   const switchTool = useCallback((nextId) => {
@@ -915,6 +1055,11 @@ const buildTryOnPrompt = (items = []) => {
     setResultUrls([]);
     setSelectedOutput('');
     if (nextId === 'tryon') setTryonStep('items');
+    if (nextId !== 'tryon') {
+      setVideoUrl('');
+      setVideoError('');
+      setVideoBusy(false);
+    }
   }, []);
 
   const goToTool = useCallback(
@@ -1619,6 +1764,177 @@ const buildTryOnPrompt = (items = []) => {
                       >
                         Download
                       </a>
+                    </div>
+                  )}
+
+                  {canShowVideoPanel && (
+                    <div className="mt-6 relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-4 md:p-5 overflow-hidden">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                            <VideoIcon className="w-5 h-5 text-violet-300" />
+                            Make it Video
+                          </div>
+                          <div className="text-xs text-zinc-300/80 mt-1">
+                            Turn your generated model into a realistic motion clip.
+                          </div>
+                        </div>
+                        {videoUrl && (
+                          <a
+                            href={videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-white/15 bg-white/10 hover:bg-white/20 transition"
+                          >
+                            Download Video
+                          </a>
+                        )}
+                      </div>
+
+                      {videoError && (
+                        <div className="mt-3 text-xs text-rose-100 bg-rose-500/15 border border-rose-400/30 rounded-lg px-3 py-2">
+                          {videoError}
+                        </div>
+                      )}
+
+                      <div
+                        className={[
+                          'mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
+                          proLocked ? 'opacity-50 pointer-events-none select-none' : '',
+                        ].join(' ')}
+                      >
+                        <div className="space-y-3">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300/80">
+                              Resolution
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {Object.entries(VIDEO_RESOLUTION_COSTS).map(([res, cost]) => {
+                                const active = videoResolution === res;
+                                return (
+                                  <button
+                                    key={res}
+                                    onClick={() => setVideoResolution(res)}
+                                    disabled={videoBusy}
+                                    className={[
+                                      'px-3 py-1.5 text-xs rounded-xl border transition focus:outline-none focus:ring-2 focus:ring-violet-400/60',
+                                      active
+                                        ? 'bg-white text-zinc-900 border-white'
+                                        : 'border-white/15 bg-white/5 text-zinc-200 hover:bg-white/10',
+                                    ].join(' ')}
+                                  >
+                                    <div className="font-semibold">{res.toUpperCase()}</div>
+                                    <div className="text-[10px] text-zinc-300/80">{cost} credit{cost > 1 ? 's' : ''}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300/80">
+                              Aspect Ratio
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {VIDEO_ASPECT_OPTIONS.map((ratio) => {
+                                const active = videoAspectRatio === ratio;
+                                return (
+                                  <button
+                                    key={ratio}
+                                    onClick={() => setVideoAspectRatio(ratio)}
+                                    disabled={videoBusy}
+                                    className={[
+                                      'px-3 py-1.5 text-xs rounded-xl border transition focus:outline-none focus:ring-2 focus:ring-violet-400/60',
+                                      active
+                                        ? 'bg-white text-zinc-900 border-white'
+                                        : 'border-white/15 bg-white/5 text-zinc-200 hover:bg-white/10',
+                                    ].join(' ')}
+                                  >
+                                    {ratio}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <label className="flex items-center gap-2 text-xs text-zinc-200">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-white/20 bg-zinc-900 text-violet-500 focus:ring-violet-400"
+                              checked={videoCameraFixed}
+                              onChange={(e) => setVideoCameraFixed(e.target.checked)}
+                              disabled={videoBusy}
+                            />
+                            Fix camera during motion
+                          </label>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300/80">
+                              Motion Prompt
+                            </div>
+                            <textarea
+                              value={videoPrompt}
+                              onChange={(e) => setVideoPrompt(e.target.value)}
+                              rows={4}
+                              disabled={videoBusy}
+                              className="mt-2 w-full resize-none rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+                              placeholder="Describe how the model should move..."
+                            />
+                          </div>
+                          <div className="text-[11px] text-zinc-300/70">
+                            Default settings: {videoFps} fps · {videoDuration}s clip
+                          </div>
+                        </div>
+                      </div>
+
+                      {!proLocked && creditsNumber !== null && (
+                        <div className="mt-3 text-[11px] text-zinc-200">
+                          Cost: {videoCost} credit{videoCost > 1 ? 's' : ''} · Remaining credits: {creditsNumber}
+                        </div>
+                      )}
+                      {!proLocked && creditsNumber === null && (
+                        <div className="mt-3 text-[11px] text-zinc-300/70">Credits balance syncing…</div>
+                      )}
+                      {insufficientCredits && !proLocked && (
+                        <div className="mt-2 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-lg px-3 py-2">
+                          You need {videoCost} credit{videoCost > 1 ? 's' : ''} to render this video.
+                        </div>
+                      )}
+
+                      <div className="mt-4 flex flex-col gap-3">
+                        <motion.button
+                          whileHover={{ scale: makeVideoDisabled ? 1 : 1.02 }}
+                          whileTap={{ scale: makeVideoDisabled ? 1 : 0.98 }}
+                          onClick={handleMakeVideo}
+                          disabled={makeVideoDisabled}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-4 py-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <VideoIcon className="w-5 h-5" />
+                          {videoBusy ? 'Rendering…' : 'Make It Video'}
+                        </motion.button>
+                        {videoUrl && (
+                          <video
+                            src={videoUrl}
+                            controls
+                            playsInline
+                            className="w-full rounded-xl border border-white/10 bg-black/40"
+                          />
+                        )}
+                      </div>
+
+                      {proLocked && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 backdrop-blur-sm text-center px-6">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white">
+                            <SparkleIcon className="w-4 h-4 text-violet-200" />
+                            Pro Only
+                          </div>
+                          <div className="text-xs text-zinc-200 max-w-xs">
+                            Animated try-on videos are exclusive to Pro members.
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2431,6 +2747,17 @@ function PlayIcon(props) {
   return (
     <svg viewBox="0 0 24 24" className={props.className || ''}>
       <path d="M8 5v14l11-7z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function VideoIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" className={props.className || ''}>
+      <path
+        d="M4 5h11a2 2 0 012 2v2.382l2.553-1.702A1 1 0 0121 6.5v11a1 1 0 01-1.553.832L17 16.631V17a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zm0 2v10h11V7H4zm15 3.618l-2 .999v2.766l2 .999V10.618z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
