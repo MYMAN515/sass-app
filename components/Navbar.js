@@ -7,6 +7,7 @@ import Cookies from 'js-cookie';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoonIcon, SunIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/solid';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+import { createPortal } from 'react-dom';
 
 const LINKS = [
   { href: '/', label: 'Home' },
@@ -23,6 +24,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [dark, setDark] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const [user, setUser] = useState(null);
   const [plan, setPlan] = useState('Free');
@@ -64,6 +66,10 @@ export default function Navbar() {
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   // --- util: جلب بيانات المستخدم من جدول Data
@@ -222,6 +228,172 @@ export default function Navbar() {
   // لون تنبيهي لو الكريدت قليل
   const lowCredits = !loading && user && credits <= 3 && plan !== 'Pro';
 
+  const mobileMenu = (
+    <AnimatePresence>
+      {menuOpen && (
+        <>
+          <motion.div
+            className="fixed inset-0 z-[180] bg-black/60 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMenuOpen(false)}
+          />
+          <motion.div
+            className="fixed inset-x-4 top-24 bottom-6 z-[200] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#120b25] via-[#100a1f] to-[#090611] text-white shadow-[0_40px_90px_-30px_rgba(12,6,25,0.9)]"
+            role="dialog"
+            aria-modal="true"
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 60 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+            style={drawerSafeInsets}
+          >
+            <div className="relative flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
+                <div className="inline-flex items-center gap-3">
+                  <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-indigo-500">
+                    <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
+                      <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
+                    </svg>
+                  </span>
+                  <div className="leading-tight">
+                    <div className="text-xs font-semibold uppercase tracking-[0.28em] text-white/60">AI Studio</div>
+                    <div className="text-base font-semibold">Creative Suite</div>
+                  </div>
+                </div>
+                <button
+                  className="inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
+                  onClick={() => setMenuOpen(false)}
+                  aria-label="Close menu"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
+                <ul className="space-y-2">
+                  {LINKS.map((l) => (
+                    <li key={l.href}>
+                      <Link
+                        href={l.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={[
+                          'flex items-center justify-between rounded-2xl border px-4 py-4 text-base font-medium transition',
+                          isActive(l.href)
+                            ? 'border-white/20 bg-white/10 text-white'
+                            : 'border-white/5 bg-white/5 text-white/80 hover:border-white/15 hover:bg-white/10 hover:text-white',
+                        ].join(' ')}
+                      >
+                        <span>{l.label}</span>
+                        {isActive(l.href) && (
+                          <span className="size-2 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={toggleTheme}
+                  className="mt-6 flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+                >
+                  <span>{dark ? 'Switch to Light mode' : 'Switch to Dark mode'}</span>
+                  {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+                </button>
+
+                <div className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                  {loading ? (
+                    <div className="h-12 w-full rounded-2xl bg-white/10" />
+                  ) : user ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/10 text-base font-semibold uppercase">
+                          {initials}
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold">{user.name || user.email}</div>
+                          <div className="text-xs text-white/60">Signed in</div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs font-medium">
+                          <div className="flex items-center justify-between text-white/70">
+                            <span>Current plan</span>
+                            <span className="inline-block size-2 rounded-full bg-emerald-400" />
+                          </div>
+                          <div className="pt-2 text-base font-semibold">{plan}</div>
+                        </div>
+                        <Link
+                          href={lowCredits ? '/pricing' : '#'}
+                          onClick={() => setMenuOpen(false)}
+                          className={[
+                            'rounded-2xl border p-3 text-xs font-medium transition',
+                            lowCredits
+                              ? 'border-rose-400/40 bg-rose-400/20 text-rose-50 hover:bg-rose-400/30'
+                              : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white',
+                          ].join(' ')}
+                        >
+                          <div className="flex items-center justify-between text-white/70">
+                            <span>Credits</span>
+                            {lowCredits && (
+                              <span className="rounded-full bg-rose-400/80 px-2 py-0.5 text-[11px] font-semibold text-rose-50">
+                                Low
+                              </span>
+                            )}
+                          </div>
+                          <motion.div
+                            key={`mobile-${creditPulseRef.current}`}
+                            initial={{ scale: 1.1 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+                            className="pt-2 text-2xl font-semibold"
+                          >
+                            {credits}
+                          </motion.div>
+                        </Link>
+                      </div>
+                      <div className="flex flex-col gap-3 pt-1 sm:flex-row">
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setMenuOpen(false)}
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
+                        >
+                          🚀 Launch Studio
+                        </Link>
+                        <button
+                          onClick={() => {
+                            setMenuOpen(false);
+                            handleLogout();
+                          }}
+                          className="inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Link
+                      href="/login"
+                      onClick={() => setMenuOpen(false)}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
+                    >
+                      Sign in
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 px-5 py-4 text-xs text-white/50">
+                © {new Date().getFullYear()} AI Studio. Crafted for visionaries.
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+
   return (
     <header
       className={[
@@ -371,169 +543,7 @@ export default function Navbar() {
         </nav>
       </div>
 
-      <AnimatePresence>
-        {menuOpen && (
-          <>
-            <motion.div
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setMenuOpen(false)}
-            />
-            <motion.div
-              className="fixed inset-x-4 top-24 bottom-6 z-50 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#120b25] via-[#100a1f] to-[#090611] text-white shadow-[0_40px_90px_-30px_rgba(12,6,25,0.9)]"
-              role="dialog"
-              aria-modal="true"
-              initial={{ opacity: 0, y: 60 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 60 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 24 }}
-              style={drawerSafeInsets}
-            >
-              <div className="relative flex h-full flex-col">
-                <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
-                  <div className="inline-flex items-center gap-3">
-                    <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-indigo-500">
-                      <svg width="18" height="18" viewBox="0 0 24 24" className="text-white">
-                        <path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" fill="currentColor" />
-                      </svg>
-                    </span>
-                    <div className="leading-tight">
-                      <div className="text-xs font-semibold uppercase tracking-[0.28em] text-white/60">AI Studio</div>
-                      <div className="text-base font-semibold">Creative Suite</div>
-                    </div>
-                  </div>
-                  <button
-                    className="inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur transition hover:bg-white/20"
-                    onClick={() => setMenuOpen(false)}
-                    aria-label="Close menu"
-                  >
-                    <XMarkIcon className="h-6 w-6" />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
-                  <ul className="space-y-2">
-                    {LINKS.map((l) => (
-                      <li key={l.href}>
-                        <Link
-                          href={l.href}
-                          onClick={() => setMenuOpen(false)}
-                          className={[
-                            'flex items-center justify-between rounded-2xl border px-4 py-4 text-base font-medium transition',
-                            isActive(l.href)
-                              ? 'border-white/20 bg-white/10 text-white'
-                              : 'border-white/5 bg-white/5 text-white/80 hover:border-white/15 hover:bg-white/10 hover:text-white',
-                          ].join(' ')}
-                        >
-                          <span>{l.label}</span>
-                          {isActive(l.href) && (
-                            <span className="size-2 rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
-                          )}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    onClick={toggleTheme}
-                    className="mt-6 flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
-                  >
-                    <span>{dark ? 'Switch to Light mode' : 'Switch to Dark mode'}</span>
-                    {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-                  </button>
-
-                  <div className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-                    {loading ? (
-                      <div className="h-12 w-full rounded-2xl bg-white/10" />
-                    ) : user ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <div className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/10 text-base font-semibold uppercase">
-                            {initials}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold">{user.name || user.email}</div>
-                            <div className="text-xs text-white/60">Signed in</div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs font-medium">
-                            <div className="flex items-center justify-between text-white/70">
-                              <span>Current plan</span>
-                              <span className="inline-block size-2 rounded-full bg-emerald-400" />
-                            </div>
-                            <div className="pt-2 text-base font-semibold">{plan}</div>
-                          </div>
-                          <Link
-                            href={lowCredits ? '/pricing' : '#'}
-                            onClick={() => setMenuOpen(false)}
-                            className={[
-                              'rounded-2xl border p-3 text-xs font-medium transition',
-                              lowCredits
-                                ? 'border-rose-400/40 bg-rose-400/20 text-rose-50 hover:bg-rose-400/30'
-                                : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white',
-                            ].join(' ')}
-                          >
-                            <div className="flex items-center justify-between text-white/70">
-                              <span>Credits</span>
-                              {lowCredits && (
-                                <span className="rounded-full bg-rose-400/80 px-2 py-0.5 text-[11px] font-semibold text-rose-50">
-                                  Low
-                                </span>
-                              )}
-                            </div>
-                            <motion.div
-                              key={`mobile-${creditPulseRef.current}`}
-                              initial={{ scale: 1.1 }}
-                              animate={{ scale: 1 }}
-                              transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-                              className="pt-2 text-2xl font-semibold"
-                            >
-                              {credits}
-                            </motion.div>
-                          </Link>
-                        </div>
-                        <div className="flex flex-col gap-3 pt-1 sm:flex-row">
-                          <Link
-                            href="/dashboard"
-                            onClick={() => setMenuOpen(false)}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
-                          >
-                            🚀 Launch Studio
-                          </Link>
-                          <button
-                            onClick={() => {
-                              setMenuOpen(false);
-                              handleLogout();
-                            }}
-                            className="inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
-                          >
-                            Logout
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Link
-                        href="/login"
-                        onClick={() => setMenuOpen(false)}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500 px-5 py-3 text-sm font-semibold shadow-lg shadow-fuchsia-500/30 transition hover:shadow-fuchsia-500/40"
-                      >
-                        Sign in
-                      </Link>
-                    )}
-                  </div>
-                </div>
-
-                <div className="border-t border-white/10 px-5 py-4 text-xs text-white/50">
-                  © {new Date().getFullYear()} AI Studio. Crafted for visionaries.
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {mounted && typeof document !== 'undefined' && createPortal(mobileMenu, document.body)}
     </header>
   );
 
