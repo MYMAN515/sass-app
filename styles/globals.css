@@ -5,3 +5,24 @@
 body {
   @apply font-sans bg-white text-gray-900 dark:bg-zinc-900 dark:text-white transition-colors duration-300;
 }
+
+:root {
+  --layout-inline-padding: clamp(1rem, 4vw, 3rem);
+}
+
+.layout-shell__content {
+  width: 100%;
+  padding-left: var(--layout-inline-padding);
+  padding-right: var(--layout-inline-padding);
+}
+
+@media (min-width: 1280px) {
+  .layout-shell__content {
+    padding-left: clamp(3rem, 6vw, 5rem);
+    padding-right: clamp(3rem, 6vw, 5rem);
+  }
+}
+
+.layout-shell__content :is(.max-w-6xl, .max-w-7xl) {
+  max-width: 100%;
+}
