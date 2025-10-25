@@ -271,15 +271,32 @@ function HeroContent() {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="mb-6 rounded-2xl border border-violet-500/40 bg-violet-900/60 px-6 py-5 text-base text-violet-100 shadow-[0_10px_40px_-20px_rgba(168,85,247,0.8)] backdrop-blur"
           >
-            <p className="flex flex-col gap-1 text-center font-semibold sm:flex-row sm:items-center sm:justify-center sm:gap-3">
+            <div className="flex flex-col items-center gap-3 text-center font-semibold sm:flex-row sm:items-center sm:justify-center sm:gap-4">
               <span className="text-2xl" aria-hidden>
                 🚀
               </span>
-              <span>
-                Hey Product Hunters! You just unlocked the AI photo studio that works harder than your third espresso.
-                Grab your free renders and let&apos;s make your launch page jealous.
-              </span>
-            </p>
+              <div className="space-y-3">
+                <p>
+                  Hey Product Hunters! You just unlocked the AI photo studio that works harder than your third espresso.
+                  Grab your free renders and let&apos;s make your launch page jealous.
+                </p>
+                <div className="flex justify-center">
+                  <a
+                    href="https://www.producthunt.com/products/ai-store-assistant?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-ai-store-assistant"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <img
+                      src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1030324&theme=light&t=1761371914824"
+                      alt="Ai Store Assistant - AI that Designs, Enhances, and Sells for You | Product Hunt"
+                      width="250"
+                      height="54"
+                      style={{ width: "250px", height: "54px" }}
+                    />
+                  </a>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
         <motion.div
