@@ -238,7 +238,7 @@ export default function Navbar() {
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"
         aria-hidden
       />
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4 sm:px-6 lg:px-10">
         <nav className="relative flex w-full flex-wrap items-center justify-between gap-3 gap-y-4 text-white py-3 sm:flex-nowrap sm:gap-4 sm:gap-y-0 sm:py-0 sm:h-20">
           <Link href="/" className="group inline-flex flex-shrink-0 items-center gap-3">
             <span className="relative grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-indigo-500 shadow-lg shadow-fuchsia-500/25">
