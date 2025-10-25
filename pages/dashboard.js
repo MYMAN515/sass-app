@@ -241,7 +241,7 @@ const MODELS = [
 ];
 
 const VIDEO_RESOLUTION_COSTS = {
-  '480p': 1,
+  '480p': 2,
   '720p': 3,
   '1080p': 5,
 };
@@ -462,9 +462,17 @@ export default function Dashboard() {
   const creditsNumber =
     typeof credits === 'number' && Number.isFinite(credits) ? Math.max(credits, 0) : null;
   const insufficientCredits = creditsNumber !== null && creditsNumber < videoCost;
-  const proLocked = plan !== 'Pro';
+  const isProPlan = plan === 'Pro';
+  const videoPlanLocked = !isProPlan && videoResolution !== '480p';
   const canShowVideoPanel = tool === 'tryon' && !!currentTryOnImage;
-  const makeVideoDisabled = proLocked || !currentTryOnImage || insufficientCredits || videoBusy;
+  const makeVideoDisabled =
+    !currentTryOnImage || insufficientCredits || videoBusy || videoPlanLocked;
+
+  useEffect(() => {
+    if (!isProPlan && videoResolution !== '480p') {
+      setVideoResolution('480p');
+    }
+  }, [isProPlan, videoResolution]);
 
   /* ---------- auth/init ---------- */
   useEffect(() => {
@@ -930,7 +938,7 @@ const buildTryOnPrompt = (items = []) => {
   }, [rbFile, rbData, rbLocal, toasts]);
 
   const handleMakeVideo = useCallback(async () => {
-    if (!currentTryOnImage || proLocked || videoBusy) return;
+    if (!currentTryOnImage || videoBusy || videoPlanLocked) return;
     setVideoError('');
     setVideoBusy(true);
     setVideoUrl('');
@@ -1004,7 +1012,6 @@ const buildTryOnPrompt = (items = []) => {
     }
   }, [
     currentTryOnImage,
-    proLocked,
     videoBusy,
     toasts,
     videoPrompt,
@@ -1015,6 +1022,7 @@ const buildTryOnPrompt = (items = []) => {
     videoFps,
     videoDuration,
     videoCost,
+    videoPlanLocked,
   ]);
 
   /* ---------- UI helpers ---------- */
@@ -1797,12 +1805,7 @@ const buildTryOnPrompt = (items = []) => {
                         </div>
                       )}
 
-                      <div
-                        className={[
-                          'mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
-                          proLocked ? 'opacity-50 pointer-events-none select-none' : '',
-                        ].join(' ')}
-                      >
+                      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                         <div className="space-y-3">
                           <div>
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300/80">
@@ -1811,24 +1814,38 @@ const buildTryOnPrompt = (items = []) => {
                             <div className="mt-2 flex flex-wrap gap-2">
                               {Object.entries(VIDEO_RESOLUTION_COSTS).map(([res, cost]) => {
                                 const active = videoResolution === res;
+                                const resolutionLocked = !isProPlan && res !== '480p';
                                 return (
                                   <button
                                     key={res}
                                     onClick={() => setVideoResolution(res)}
-                                    disabled={videoBusy}
+                                    disabled={videoBusy || resolutionLocked}
                                     className={[
                                       'px-3 py-1.5 text-xs rounded-xl border transition focus:outline-none focus:ring-2 focus:ring-violet-400/60',
                                       active
                                         ? 'bg-white text-zinc-900 border-white'
-                                        : 'border-white/15 bg-white/5 text-zinc-200 hover:bg-white/10',
+                                        : [
+                                            'border-white/15 bg-white/5 text-zinc-200',
+                                            resolutionLocked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10',
+                                          ].join(' '),
                                     ].join(' ')}
                                   >
                                     <div className="font-semibold">{res.toUpperCase()}</div>
                                     <div className="text-[10px] text-zinc-300/80">{cost} credit{cost > 1 ? 's' : ''}</div>
+                                    {resolutionLocked && (
+                                      <div className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-violet-200">
+                                        Pro
+                                      </div>
+                                    )}
                                   </button>
                                 );
                               })}
                             </div>
+                            {!isProPlan && (
+                              <div className="mt-2 text-[10px] text-zinc-300/70">
+                                Upgrade to Pro to unlock HD video resolutions.
+                              </div>
+                            )}
                           </div>
 
                           <div>
@@ -1889,15 +1906,15 @@ const buildTryOnPrompt = (items = []) => {
                         </div>
                       </div>
 
-                      {!proLocked && creditsNumber !== null && (
+                      {creditsNumber !== null && (
                         <div className="mt-3 text-[11px] text-zinc-200">
                           Cost: {videoCost} credit{videoCost > 1 ? 's' : ''} · Remaining credits: {creditsNumber}
                         </div>
                       )}
-                      {!proLocked && creditsNumber === null && (
+                      {creditsNumber === null && (
                         <div className="mt-3 text-[11px] text-zinc-300/70">Credits balance syncing…</div>
                       )}
-                      {insufficientCredits && !proLocked && (
+                      {insufficientCredits && (
                         <div className="mt-2 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-lg px-3 py-2">
                           You need {videoCost} credit{videoCost > 1 ? 's' : ''} to render this video.
                         </div>
@@ -1924,17 +1941,6 @@ const buildTryOnPrompt = (items = []) => {
                         )}
                       </div>
 
-                      {proLocked && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 backdrop-blur-sm text-center px-6">
-                          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white">
-                            <SparkleIcon className="w-4 h-4 text-violet-200" />
-                            Pro Only
-                          </div>
-                          <div className="text-xs text-zinc-200 max-w-xs">
-                            Animated try-on videos are exclusive to Pro members.
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
