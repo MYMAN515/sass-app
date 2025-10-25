@@ -125,10 +125,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (userData.plan !== 'Pro') {
-      return res.status(403).json({ error: 'This feature is available for Pro members only.' });
-    }
-
     const normalizedResolution = (typeof resolution === 'string' ? resolution.toLowerCase() : '1080p')
       .replace(/\s+/g, '')
       .replace(/[^0-9p]/gi, '')
@@ -137,6 +133,15 @@ export default async function handler(req, res) {
       normalizedResolution === '480p' || normalizedResolution === '720p' || normalizedResolution === '1080p'
         ? normalizedResolution
         : '1080p';
+
+    const isProMember = userData.plan === 'Pro';
+    const isFreeMember = userData.plan === 'Free';
+
+    if (!isProMember) {
+      if (!isFreeMember || chosenResolution !== '480p') {
+        return res.status(403).json({ error: 'This feature is available for Pro members only.' });
+      }
+    }
 
     const cost = RESOLUTION_COSTS[chosenResolution];
     const currentCredits = Number.isFinite(userData.credits) ? userData.credits : 0;
