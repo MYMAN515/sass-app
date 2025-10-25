@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef, useState, memo } from "react";
 import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
+import { useRouter } from "next/router";
 
 /**
  * Ultra Landing v2 — JSX
@@ -246,10 +247,41 @@ function HeroContent() {
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], [0, -100]);
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const router = useRouter();
+  const [showProductHuntHello, setShowProductHuntHello] = useState(false);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const refParam = router.query.ref;
+    const referral = Array.isArray(refParam) ? refParam[0] : refParam;
+    if (typeof referral === "string" && referral.toLowerCase() === "producthunt") {
+      setShowProductHuntHello(true);
+    } else {
+      setShowProductHuntHello(false);
+    }
+  }, [router.isReady, router.query.ref]);
 
   return (
     <motion.section style={{ y, opacity }} className="relative z-10 px-6 pt-28 pb-24 md:px-12 lg:px-20 lg:pt-36">
       <div className="mx-auto max-w-7xl">
+        {showProductHuntHello && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-6 rounded-2xl border border-violet-500/40 bg-violet-900/60 px-6 py-5 text-base text-violet-100 shadow-[0_10px_40px_-20px_rgba(168,85,247,0.8)] backdrop-blur"
+          >
+            <p className="flex flex-col gap-1 text-center font-semibold sm:flex-row sm:items-center sm:justify-center sm:gap-3">
+              <span className="text-2xl" aria-hidden>
+                🚀
+              </span>
+              <span>
+                Hey Product Hunters! You just unlocked the AI photo studio that works harder than your third espresso.
+                Grab your free renders and let&apos;s make your launch page jealous.
+              </span>
+            </p>
+          </motion.div>
+        )}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
