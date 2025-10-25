@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Poppins } from 'next/font/google';
 import { mirrorToStorage } from '@/lib/mirrorToStorage';
 import { createHistory } from '@/lib/historyClient';
+import { isAbortError } from '@/lib/isAbortError';
 
 const poppins = Poppins({ subsets: ['latin'], weight: ['400','600','700'], display: 'swap' });
 
@@ -148,6 +149,8 @@ export default function TryOnPage(){
   const [supabase] = useState(() => createPagesBrowserClient());
   const [dragActive, setDragActive] = useState(false);
   const [state, dispatch] = useReducer(reducer, initialState);
+  const requestControllerRef = useRef(null);
+  const activeRequestRef = useRef(null);
 
   const { userEmail, userId, userPlan, previewUrl, file, resultUrl,
           loading, progress, showCustomizer, options, toast } = state;
@@ -167,6 +170,10 @@ export default function TryOnPage(){
       dispatch({ type:'SESSION', payload:{ session, userEmail: email, userId: uid, userPlan: userData?.plan || 'Free' }});
     })();
   },[supabase]);
+
+  useEffect(() => () => {
+    requestControllerRef.current?.abort();
+  }, []);
 
   // Cleanup preview URL
   useEffect(()=>()=>{ if(previewUrl) URL.revokeObjectURL(previewUrl); },[previewUrl]);
@@ -205,22 +212,39 @@ export default function TryOnPage(){
     if(!file)      return dispatch({ type:'TOAST', payload:{ show:true, message:'Please upload an image.', type:'error' }});
     if(!userEmail) return dispatch({ type:'TOAST', payload:{ show:true, message:'User not logged in. Please login again.', type:'error' }});
 
-    dispatch({ type:'LOADING', payload:true });
-    dispatch({ type:'PROGRESS', payload:12 });
+    const selectedOptions = customOptions || options;
+    const prompt = generateDynamicPrompt(selectedOptions);
 
-    const prompt = generateDynamicPrompt(customOptions || options);
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    const requestToken = Symbol('tryon-request');
+    activeRequestRef.current = requestToken;
+
+    const isActive = () => activeRequestRef.current === requestToken && !controller.signal.aborted;
+    const safeDispatch = (action) => { if (isActive()) dispatch(action); };
+    const safeToast = (payload) => safeDispatch({ type:'TOAST', payload });
+    const safeTimeout = (fn, delay) => setTimeout(() => { if (isActive()) fn(); }, delay);
+
+    safeDispatch({ type:'LOADING', payload:true });
+    safeDispatch({ type:'PROGRESS', payload:12 });
 
     try{
       const imageUrl = await uploadImageToSupabase(file);
-      dispatch({ type:'PROGRESS', payload:40 });
+      if(!isActive()) return;
+
+      safeDispatch({ type:'PROGRESS', payload:40 });
 
       const res = await fetch('/api/tryon',{
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ imageUrl, prompt, user_email: userEmail }),
+        signal: controller.signal,
       });
 
-      dispatch({ type:'PROGRESS', payload:75 });
+      if(!isActive()) return;
+
+      safeDispatch({ type:'PROGRESS', payload:75 });
 
       const text = await res.text();
       let data;
@@ -229,35 +253,56 @@ export default function TryOnPage(){
       }
 
       if(!res.ok){
-        dispatch({ type:'TOAST', payload:{ show:true, message: data?.error ? `Server Error: ${data.error}` : 'Unknown server error', type:'error' }});
-        dispatch({ type:'LOADING', payload:false });
+        if(!isActive()) return;
+        safeToast({ show:true, message: data?.error ? `Server Error: ${data.error}` : 'Unknown server error', type:'error' });
         return;
       }
-            const mirrored = await mirrorToStorage({ url: data.image });
-
-// 2) نحط الرابط الجديد في الـ state
-dispatch({ type: 'RESULT', payload: { resultUrl: mirrored.publicUrl } });
-
-// 3) نحفظ في history
-await createHistory({
-  kind: 'tryon',
-  input_url: imageUrl,
-  output_url: mirrored.publicUrl,
-  prompt,
-  options: { ...options, source_url: data.image, storage_path: mirrored.path },
-  credits_used: 1,
-  status: 'success',
-});
+      if(!isActive()) return;
 
       const image = Array.isArray(data.image) ? data.image[0] : data.image;
-      dispatch({ type:'RESULT', payload:{ resultUrl: image }});
-      dispatch({ type:'TOAST', payload:{ show:true, message:'Try-On complete!', type:'success' }});
-      dispatch({ type:'PROGRESS', payload:100 });
+      if(!image){
+        safeToast({ show:true, message:'Try-On failed: missing image result.', type:'error' });
+        return;
+      }
+
+      let publicUrl = image;
+      let mirroredMeta = null;
+      try {
+        const mirrored = await mirrorToStorage({ url: image });
+        mirroredMeta = mirrored;
+        if (mirrored?.publicUrl) {
+          publicUrl = mirrored.publicUrl;
+          if(!isActive()) return;
+        }
+      } catch (mirrorErr) {
+        console.warn('Failed to mirror image', mirrorErr);
+      }
+
+      if(!isActive()) return;
+
+      safeDispatch({ type:'RESULT', payload:{ resultUrl: publicUrl }});
+      safeToast({ show:true, message:'Try-On complete!', type:'success' });
+      safeDispatch({ type:'PROGRESS', payload:100 });
+
+      Promise.resolve(
+        createHistory({
+          kind: 'tryon',
+          input_url: imageUrl,
+          output_url: publicUrl,
+          prompt,
+          options: { ...selectedOptions, source_url: image, storage_path: mirroredMeta?.path },
+          credits_used: 1,
+          status: 'success',
+        })
+      ).catch((historyErr) => console.warn('Failed to save history', historyErr));
     }catch(err){
-      dispatch({ type:'TOAST', payload:{ show:true, message: err.message, type:'error' }});
+      if(isAbortError(err) || !isActive()) return;
+      safeToast({ show:true, message: err.message, type:'error' });
     }finally{
-      dispatch({ type:'LOADING', payload:false });
-      setTimeout(()=>dispatch({ type:'PROGRESS', payload:null }), 700);
+      if(isActive()){
+        safeDispatch({ type:'LOADING', payload:false });
+        safeTimeout(()=>safeDispatch({ type:'PROGRESS', payload:null }), 700);
+      }
     }
   }
 
