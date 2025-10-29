@@ -103,7 +103,7 @@ export default function Footer() {
         />
       </div>
 
-      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-16 px-6 py-16 sm:px-10 lg:px-16">
+      <div className="relative flex w-full flex-col gap-16 px-6 py-16 sm:px-10 lg:px-16">
         {/* Top CTA */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}

@@ -26,13 +26,13 @@ export default function Layout({
 
   const metaDescription = description || DEFAULT_DESCRIPTION;
   const mainClasses = [
-    'flex-1 px-4 md:px-10 pt-[5.5rem]',
+    'flex-1 w-full pt-[5.5rem] layout-shell__content',
     className,
   ].filter(Boolean).join(' ');
 
   return (
     <AnimatePresence mode="wait">
-      <div className="min-h-screen flex flex-col bg-[#0B0F19] text-[#F1F5F9]">
+      <div className="layout-shell min-h-screen w-full overflow-x-hidden flex flex-col bg-[#0B0F19] text-[#F1F5F9]">
         <Head>
           <title>{computedTitle}</title>
           <meta name="description" content={metaDescription} />
