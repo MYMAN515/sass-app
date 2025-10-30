@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoonIcon, SunIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/solid';
@@ -18,7 +18,8 @@ const LINKS = [
 
 export default function Navbar() {
   const router = useRouter();
-  const pathname = usePathname();
+  const rawPath = router?.asPath || router?.pathname || '/';
+  const pathname = rawPath.split('?')[0].split('#')[0];
   const [supabase] = useState(() => createPagesBrowserClient());
 
   const [scrolled, setScrolled] = useState(false);
@@ -33,10 +34,13 @@ export default function Navbar() {
   const creditPulseRef = useRef(0); // لتوليد key مختلف عند التغيير للأنيميشن
 
   // لماذا: تمييز الرابط الحالي بصريًا
-  const isActive = useCallback((href) => {
-    if (href === '/') return pathname === '/';
-    return pathname?.startsWith(href);
-  }, [pathname]);
+  const isActive = useCallback(
+    (href) => {
+      if (href === '/') return pathname === '/';
+      return pathname?.startsWith(href);
+    },
+    [pathname]
+  );
 
   // Theme init
   useEffect(() => {
